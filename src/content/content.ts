@@ -424,7 +424,7 @@ function updateStatsDisplay(grade: 0 | 1 | 2 | 3) {
 /**
  * Build stats bar HTML for the quiz
  */
-function buildStatsHTML(): string {
+function buildStatsHTML(deckName?: string): string {
   const { todayTotal, todayCorrect, sessionCorrect, sessionIncorrect, currentStreak } = sessionStats;
   
   // Calculate accuracy percentage
@@ -438,6 +438,7 @@ function buildStatsHTML(): string {
   const rowStyle = `display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 0 16px 0; margin-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.1);`;
   const pillBase = `display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 100px; cursor: help;`;
   
+  const purpleStyle = `${pillBase} background: #f3e8ff; color: #7c3aed;`;
   const blueStyle = `${pillBase} background: #e0f2fe; color: #0369a1;`;
   const greenStyle = `${pillBase} background: #dcfce7; color: #15803d;`;
   const tealStyle = `${pillBase} background: #ccfbf1; color: #0f766e;`;
@@ -446,8 +447,12 @@ function buildStatsHTML(): string {
   
   const sessionStyle = sessionScore >= 0 ? tealStyle : redStyle;
   
+  // Truncate deck name if too long
+  const displayDeck = deckName ? (deckName.length > 20 ? deckName.substring(0, 18) + '...' : deckName) : null;
+  
   return `
     <div style="${rowStyle}">
+      ${displayDeck ? `<span style="${purpleStyle}" data-tooltip="Current deck: ${escapeHTML(deckName || '')}">${escapeHTML(displayDeck)}</span>` : ''}
       <span style="${blueStyle}" data-tooltip="${todayTotal} questions answered (${todayCorrect} correct)">${todayTotal} today</span>
       <span style="${greenStyle}" data-tooltip="${accuracy}% of answers correct">${accuracy}%</span>
       <span style="${sessionStyle}" data-tooltip="Session: ${sessionCorrect} correct, ${sessionIncorrect} wrong">${sessionScoreDisplay}</span>
@@ -516,8 +521,8 @@ function buildQuizHTML(card: Card): string {
       break;
   }
   
-  // Build stats bar
-  const statsHTML = buildStatsHTML();
+  // Build stats bar with deck name
+  const statsHTML = buildStatsHTML(card.deckId);
   
   return `
     <div class="scrolllearn-quiz" role="dialog" aria-modal="true" aria-labelledby="ss-question">
