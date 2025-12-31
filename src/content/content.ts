@@ -522,7 +522,7 @@ function buildQuizHTML(card: Card): string {
   }
   
   // Build stats bar with deck name
-  const statsHTML = buildStatsHTML(card.deckId);
+  const statsHTML = buildStatsHTML(card.deckName || card.deckId);
   
   return `
     <div class="scrolllearn-quiz" role="dialog" aria-modal="true" aria-labelledby="ss-question">

@@ -6,6 +6,7 @@ export type Grade = 0 | 1 | 2 | 3;
 export interface Card {
   id: string;
   deckId: string;
+  deckName?: string; // Populated when fetched for quiz
   kind: CardKind;
   front: string;
   back: string;

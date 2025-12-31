@@ -170,11 +170,17 @@ async function handleGetNextCard(domain: string): Promise<Response<Card | null>>
     // Sort for optimal review order
     const sorted = sortCardsForReview(dueCards);
     
+    // Get all decks to lookup deck names
+    const decks = await storage.getDecks();
+    const deckMap = new Map(decks.map(d => [d.id, d.name]));
+    
     // Find first card that isn't snoozed
     for (const card of sorted) {
       if (!(await storage.isCardSnoozed(card.id))) {
         console.log('[ScrollLearn Background] Returning card:', card.front.substring(0, 30));
-        return { ok: true, data: card };
+        // Add deck name to the card
+        const deckName = deckMap.get(card.deckId) || card.deckId;
+        return { ok: true, data: { ...card, deckName } };
       }
     }
     
