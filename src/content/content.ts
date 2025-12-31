@@ -434,12 +434,24 @@ function buildStatsHTML(): string {
   const sessionScore = sessionCorrect - sessionIncorrect;
   const sessionScoreDisplay = sessionScore >= 0 ? `+${sessionScore}` : `${sessionScore}`;
   
+  // Inline styles to override Facebook CSS
+  const rowStyle = `display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 0 16px 0; margin-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.1);`;
+  const pillBase = `display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 100px; cursor: help;`;
+  
+  const blueStyle = `${pillBase} background: #e0f2fe; color: #0369a1;`;
+  const greenStyle = `${pillBase} background: #dcfce7; color: #15803d;`;
+  const tealStyle = `${pillBase} background: #ccfbf1; color: #0f766e;`;
+  const redStyle = `${pillBase} background: #fee2e2; color: #b91c1c;`;
+  const orangeStyle = `${pillBase} background: #ffedd5; color: #c2410c;`;
+  
+  const sessionStyle = sessionScore >= 0 ? tealStyle : redStyle;
+  
   return `
-    <div class="scrolllearn-stats-row">
-      <span class="scrolllearn-stat-pill scrolllearn-stat-blue" data-tooltip="${todayTotal} questions answered (${todayCorrect} correct)">${todayTotal} today</span>
-      <span class="scrolllearn-stat-pill scrolllearn-stat-green" data-tooltip="${accuracy}% of answers correct">${accuracy}%</span>
-      <span class="scrolllearn-stat-pill ${sessionScore >= 0 ? 'scrolllearn-stat-teal' : 'scrolllearn-stat-red'}" data-tooltip="Session: ${sessionCorrect} correct, ${sessionIncorrect} wrong">${sessionScoreDisplay}</span>
-      ${currentStreak > 0 ? `<span class="scrolllearn-stat-pill scrolllearn-stat-orange" data-tooltip="${currentStreak} day learning streak!">${currentStreak} streak</span>` : ''}
+    <div style="${rowStyle}">
+      <span style="${blueStyle}" data-tooltip="${todayTotal} questions answered (${todayCorrect} correct)">${todayTotal} today</span>
+      <span style="${greenStyle}" data-tooltip="${accuracy}% of answers correct">${accuracy}%</span>
+      <span style="${sessionStyle}" data-tooltip="Session: ${sessionCorrect} correct, ${sessionIncorrect} wrong">${sessionScoreDisplay}</span>
+      ${currentStreak > 0 ? `<span style="${orangeStyle}" data-tooltip="${currentStreak} day learning streak!">${currentStreak} streak</span>` : ''}
     </div>
   `;
 }
