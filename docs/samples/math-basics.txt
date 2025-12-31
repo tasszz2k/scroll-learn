@@ -1,0 +1,20 @@
+# Math Basics - Simple Format
+# Great for quick mental math practice
+
+[deck:Math Basics]
+What is the square root of 144?|12
+What is 15 squared?|225
+What is the value of pi (to 2 decimal places)?|3.14
+What is 7 x 8?|56
+What is 12 x 12?|144
+What is 25% of 200?|50
+What is 3/4 as a decimal?|0.75
+What is 2^10?|1024
+What is the sum of angles in a triangle?|180 degrees
+What is the formula for area of a circle?|pi r squared
+What is 17 + 28?|45
+What is 100 - 37?|63
+What is 144 / 12?|12
+What is 9 cubed?|729
+What is the square root of 256?|16
+

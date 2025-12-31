@@ -1,0 +1,17 @@
+deck,kind,front,back,options,correct,fuzziness,mediaUrl,tags
+World Capitals,text,What is the capital of France?,Paris,,,0.85,,geography|europe
+World Capitals,text,What is the capital of Japan?,Tokyo,,,0.85,,geography|asia
+World Capitals,text,What is the capital of Australia?,Canberra,,,0.85,,geography|oceania
+World Capitals,text,What is the capital of Brazil?,Brasilia,,,0.85,,geography|south-america
+World Capitals,text,What is the capital of Canada?,Ottawa,,,0.85,,geography|north-america
+World Capitals,text,What is the capital of Germany?,Berlin,,,0.85,,geography|europe
+World Capitals,text,What is the capital of Italy?,Rome,,,0.85,,geography|europe
+World Capitals,text,What is the capital of Spain?,Madrid,,,0.85,,geography|europe
+World Capitals,text,What is the capital of China?,Beijing,,,0.85,,geography|asia
+World Capitals,text,What is the capital of India?,New Delhi,,,0.85,,geography|asia
+World Capitals,text,What is the capital of Russia?,Moscow,,,0.85,,geography|europe
+World Capitals,text,What is the capital of South Korea?,Seoul,,,0.85,,geography|asia
+World Capitals,text,What is the capital of Mexico?,Mexico City,,,0.85,,geography|north-america
+World Capitals,text,What is the capital of Egypt?,Cairo,,,0.85,,geography|africa
+World Capitals,text,What is the capital of South Africa?,Pretoria,,,0.85,,geography|africa
+

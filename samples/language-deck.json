@@ -1,0 +1,105 @@
+{
+  "deck": {
+    "name": "Spanish Basics",
+    "description": "Common Spanish words and phrases for beginners"
+  },
+  "cards": [
+    {
+      "kind": "text",
+      "front": "How do you say 'Hello' in Spanish?",
+      "back": "Hola",
+      "tags": ["greetings", "basics"]
+    },
+    {
+      "kind": "text",
+      "front": "How do you say 'Goodbye' in Spanish?",
+      "back": "Adios",
+      "tags": ["greetings", "basics"]
+    },
+    {
+      "kind": "text",
+      "front": "How do you say 'Thank you' in Spanish?",
+      "back": "Gracias",
+      "tags": ["basics", "polite"]
+    },
+    {
+      "kind": "text",
+      "front": "How do you say 'Please' in Spanish?",
+      "back": "Por favor",
+      "tags": ["basics", "polite"]
+    },
+    {
+      "kind": "mcq-single",
+      "front": "What does 'Buenos dias' mean?",
+      "back": "Good morning",
+      "options": ["Good morning", "Good night", "Good afternoon", "Goodbye"],
+      "correct": 0,
+      "tags": ["greetings", "time"]
+    },
+    {
+      "kind": "mcq-single",
+      "front": "What does 'Buenas noches' mean?",
+      "back": "Good night",
+      "options": ["Good morning", "Good night", "Good afternoon", "Hello"],
+      "correct": 1,
+      "tags": ["greetings", "time"]
+    },
+    {
+      "kind": "cloze",
+      "front": "The Spanish word for 'water' is {{agua}}",
+      "back": "agua",
+      "tags": ["vocabulary", "food"]
+    },
+    {
+      "kind": "cloze",
+      "front": "To say 'I love you' in Spanish, you say 'Te {{quiero}}'",
+      "back": "quiero",
+      "tags": ["phrases", "emotions"]
+    },
+    {
+      "kind": "text",
+      "front": "What is 'one' in Spanish?",
+      "back": "Uno",
+      "tags": ["numbers"]
+    },
+    {
+      "kind": "text",
+      "front": "What is 'two' in Spanish?",
+      "back": "Dos",
+      "tags": ["numbers"]
+    },
+    {
+      "kind": "text",
+      "front": "What is 'three' in Spanish?",
+      "back": "Tres",
+      "tags": ["numbers"]
+    },
+    {
+      "kind": "mcq-multi",
+      "front": "Which of these are Spanish greetings? (Select all)",
+      "back": "Hola, Buenos dias, Buenas tardes",
+      "options": ["Hola", "Buenos dias", "Merci", "Buenas tardes", "Danke"],
+      "correct": [0, 1, 3],
+      "tags": ["greetings"]
+    },
+    {
+      "kind": "text",
+      "front": "How do you ask 'How are you?' in Spanish?",
+      "back": "Como estas",
+      "tags": ["greetings", "conversation"]
+    },
+    {
+      "kind": "text",
+      "front": "What does 'Mucho gusto' mean?",
+      "back": "Nice to meet you",
+      "tags": ["greetings", "polite"]
+    },
+    {
+      "kind": "text",
+      "front": "How do you say 'My name is...' in Spanish?",
+      "back": "Me llamo",
+      "tags": ["introduction", "basics"]
+    }
+  ]
+}
+

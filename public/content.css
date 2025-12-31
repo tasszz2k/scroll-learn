@@ -1,0 +1,472 @@
+/* ScrollLearn Injected Quiz Styles */
+/* These styles are injected into social media pages and isolated via Shadow DOM */
+
+.scrolllearn-quiz-container {
+  --ss-primary: #0ea5e9;
+  --ss-primary-dark: #0284c7;
+  --ss-accent: #d946ef;
+  --ss-success: #22c55e;
+  --ss-error: #ef4444;
+  --ss-warning: #f59e0b;
+  --ss-surface: #ffffff;
+  --ss-surface-dark: #f1f5f9;
+  --ss-text: #0f172a;
+  --ss-text-muted: #64748b;
+  --ss-border: #e2e8f0;
+  --ss-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --ss-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --ss-radius: 12px;
+  --ss-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  all: initial;
+  font-family: var(--ss-font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ss-text);
+  box-sizing: border-box;
+}
+
+.scrolllearn-quiz-container *,
+.scrolllearn-quiz-container *::before,
+.scrolllearn-quiz-container *::after {
+  box-sizing: border-box;
+}
+
+.scrolllearn-quiz {
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-border);
+  border-radius: var(--ss-radius);
+  box-shadow: var(--ss-shadow-lg);
+  padding: 20px;
+  margin: 16px 0;
+  max-width: 600px;
+  animation: ss-slideIn 0.3s ease-out;
+}
+
+@keyframes ss-slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scrolllearn-quiz-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ss-border);
+}
+
+.scrolllearn-quiz-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ss-primary);
+}
+
+.scrolllearn-quiz-brand svg {
+  width: 20px;
+  height: 20px;
+}
+
+.scrolllearn-quiz-deck {
+  font-size: 12px;
+  color: var(--ss-text-muted);
+  background: var(--ss-surface-dark);
+  padding: 4px 10px;
+  border-radius: 100px;
+}
+
+.scrolllearn-quiz-question {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ss-text);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.scrolllearn-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.scrolllearn-quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--ss-surface);
+  border: 2px solid var(--ss-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+}
+
+.scrolllearn-quiz-option:hover:not(.disabled) {
+  border-color: var(--ss-primary);
+  background: rgba(14, 165, 233, 0.05);
+}
+
+.scrolllearn-quiz-option:focus {
+  outline: none;
+  border-color: var(--ss-primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+.scrolllearn-quiz-option.selected {
+  border-color: var(--ss-primary);
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.scrolllearn-quiz-option.correct {
+  border-color: var(--ss-success);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.scrolllearn-quiz-option.incorrect {
+  border-color: var(--ss-error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.scrolllearn-quiz-option.disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.scrolllearn-quiz-option-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--ss-surface-dark);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-text-muted);
+  flex-shrink: 0;
+}
+
+.scrolllearn-quiz-option.selected .scrolllearn-quiz-option-key {
+  background: var(--ss-primary);
+  color: white;
+}
+
+.scrolllearn-quiz-option-text {
+  flex: 1;
+}
+
+.scrolllearn-quiz-option-indicator {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.scrolllearn-quiz-input-container {
+  margin-bottom: 16px;
+}
+
+.scrolllearn-quiz-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 2px solid var(--ss-border);
+  border-radius: 8px;
+  background: var(--ss-surface);
+  color: var(--ss-text);
+  transition: all 0.15s ease;
+}
+
+.scrolllearn-quiz-input:focus {
+  outline: none;
+  border-color: var(--ss-primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+.scrolllearn-quiz-input.correct {
+  border-color: var(--ss-success);
+}
+
+.scrolllearn-quiz-input.incorrect {
+  border-color: var(--ss-error);
+}
+
+.scrolllearn-quiz-cloze {
+  font-size: 16px;
+  line-height: 1.8;
+  margin-bottom: 16px;
+}
+
+.scrolllearn-quiz-cloze-blank {
+  display: inline-block;
+  min-width: 80px;
+  padding: 4px 12px;
+  margin: 0 4px;
+  border-bottom: 2px solid var(--ss-primary);
+  background: rgba(14, 165, 233, 0.05);
+  border-radius: 4px 4px 0 0;
+}
+
+.scrolllearn-quiz-cloze-blank input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  font-family: inherit;
+  color: var(--ss-text);
+  text-align: center;
+  outline: none;
+}
+
+.scrolllearn-quiz-audio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--ss-surface-dark);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.scrolllearn-quiz-audio-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--ss-primary);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scrolllearn-quiz-audio-btn:hover {
+  background: var(--ss-primary-dark);
+  transform: scale(1.05);
+}
+
+.scrolllearn-quiz-audio-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.scrolllearn-quiz-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  animation: ss-slideIn 0.2s ease-out;
+}
+
+.scrolllearn-quiz-feedback.success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.scrolllearn-quiz-feedback.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.scrolllearn-quiz-feedback.partial {
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.scrolllearn-quiz-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scrolllearn-quiz-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scrolllearn-quiz-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.3);
+}
+
+.scrolllearn-quiz-btn-primary {
+  background: var(--ss-primary);
+  color: white;
+}
+
+.scrolllearn-quiz-btn-primary:hover {
+  background: var(--ss-primary-dark);
+}
+
+.scrolllearn-quiz-btn-secondary {
+  background: var(--ss-surface-dark);
+  color: var(--ss-text);
+}
+
+.scrolllearn-quiz-btn-secondary:hover {
+  background: var(--ss-border);
+}
+
+.scrolllearn-quiz-btn-ghost {
+  background: transparent;
+  color: var(--ss-text-muted);
+}
+
+.scrolllearn-quiz-btn-ghost:hover {
+  background: var(--ss-surface-dark);
+  color: var(--ss-text);
+}
+
+.scrolllearn-quiz-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ss-border);
+}
+
+.scrolllearn-quiz-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--ss-text-muted);
+  background: transparent;
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scrolllearn-quiz-toolbar-btn:hover {
+  background: var(--ss-surface-dark);
+  color: var(--ss-text);
+}
+
+.scrolllearn-quiz-toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Scroll blocking overlay */
+.scrolllearn-scroll-blocker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  z-index: 9998;
+  animation: ss-fadeIn 0.2s ease-out;
+}
+
+@keyframes ss-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.scrolllearn-quiz-floating {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  width: 90%;
+  max-width: 500px;
+}
+
+/* Multi-select checkboxes */
+.scrolllearn-quiz-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--ss-border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.scrolllearn-quiz-option.selected .scrolllearn-quiz-checkbox {
+  background: var(--ss-primary);
+  border-color: var(--ss-primary);
+}
+
+.scrolllearn-quiz-option.selected .scrolllearn-quiz-checkbox::after {
+  content: '';
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-bottom: 2px;
+}
+
+/* Keyboard hint */
+.scrolllearn-quiz-keyboard-hint {
+  font-size: 11px;
+  color: var(--ss-text-muted);
+  margin-top: 12px;
+  text-align: center;
+}
+
+/* Progress indicator */
+.scrolllearn-quiz-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ss-text-muted);
+}
+
+.scrolllearn-quiz-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--ss-surface-dark);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.scrolllearn-quiz-progress-fill {
+  height: 100%;
+  background: var(--ss-primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+

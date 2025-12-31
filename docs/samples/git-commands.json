@@ -1,0 +1,108 @@
+[
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to initialize a new Git repository",
+    "back": "git init",
+    "tags": ["git", "basics"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to clone a remote repository",
+    "back": "git clone",
+    "tags": ["git", "basics"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to stage all changes for commit",
+    "back": "git add .",
+    "tags": ["git", "staging"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to commit staged changes with a message",
+    "back": "git commit -m",
+    "tags": ["git", "commit"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to push commits to remote repository",
+    "back": "git push",
+    "tags": ["git", "remote"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to pull changes from remote repository",
+    "back": "git pull",
+    "tags": ["git", "remote"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to create a new branch",
+    "back": "git branch or git checkout -b",
+    "tags": ["git", "branching"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to switch to a different branch",
+    "back": "git checkout or git switch",
+    "tags": ["git", "branching"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to merge a branch into current branch",
+    "back": "git merge",
+    "tags": ["git", "branching"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to view commit history",
+    "back": "git log",
+    "tags": ["git", "history"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to check current repository status",
+    "back": "git status",
+    "tags": ["git", "basics"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to discard changes in working directory",
+    "back": "git checkout -- or git restore",
+    "tags": ["git", "undo"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to unstage a file",
+    "back": "git reset HEAD or git restore --staged",
+    "tags": ["git", "undo"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to stash uncommitted changes",
+    "back": "git stash",
+    "tags": ["git", "stash"]
+  },
+  {
+    "deckName": "Git Commands",
+    "kind": "text",
+    "front": "Command to apply stashed changes",
+    "back": "git stash pop or git stash apply",
+    "tags": ["git", "stash"]
+  }
+]
+

@@ -1,0 +1,25 @@
+# JavaScript Fundamentals - Simple Format
+# Format: Question|Answer
+
+[deck:JavaScript Fundamentals]
+What keyword declares a block-scoped variable?|let
+What keyword declares a constant?|const
+What keyword declares a function-scoped variable?|var
+What method adds an element to the end of an array?|push
+What method removes the last element from an array?|pop
+What method adds an element to the beginning of an array?|unshift
+What method removes the first element from an array?|shift
+What does JSON stand for?|JavaScript Object Notation
+What method converts a JSON string to an object?|JSON.parse
+What method converts an object to a JSON string?|JSON.stringify
+What is the typeof null?|object
+What is the typeof undefined?|undefined
+What is the typeof NaN?|number
+What method checks if a value is NaN?|isNaN
+What is the result of 0.1 + 0.2 === 0.3?|false
+What operator checks both value and type?|===
+What is a closure?|A function with access to its outer scope
+What does the spread operator look like?|...
+What method creates a new array with transformed elements?|map
+What method filters elements based on a condition?|filter
+

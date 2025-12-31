@@ -1,0 +1,89 @@
+{
+  "deck": {
+    "name": "Programming Concepts",
+    "description": "Fundamental programming and computer science concepts"
+  },
+  "cards": [
+    {
+      "kind": "text",
+      "front": "What does API stand for?",
+      "back": "Application Programming Interface",
+      "tags": ["acronyms", "web"]
+    },
+    {
+      "kind": "text",
+      "front": "What is the time complexity of binary search?",
+      "back": "O(log n)",
+      "tags": ["algorithms", "complexity"]
+    },
+    {
+      "kind": "mcq-single",
+      "front": "Which data structure uses LIFO (Last In, First Out)?",
+      "back": "Stack",
+      "options": ["Queue", "Stack", "Array", "Linked List"],
+      "correct": 1,
+      "tags": ["data-structures"]
+    },
+    {
+      "kind": "mcq-single",
+      "front": "Which data structure uses FIFO (First In, First Out)?",
+      "back": "Queue",
+      "options": ["Queue", "Stack", "Tree", "Graph"],
+      "correct": 0,
+      "tags": ["data-structures"]
+    },
+    {
+      "kind": "cloze",
+      "front": "The four pillars of OOP are: Encapsulation, Inheritance, {{Polymorphism}}, and Abstraction",
+      "back": "Polymorphism",
+      "tags": ["oop", "concepts"]
+    },
+    {
+      "kind": "text",
+      "front": "What is the difference between == and === in JavaScript?",
+      "back": "== compares values with type coercion, === compares values and types strictly",
+      "tags": ["javascript", "operators"]
+    },
+    {
+      "kind": "mcq-multi",
+      "front": "Which are valid HTTP methods? (Select all)",
+      "back": "GET, POST, PUT, DELETE",
+      "options": ["GET", "POST", "SEND", "PUT", "FETCH", "DELETE"],
+      "correct": [0, 1, 3, 5],
+      "tags": ["web", "http"]
+    },
+    {
+      "kind": "text",
+      "front": "What does SQL stand for?",
+      "back": "Structured Query Language",
+      "tags": ["database", "acronyms"]
+    },
+    {
+      "kind": "cloze",
+      "front": "In Git, to create a new branch use: git {{checkout}} -b branch-name (or git switch -c)",
+      "back": "checkout",
+      "tags": ["git", "commands"]
+    },
+    {
+      "kind": "text",
+      "front": "What is the purpose of a foreign key in a database?",
+      "back": "To create a link between two tables by referencing the primary key of another table",
+      "tags": ["database", "sql"]
+    },
+    {
+      "kind": "mcq-single",
+      "front": "What is the worst-case time complexity of quicksort?",
+      "back": "O(n^2)",
+      "options": ["O(n)", "O(n log n)", "O(n^2)", "O(log n)"],
+      "correct": 2,
+      "tags": ["algorithms", "sorting"]
+    },
+    {
+      "kind": "text",
+      "front": "What is a closure in programming?",
+      "back": "A function that has access to variables from its outer scope even after the outer function has returned",
+      "tags": ["javascript", "concepts"]
+    }
+  ]
+}
+

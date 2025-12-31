@@ -1,0 +1,26 @@
+# Spanish Basics - Simple Format
+# Format: Question|Answer (use | as separator)
+# Lines starting with # are ignored
+
+[deck:Spanish Basics]
+Hello|Hola
+Goodbye|Adios
+Thank you|Gracias
+Please|Por favor
+Yes|Si
+No|No
+Good morning|Buenos dias
+Good night|Buenas noches
+How are you?|Como estas?
+I am fine|Estoy bien
+What is your name?|Como te llamas?
+My name is...|Me llamo...
+Nice to meet you|Mucho gusto
+Excuse me|Disculpe
+Sorry|Lo siento
+Water|Agua
+Food|Comida
+House|Casa
+Friend|Amigo
+Family|Familia
+

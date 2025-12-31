@@ -1,0 +1,92 @@
+[
+  {
+    "deckName": "React Concepts",
+    "kind": "text",
+    "front": "What hook is used for state management in functional components?",
+    "back": "useState",
+    "tags": ["react", "hooks"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "text",
+    "front": "What hook is used for side effects in React?",
+    "back": "useEffect",
+    "tags": ["react", "hooks"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "text",
+    "front": "What hook is used for accessing context?",
+    "back": "useContext",
+    "tags": ["react", "hooks"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "text",
+    "front": "What hook is used for memoizing expensive calculations?",
+    "back": "useMemo",
+    "tags": ["react", "hooks", "performance"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "text",
+    "front": "What hook is used for memoizing callback functions?",
+    "back": "useCallback",
+    "tags": ["react", "hooks", "performance"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "mcq-single",
+    "front": "What is the virtual DOM?",
+    "options": [
+      "A lightweight copy of the real DOM",
+      "A database for React",
+      "A styling framework",
+      "A testing library"
+    ],
+    "correct": [0],
+    "tags": ["react", "fundamentals"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "mcq-single",
+    "front": "Which method is used to render a React component to the DOM?",
+    "options": [
+      "ReactDOM.render() or createRoot().render()",
+      "React.display()",
+      "Component.show()",
+      "DOM.append()"
+    ],
+    "correct": [0],
+    "tags": ["react", "fundamentals"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "mcq-multi",
+    "front": "Which of the following are React hooks? (Select all that apply)",
+    "options": [
+      "useState",
+      "useEffect",
+      "useClass",
+      "useReducer",
+      "useComponent"
+    ],
+    "correct": [0, 1, 3],
+    "tags": ["react", "hooks"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "cloze",
+    "front": "In React, {{props}} are used to pass data from parent to child components.",
+    "back": "props",
+    "tags": ["react", "fundamentals"]
+  },
+  {
+    "deckName": "React Concepts",
+    "kind": "cloze",
+    "front": "The {{useRef}} hook is used to persist values across renders without causing re-renders.",
+    "back": "useRef",
+    "tags": ["react", "hooks"]
+  }
+]
+

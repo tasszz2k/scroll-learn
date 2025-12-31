@@ -1,0 +1,12 @@
+deck,kind,front,back,options,correct,fuzziness,mediaUrl,tags
+Programming MCQ,mcq-single,Which data structure uses LIFO (Last In First Out)?,,Stack|Queue|Array|Linked List,0,,,data-structures
+Programming MCQ,mcq-single,Which data structure uses FIFO (First In First Out)?,,Queue|Stack|Tree|Graph,0,,,data-structures
+Programming MCQ,mcq-single,What is the time complexity of binary search?,,O(log n)|O(n)|O(n^2)|O(1),0,,,algorithms
+Programming MCQ,mcq-single,Which sorting algorithm has the best average case complexity?,,Merge Sort O(n log n)|Bubble Sort O(n^2)|Selection Sort O(n^2)|Insertion Sort O(n^2),0,,,algorithms
+Programming MCQ,mcq-single,What does HTML stand for?,,HyperText Markup Language|High Tech Modern Language|Home Tool Markup Language|Hyperlink Text Management Language,0,,,web
+Programming MCQ,mcq-single,What does CSS stand for?,,Cascading Style Sheets|Computer Style Sheets|Creative Style System|Colorful Style Sheets,0,,,web
+Programming MCQ,mcq-single,Which HTTP method is used to update a resource?,,PUT|GET|DELETE|HEAD,0,,,web|api
+Programming MCQ,mcq-single,Which HTTP status code indicates success?,,200|404|500|301,0,,,web|api
+Programming MCQ,mcq-single,What is the default port for HTTPS?,,443|80|8080|3000,0,,,networking
+Programming MCQ,mcq-single,Which language is primarily used for iOS development?,,Swift|Kotlin|Java|C#,0,,,mobile
+
