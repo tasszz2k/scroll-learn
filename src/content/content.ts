@@ -24,6 +24,24 @@ let observer: MutationObserver | null = null;
 let currentCard: Card | null = null;
 let scrollBlockHandler: ((e: Event) => void) | null = null;
 
+// Session stats
+interface SessionStats {
+  todayTotal: number;
+  todayCorrect: number;
+  todayIncorrect: number;
+  sessionCorrect: number;
+  sessionIncorrect: number;
+  currentStreak: number;
+}
+let sessionStats: SessionStats = {
+  todayTotal: 0,
+  todayCorrect: 0,
+  todayIncorrect: 0,
+  sessionCorrect: 0,
+  sessionIncorrect: 0,
+  currentStreak: 0,
+};
+
 // Quiz container ID
 const QUIZ_CONTAINER_ID = 'scrolllearn-quiz-root';
 const BLOCKER_ID = 'scrolllearn-scroll-blocker';
@@ -100,6 +118,28 @@ async function loadSettings() {
     }
   } catch (error) {
     console.error('[ScrollLearn] Failed to load settings:', error);
+  }
+}
+
+/**
+ * Load today's stats from background
+ */
+async function loadTodayStats() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'get_stats' });
+    if (response.ok && response.data) {
+      const stats = response.data;
+      const today = new Date().toISOString().split('T')[0];
+      const todayData = stats.dailyStats?.find((d: { date: string }) => d.date === today);
+      if (todayData) {
+        sessionStats.todayTotal = todayData.reviews || 0;
+        sessionStats.todayCorrect = todayData.correct || 0;
+        sessionStats.todayIncorrect = todayData.incorrect || 0;
+      }
+      sessionStats.currentStreak = stats.currentStreak || 0;
+    }
+  } catch (error) {
+    console.error('[ScrollLearn] Failed to load stats:', error);
   }
 }
 
@@ -199,6 +239,9 @@ async function checkAndInjectQuiz() {
  */
 async function showQuiz() {
   if (isQuizActive) return;
+  
+  // Load today's stats before showing quiz
+  await loadTodayStats();
   
   console.log('[ScrollLearn] Requesting card from background...');
   
@@ -328,6 +371,98 @@ function preventScrollKeys(e: KeyboardEvent) {
 }
 
 /**
+ * Update the stats display with animation after answering
+ */
+function updateStatsDisplay(grade: 0 | 1 | 2 | 3) {
+  const statsContainer = document.querySelector('.scrolllearn-quiz-stats');
+  if (!statsContainer) return;
+  
+  const isCorrect = grade >= 2;
+  const scoreChange = isCorrect ? '+1' : '-1';
+  const scoreClass = isCorrect ? 'correct' : 'incorrect';
+  
+  // Create floating score indicator
+  const indicator = document.createElement('div');
+  indicator.className = `scrolllearn-quiz-score-indicator ${scoreClass}`;
+  indicator.textContent = scoreChange;
+  
+  // Position near the score stat
+  const scoreStat = statsContainer.querySelector('.scrolllearn-quiz-stat-score');
+  if (scoreStat) {
+    scoreStat.appendChild(indicator);
+    
+    // Update the score value
+    const scoreValue = scoreStat.querySelector('.scrolllearn-quiz-score-value');
+    if (scoreValue) {
+      const sessionScore = sessionStats.sessionCorrect - sessionStats.sessionIncorrect;
+      const scoreClass = sessionScore >= 0 ? 'positive' : 'negative';
+      scoreValue.textContent = sessionScore >= 0 ? `+${sessionScore}` : `${sessionScore}`;
+      scoreStat.classList.remove('positive', 'negative');
+      scoreStat.classList.add(scoreClass);
+    }
+    
+    // Remove indicator after animation
+    setTimeout(() => indicator.remove(), 1000);
+  }
+  
+  // Update today total
+  const todayStat = statsContainer.querySelector('.scrolllearn-quiz-stat:first-child span:first-of-type');
+  if (todayStat) {
+    todayStat.textContent = String(sessionStats.todayTotal);
+  }
+  
+  // Update accuracy
+  const accuracy = sessionStats.todayTotal > 0 
+    ? Math.round((sessionStats.todayCorrect / sessionStats.todayTotal) * 100) 
+    : 0;
+  const accuracyStat = statsContainer.querySelectorAll('.scrolllearn-quiz-stat')[1]?.querySelector('span:first-of-type');
+  if (accuracyStat) {
+    accuracyStat.textContent = `${accuracy}%`;
+  }
+}
+
+/**
+ * Build stats bar HTML for the quiz
+ */
+function buildStatsHTML(): string {
+  const { todayTotal, todayCorrect, sessionCorrect, sessionIncorrect, currentStreak } = sessionStats;
+  
+  // Calculate accuracy percentage
+  const accuracy = todayTotal > 0 ? Math.round((todayCorrect / todayTotal) * 100) : 0;
+  
+  // Session score display
+  const sessionScore = sessionCorrect - sessionIncorrect;
+  const sessionScoreClass = sessionScore >= 0 ? 'positive' : 'negative';
+  const sessionScoreDisplay = sessionScore >= 0 ? `+${sessionScore}` : `${sessionScore}`;
+  
+  return `
+    <div class="scrolllearn-quiz-stats">
+      <div class="scrolllearn-quiz-stat" title="Questions answered today">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span>${todayTotal}</span>
+        <span class="scrolllearn-quiz-stat-label">today</span>
+      </div>
+      <div class="scrolllearn-quiz-stat" title="Accuracy rate">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        <span>${accuracy}%</span>
+        <span class="scrolllearn-quiz-stat-label">accuracy</span>
+      </div>
+      <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-score ${sessionScoreClass}" title="Session score (correct - incorrect)">
+        <span class="scrolllearn-quiz-score-value">${sessionScoreDisplay}</span>
+        <span class="scrolllearn-quiz-stat-label">session</span>
+      </div>
+      ${currentStreak > 0 ? `
+        <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-streak" title="Current streak">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>
+          <span>${currentStreak}</span>
+          <span class="scrolllearn-quiz-stat-label">streak</span>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+/**
  * Build quiz HTML based on card type
  */
 function buildQuizHTML(card: Card): string {
@@ -387,6 +522,9 @@ function buildQuizHTML(card: Card): string {
       break;
   }
   
+  // Build stats bar
+  const statsHTML = buildStatsHTML();
+  
   return `
     <div class="scrolllearn-quiz" role="dialog" aria-modal="true" aria-labelledby="ss-question">
       <div class="scrolllearn-quiz-header">
@@ -396,6 +534,8 @@ function buildQuizHTML(card: Card): string {
         </div>
         <span class="scrolllearn-quiz-deck">${card.deckId ? 'Quiz Time' : 'Quick Quiz'}</span>
       </div>
+      
+      ${statsHTML}
       
       <div class="scrolllearn-quiz-question" id="ss-question">
         ${escapeHTML(card.front)}
@@ -631,6 +771,21 @@ async function handleSubmit(card: Card) {
   
   // Grade the answer locally (background will also grade)
   const grade = gradeAnswerLocally(card, userAnswer);
+  
+  // Update session stats
+  sessionStats.todayTotal++;
+  if (grade >= 2) {
+    sessionStats.todayCorrect++;
+    sessionStats.sessionCorrect++;
+    sessionStats.currentStreak++;
+  } else {
+    sessionStats.todayIncorrect++;
+    sessionStats.sessionIncorrect++;
+    sessionStats.currentStreak = 0;
+  }
+  
+  // Update stats display
+  updateStatsDisplay(grade);
   
   // Show feedback
   showAnswerFeedback(card, grade);

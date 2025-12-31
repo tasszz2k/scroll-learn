@@ -85,6 +85,106 @@
   border-radius: 100px;
 }
 
+/* Stats Bar */
+.scrolllearn-quiz-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 10px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--ss-border);
+}
+
+.scrolllearn-quiz-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--ss-text-muted);
+  position: relative;
+}
+
+.scrolllearn-quiz-stat svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+
+.scrolllearn-quiz-stat span:first-of-type {
+  font-weight: 600;
+  color: var(--ss-text);
+}
+
+.scrolllearn-quiz-stat-label {
+  font-size: 11px;
+  color: var(--ss-text-muted);
+  font-weight: 400 !important;
+}
+
+.scrolllearn-quiz-stat-score {
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: var(--ss-surface-dark);
+}
+
+.scrolllearn-quiz-stat-score.positive .scrolllearn-quiz-score-value {
+  color: var(--ss-success);
+}
+
+.scrolllearn-quiz-stat-score.negative .scrolllearn-quiz-score-value {
+  color: var(--ss-error);
+}
+
+.scrolllearn-quiz-score-value {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.scrolllearn-quiz-stat-streak {
+  color: var(--ss-warning);
+}
+
+.scrolllearn-quiz-stat-streak svg {
+  color: var(--ss-warning);
+  opacity: 1;
+}
+
+.scrolllearn-quiz-stat-streak span:first-of-type {
+  color: var(--ss-warning);
+}
+
+/* Score indicator animation */
+.scrolllearn-quiz-score-indicator {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 700;
+  font-size: 14px;
+  animation: ss-scoreFloat 1s ease-out forwards;
+  pointer-events: none;
+}
+
+.scrolllearn-quiz-score-indicator.correct {
+  color: var(--ss-success);
+}
+
+.scrolllearn-quiz-score-indicator.incorrect {
+  color: var(--ss-error);
+}
+
+@keyframes ss-scoreFloat {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+}
+
 .scrolllearn-quiz-question {
   font-size: 16px;
   font-weight: 500;
