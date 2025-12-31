@@ -85,32 +85,65 @@
   border-radius: 100px;
 }
 
-/* Stats Bar - Horizontal pills */
-.scrolllearn-quiz-stats {
+/* Stats Row - Colored pill labels */
+.scrolllearn-stats-row {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 0;
-  margin-bottom: 12px;
+  padding: 0 0 16px 0;
+  margin-bottom: 16px;
   border-bottom: 1px solid var(--ss-border);
 }
 
-.scrolllearn-quiz-stat {
+.scrolllearn-stat-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   font-size: 12px;
-  color: var(--ss-text-muted);
-  background: var(--ss-surface-dark);
-  padding: 4px 10px;
+  font-weight: 500;
+  padding: 6px 14px;
   border-radius: 100px;
-  position: relative;
   cursor: help;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Tooltip element */
+.scrolllearn-stat-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Blue - Today count */
+.scrolllearn-stat-blue {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+/* Green - Accuracy */
+.scrolllearn-stat-green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* Teal - Positive session */
+.scrolllearn-stat-teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+/* Red - Negative session */
+.scrolllearn-stat-red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Orange - Streak */
+.scrolllearn-stat-orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+/* Tooltip element - kept for JS-based tooltips */
 .scrolllearn-tooltip {
   position: fixed;
   background: #1e293b;
@@ -129,60 +162,6 @@
 
 .scrolllearn-tooltip.visible {
   opacity: 1;
-}
-
-.scrolllearn-quiz-stat svg {
-  width: 12px !important;
-  height: 12px !important;
-  min-width: 12px;
-  max-width: 12px;
-  min-height: 12px;
-  max-height: 12px;
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-.scrolllearn-quiz-stat-value {
-  font-weight: 600;
-  color: var(--ss-text);
-}
-
-.scrolllearn-quiz-stat-label {
-  font-size: 11px;
-  color: var(--ss-text-muted);
-  font-weight: 400;
-}
-
-.scrolllearn-quiz-stat-score.positive {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.scrolllearn-quiz-stat-score.positive .scrolllearn-quiz-stat-value {
-  color: var(--ss-success);
-}
-
-.scrolllearn-quiz-stat-score.negative {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.scrolllearn-quiz-stat-score.negative .scrolllearn-quiz-stat-value {
-  color: var(--ss-error);
-}
-
-.scrolllearn-quiz-stat-streak {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.scrolllearn-quiz-stat-streak svg {
-  color: var(--ss-warning);
-  opacity: 1;
-}
-
-.scrolllearn-quiz-stat-streak .scrolllearn-quiz-stat-value {
-  color: var(--ss-warning);
 }
 
 /* Score indicator animation */
