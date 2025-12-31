@@ -69,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   domainSettings: {
     'facebook.com': { enabled: true },
     'youtube.com': { enabled: true },
+    'instagram.com': { enabled: true },
   },
   fuzzyThresholds: {
     exact: 1.0,

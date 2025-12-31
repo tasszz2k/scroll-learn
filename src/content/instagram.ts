@@ -19,9 +19,11 @@ export const instagramDetector: DomainDetector = {
   /**
    * Get selector for feed posts
    * Instagram wraps each post in an article element
+   * Use more specific selector to avoid nested matches
    */
   getPostSelector(): string {
-    return 'article[role="presentation"], article';
+    // Target top-level articles only (direct children of main sections)
+    return 'main article, section > div > div > article';
   },
   
   /**
@@ -82,7 +84,7 @@ export const instagramDetector: DomainDetector = {
    * Get unique identifier for a post
    */
   getPostId(post: Element): string | null {
-    // Try to find post link with ID
+    // Try to find post link with ID (most reliable)
     const postLink = post.querySelector('a[href*="/p/"], a[href*="/reel/"]');
     if (postLink) {
       const href = postLink.getAttribute('href') || '';
@@ -94,14 +96,32 @@ export const instagramDetector: DomainDetector = {
     const timeElement = post.querySelector('time[datetime]');
     if (timeElement) {
       const datetime = timeElement.getAttribute('datetime');
-      if (datetime) return `ig-${datetime}`;
+      if (datetime) return `ig-time-${datetime}`;
     }
     
-    // Fallback to position-based ID
-    const rect = post.getBoundingClientRect();
-    const scrollY = window.scrollY;
-    const approxY = Math.round((rect.top + scrollY) / 100) * 100;
-    return `ig-post-y${approxY}`;
+    // Try to find username link as identifier
+    const userLink = post.querySelector('a[href^="/"][role="link"]');
+    if (userLink) {
+      const href = userLink.getAttribute('href') || '';
+      const userMatch = href.match(/^\/([^/]+)\/?$/);
+      if (userMatch) {
+        // Combine username with image src for uniqueness
+        const img = post.querySelector('img[src]');
+        const imgSrc = img?.getAttribute('src') || '';
+        const imgHash = imgSrc.slice(-20); // Last 20 chars of image URL
+        return `ig-${userMatch[1]}-${imgHash}`;
+      }
+    }
+    
+    // Last resort: use index in parent (stable as long as DOM structure doesn't change)
+    const parent = post.parentElement;
+    if (parent) {
+      const siblings = Array.from(parent.querySelectorAll(':scope > article'));
+      const index = siblings.indexOf(post as Element);
+      if (index >= 0) return `ig-idx-${index}`;
+    }
+    
+    return null; // Don't count posts we can't identify stably
   },
 };
 

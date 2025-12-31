@@ -225,6 +225,7 @@ async function checkAndInjectQuiz() {
   
   // Count posts that we haven't seen before
   // Simply count any valid post with a unique ID - this works with Facebook's virtual DOM
+  let newPostsThisCheck = 0;
   for (const post of posts) {
     const postId = currentDetector.getPostId(post);
     if (!postId) continue;
@@ -232,7 +233,13 @@ async function checkAndInjectQuiz() {
     if (!scrolledPastPostIds.has(postId)) {
       scrolledPastPostIds.add(postId);
       scrolledPastCount++;
+      newPostsThisCheck++;
+      console.log('[ScrollLearn] New post found:', postId, 'Total:', scrolledPastCount);
     }
+  }
+  
+  if (newPostsThisCheck > 0) {
+    console.log('[ScrollLearn] Posts this check:', posts.length, 'New:', newPostsThisCheck, 'Total unique:', scrolledPastCount, 'Target:', settings.showAfterNPosts);
   }
   
   // Check if we should show a quiz
@@ -270,7 +277,20 @@ async function showQuiz() {
     
     currentCard = response.data as Card;
     isQuizActive = true;
-    scrolledPastPostIds.clear(); scrolledPastCount = 0; // Reset counter after showing quiz
+    
+    // Reset counter but pre-populate with visible posts so they aren't re-counted after quiz
+    scrolledPastCount = 0;
+    scrolledPastPostIds.clear();
+    if (currentDetector) {
+      const visiblePosts = getVisiblePosts(currentDetector);
+      for (const post of visiblePosts) {
+        const postId = currentDetector.getPostId(post);
+        if (postId) {
+          scrolledPastPostIds.add(postId);
+        }
+      }
+      console.log('[ScrollLearn] Pre-populated', visiblePosts.length, 'posts, count reset to 0');
+    }
     
     console.log('[ScrollLearn] Showing card:', currentCard.front.substring(0, 50));
     
@@ -289,6 +309,10 @@ async function showQuiz() {
  * Inject quiz UI into the page
  */
 function injectQuizUI(card: Card) {
+  // CRITICAL: Save scroll position BEFORE any DOM changes
+  const savedScrollY = window.scrollY;
+  const savedScrollX = window.scrollX;
+  
   // Remove any existing quiz
   removeQuizUI();
   
@@ -314,23 +338,28 @@ function injectQuizUI(card: Card) {
   // Add event listeners
   setupQuizEventListeners(card);
   
-  // Focus first interactive element
+  // Focus first interactive element (but prevent scroll)
   const firstButton = container.querySelector('button, input');
   if (firstButton instanceof HTMLElement) {
-    firstButton.focus();
+    firstButton.focus({ preventScroll: true });
   }
+  
+  // CRITICAL: Restore scroll position after all DOM changes
+  // Use multiple frames to ensure it sticks on Instagram/SPAs
+  window.scrollTo(savedScrollX, savedScrollY);
+  requestAnimationFrame(() => {
+    window.scrollTo(savedScrollX, savedScrollY);
+    setTimeout(() => {
+      window.scrollTo(savedScrollX, savedScrollY);
+    }, 0);
+  });
 }
 
 /**
  * Enable scroll blocking
  */
 function enableScrollBlock() {
-  // Simple approach: just prevent scroll events without moving body
-  // This preserves scroll position on Facebook's complex layout
-  document.documentElement.style.overflow = 'hidden';
-  document.body.style.overflow = 'hidden';
-  
-  // Prevent scroll events
+  // Prevent scroll events - this is the most reliable method
   scrollBlockHandler = (e: Event) => {
     e.preventDefault();
     e.stopPropagation();
@@ -338,6 +367,13 @@ function enableScrollBlock() {
   
   window.addEventListener('wheel', scrollBlockHandler, { passive: false });
   window.addEventListener('touchmove', scrollBlockHandler, { passive: false });
+  
+  // Only set overflow:hidden for Facebook (not Instagram - it causes scroll reset)
+  const isInstagram = window.location.hostname.includes('instagram');
+  if (!isInstagram) {
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  }
   
   // Prevent keyboard scrolling (but allow typing in inputs)
   document.addEventListener('keydown', preventScrollKeys);
@@ -347,7 +383,7 @@ function enableScrollBlock() {
  * Disable scroll blocking
  */
 function disableScrollBlock() {
-  // Remove overflow styles
+  // Remove overflow styles (safe to call even if not set)
   document.documentElement.style.overflow = '';
   document.body.style.overflow = '';
   
@@ -1268,6 +1304,20 @@ function closeQuiz() {
   
   // Remove keyboard listener
   document.removeEventListener('keydown', handleKeyDown);
+  
+  // IMPORTANT: Pre-populate the set with all currently visible posts
+  // This prevents immediately triggering another quiz after closing
+  if (currentDetector) {
+    const visiblePosts = getVisiblePosts(currentDetector);
+    for (const post of visiblePosts) {
+      const postId = currentDetector.getPostId(post);
+      if (postId && !scrolledPastPostIds.has(postId)) {
+        scrolledPastPostIds.add(postId);
+        // Don't increment scrolledPastCount - these are "seen" but not "scrolled past"
+      }
+    }
+    console.log('[ScrollLearn] Pre-populated', visiblePosts.length, 'visible posts after quiz close');
+  }
 }
 
 /**
