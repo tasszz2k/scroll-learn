@@ -379,11 +379,11 @@ function updateStatsDisplay(grade: 0 | 1 | 2 | 3) {
   
   const isCorrect = grade >= 2;
   const scoreChange = isCorrect ? '+1' : '-1';
-  const scoreClass = isCorrect ? 'correct' : 'incorrect';
+  const indicatorClass = isCorrect ? 'correct' : 'incorrect';
   
   // Create floating score indicator
   const indicator = document.createElement('div');
-  indicator.className = `scrolllearn-quiz-score-indicator ${scoreClass}`;
+  indicator.className = `scrolllearn-quiz-score-indicator ${indicatorClass}`;
   indicator.textContent = scoreChange;
   
   // Position near the score stat
@@ -392,7 +392,7 @@ function updateStatsDisplay(grade: 0 | 1 | 2 | 3) {
     scoreStat.appendChild(indicator);
     
     // Update the score value
-    const scoreValue = scoreStat.querySelector('.scrolllearn-quiz-score-value');
+    const scoreValue = scoreStat.querySelector('.scrolllearn-quiz-stat-value');
     if (scoreValue) {
       const sessionScore = sessionStats.sessionCorrect - sessionStats.sessionIncorrect;
       const scoreClass = sessionScore >= 0 ? 'positive' : 'negative';
@@ -406,7 +406,7 @@ function updateStatsDisplay(grade: 0 | 1 | 2 | 3) {
   }
   
   // Update today total
-  const todayStat = statsContainer.querySelector('.scrolllearn-quiz-stat:first-child span:first-of-type');
+  const todayStat = statsContainer.querySelector('.scrolllearn-quiz-stat:first-child .scrolllearn-quiz-stat-value');
   if (todayStat) {
     todayStat.textContent = String(sessionStats.todayTotal);
   }
@@ -415,7 +415,7 @@ function updateStatsDisplay(grade: 0 | 1 | 2 | 3) {
   const accuracy = sessionStats.todayTotal > 0 
     ? Math.round((sessionStats.todayCorrect / sessionStats.todayTotal) * 100) 
     : 0;
-  const accuracyStat = statsContainer.querySelectorAll('.scrolllearn-quiz-stat')[1]?.querySelector('span:first-of-type');
+  const accuracyStat = statsContainer.querySelectorAll('.scrolllearn-quiz-stat')[1]?.querySelector('.scrolllearn-quiz-stat-value');
   if (accuracyStat) {
     accuracyStat.textContent = `${accuracy}%`;
   }
@@ -438,23 +438,23 @@ function buildStatsHTML(): string {
   return `
     <div class="scrolllearn-quiz-stats">
       <div class="scrolllearn-quiz-stat" title="Questions answered today">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-        <span>${todayTotal}</span>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span class="scrolllearn-quiz-stat-value">${todayTotal}</span>
         <span class="scrolllearn-quiz-stat-label">today</span>
       </div>
       <div class="scrolllearn-quiz-stat" title="Accuracy rate">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-        <span>${accuracy}%</span>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        <span class="scrolllearn-quiz-stat-value">${accuracy}%</span>
         <span class="scrolllearn-quiz-stat-label">accuracy</span>
       </div>
-      <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-score ${sessionScoreClass}" title="Session score (correct - incorrect)">
-        <span class="scrolllearn-quiz-score-value">${sessionScoreDisplay}</span>
+      <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-score ${sessionScoreClass}" title="Session score">
+        <span class="scrolllearn-quiz-stat-value">${sessionScoreDisplay}</span>
         <span class="scrolllearn-quiz-stat-label">session</span>
       </div>
       ${currentStreak > 0 ? `
         <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-streak" title="Current streak">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>
-          <span>${currentStreak}</span>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>
+          <span class="scrolllearn-quiz-stat-value">${currentStreak}</span>
           <span class="scrolllearn-quiz-stat-label">streak</span>
         </div>
       ` : ''}
