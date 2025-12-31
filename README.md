@@ -1,6 +1,22 @@
-# ScrollLearn
+<p align="center">
+  <img src="docs/images/icon.png" alt="ScrollLearn Logo" width="128" height="128">
+</p>
 
-**Learn while you scroll** - A Chrome extension that injects spaced repetition flashcard quizzes into your social media feeds.
+<h1 align="center">ScrollLearn</h1>
+
+<p align="center">
+  <strong>Learn while you scroll</strong> - A Chrome extension that injects spaced repetition flashcard quizzes into your social media feeds.
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#configuration">Configuration</a> •
+  <a href="#contributing">Contributing</a>
+</p>
+
+---
 
 ## Features
 
