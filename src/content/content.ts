@@ -435,30 +435,24 @@ function buildStatsHTML(): string {
   const sessionScoreClass = sessionScore >= 0 ? 'positive' : 'negative';
   const sessionScoreDisplay = sessionScore >= 0 ? `+${sessionScore}` : `${sessionScore}`;
   
-  // Build detailed tooltips
-  const todayTooltip = `Today's Progress: ${todayTotal} questions answered (${todayCorrect} correct, ${todayTotal - todayCorrect} incorrect)`;
-  const accuracyTooltip = `Accuracy: ${accuracy}% of your answers today were correct`;
-  const sessionTooltip = `Session Score: ${sessionCorrect} correct - ${sessionIncorrect} incorrect = ${sessionScoreDisplay}`;
-  const streakTooltip = `Current Streak: ${currentStreak} consecutive days of learning!`;
-  
   return `
     <div class="scrolllearn-quiz-stats">
-      <div class="scrolllearn-quiz-stat" title="${todayTooltip}">
+      <div class="scrolllearn-quiz-stat" data-tooltip="${todayTotal} questions (${todayCorrect} correct)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
         <span class="scrolllearn-quiz-stat-value">${todayTotal}</span>
         <span class="scrolllearn-quiz-stat-label">today</span>
       </div>
-      <div class="scrolllearn-quiz-stat" title="${accuracyTooltip}">
+      <div class="scrolllearn-quiz-stat" data-tooltip="${accuracy}% correct answers today">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
         <span class="scrolllearn-quiz-stat-value">${accuracy}%</span>
         <span class="scrolllearn-quiz-stat-label">accuracy</span>
       </div>
-      <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-score ${sessionScoreClass}" title="${sessionTooltip}">
+      <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-score ${sessionScoreClass}" data-tooltip="${sessionCorrect} correct - ${sessionIncorrect} wrong">
         <span class="scrolllearn-quiz-stat-value">${sessionScoreDisplay}</span>
         <span class="scrolllearn-quiz-stat-label">session</span>
       </div>
       ${currentStreak > 0 ? `
-        <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-streak" title="${streakTooltip}">
+        <div class="scrolllearn-quiz-stat scrolllearn-quiz-stat-streak" data-tooltip="${currentStreak} day streak!">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></svg>
           <span class="scrolllearn-quiz-stat-value">${currentStreak}</span>
           <span class="scrolllearn-quiz-stat-label">streak</span>
