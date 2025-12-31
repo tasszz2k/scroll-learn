@@ -20,7 +20,7 @@
 
 ## Features
 
-- **Feed Integration**: Quizzes appear naturally in Facebook and YouTube feeds after scrolling past N posts
+- **Feed Integration**: Quizzes appear naturally in Facebook, YouTube, and Instagram feeds after scrolling past N posts
 - **Spaced Repetition**: SM-2 algorithm for optimal learning retention
 - **Multiple Card Types**: 
   - Text (type your answer)
@@ -137,7 +137,7 @@ In the **Settings** tab:
   - Pause after quiz (0-60 minutes)
 
 - **Enabled Sites**
-  - Toggle Facebook/YouTube
+  - Toggle Facebook/YouTube/Instagram
 
 - **Answer Matching**
   - Characters to ignore

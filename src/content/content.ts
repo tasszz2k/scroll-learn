@@ -12,6 +12,7 @@ import type { Card, Settings } from '../common/types';
 import { DEFAULT_SETTINGS } from '../common/types';
 import { facebookDetector, getVisiblePosts, type DomainDetector } from './fb';
 import { youtubeDetector, isYouTubeFeedPage, isYouTubeWatchPage } from './youtube';
+import { instagramDetector, isInstagramFeedPage } from './instagram';
 
 // State
 let currentDetector: DomainDetector | null = null;
@@ -93,6 +94,13 @@ function detectDomain(): DomainDetector | null {
     // Only activate on feed pages
     if (isYouTubeFeedPage() || isYouTubeWatchPage()) {
       return youtubeDetector;
+    }
+  }
+  
+  if (instagramDetector.domain.test(hostname)) {
+    // Only activate on feed/explore pages
+    if (isInstagramFeedPage()) {
+      return instagramDetector;
     }
   }
   
