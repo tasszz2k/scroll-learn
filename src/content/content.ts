@@ -682,30 +682,79 @@ function setupQuizEventListeners(card: Card) {
  * Setup tooltip listeners for stat elements
  */
 function setupTooltips(container: HTMLElement) {
+  // Create a persistent tooltip container at the top level
+  let tooltipWrapper = document.getElementById('scrolllearn-tooltip-wrapper');
+  if (!tooltipWrapper) {
+    tooltipWrapper = document.createElement('div');
+    tooltipWrapper.id = 'scrolllearn-tooltip-wrapper';
+    tooltipWrapper.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2147483647;
+    `;
+    document.documentElement.appendChild(tooltipWrapper);
+  }
+  
   let tooltipEl: HTMLElement | null = null;
   
   const showTooltip = (e: MouseEvent) => {
     const target = e.currentTarget as HTMLElement;
     const text = target.getAttribute('data-tooltip');
-    if (!text) return;
+    if (!text || !tooltipWrapper) return;
     
     // Remove any existing tooltip
     tooltipEl?.remove();
     
-    // Create tooltip element
+    // Create tooltip element with inline styles to avoid CSS conflicts
     tooltipEl = document.createElement('div');
-    tooltipEl.className = 'scrolllearn-tooltip';
+    tooltipEl.style.cssText = `
+      position: fixed;
+      background: #1e293b;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 400;
+      line-height: 1.4;
+      max-width: 250px;
+      text-align: center;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      white-space: normal;
+      word-wrap: break-word;
+    `;
     tooltipEl.textContent = text;
-    document.body.appendChild(tooltipEl);
+    tooltipWrapper.appendChild(tooltipEl);
     
-    // Position it
+    // Position it above the element
     const rect = target.getBoundingClientRect();
-    tooltipEl.style.left = `${rect.left + rect.width / 2 - tooltipEl.offsetWidth / 2}px`;
-    tooltipEl.style.top = `${rect.top - tooltipEl.offsetHeight - 8}px`;
+    const tooltipRect = tooltipEl.getBoundingClientRect();
     
-    // Show
+    let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
+    let top = rect.top - tooltipRect.height - 8;
+    
+    // Keep within viewport
+    if (left < 8) left = 8;
+    if (left + tooltipRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - tooltipRect.width - 8;
+    }
+    if (top < 8) {
+      top = rect.bottom + 8; // Show below if no room above
+    }
+    
+    tooltipEl.style.left = `${left}px`;
+    tooltipEl.style.top = `${top}px`;
+    
+    // Show with animation
     requestAnimationFrame(() => {
-      if (tooltipEl) tooltipEl.classList.add('visible');
+      if (tooltipEl) tooltipEl.style.opacity = '1';
     });
   };
   
