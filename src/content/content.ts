@@ -673,6 +673,55 @@ function setupQuizEventListeners(card: Card) {
   if (settings.enableKeyboardShortcuts) {
     document.addEventListener('keydown', handleKeyDown);
   }
+  
+  // Setup tooltips for stats
+  setupTooltips(container);
+}
+
+/**
+ * Setup tooltip listeners for stat elements
+ */
+function setupTooltips(container: HTMLElement) {
+  let tooltipEl: HTMLElement | null = null;
+  
+  const showTooltip = (e: MouseEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    const text = target.getAttribute('data-tooltip');
+    if (!text) return;
+    
+    // Remove any existing tooltip
+    tooltipEl?.remove();
+    
+    // Create tooltip element
+    tooltipEl = document.createElement('div');
+    tooltipEl.className = 'scrolllearn-tooltip';
+    tooltipEl.textContent = text;
+    document.body.appendChild(tooltipEl);
+    
+    // Position it
+    const rect = target.getBoundingClientRect();
+    tooltipEl.style.left = `${rect.left + rect.width / 2 - tooltipEl.offsetWidth / 2}px`;
+    tooltipEl.style.top = `${rect.top - tooltipEl.offsetHeight - 8}px`;
+    
+    // Show
+    requestAnimationFrame(() => {
+      if (tooltipEl) tooltipEl.classList.add('visible');
+    });
+  };
+  
+  const hideTooltip = () => {
+    if (tooltipEl) {
+      tooltipEl.remove();
+      tooltipEl = null;
+    }
+  };
+  
+  // Attach to all elements with data-tooltip
+  const statsElements = container.querySelectorAll('[data-tooltip]');
+  statsElements.forEach(el => {
+    el.addEventListener('mouseenter', showTooltip as EventListener);
+    el.addEventListener('mouseleave', hideTooltip);
+  });
 }
 
 /**
