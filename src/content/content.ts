@@ -996,30 +996,15 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
     case 'text':
     case 'audio': {
       const input = (userAnswer as string).toLowerCase().trim();
-      const canonicalAnswers = (card.canonicalAnswers && card.canonicalAnswers.length > 0
-        ? card.canonicalAnswers
-        : [card.back]
-      ).map(answer => answer.toLowerCase().trim());
-
-      if (canonicalAnswers.includes(input)) return 3;
-
-      if (isStrictDefinitionCard(card)) return 0;
+      const canonical = card.canonicalAnswers?.[0]?.toLowerCase() || card.back.toLowerCase();
+      
+      if (input === canonical) return 3;
       
       // Simple fuzzy check
-      let bestSimilarity = 0;
-      for (const answer of canonicalAnswers) {
-        bestSimilarity = Math.max(bestSimilarity, calculateSimpleSimilarity(input, answer));
-      }
-
-      const isSingleTermCard = canonicalAnswers.every(answer => isSingleTermAnswer(answer));
-      if (isSingleTermCard) {
-        if (bestSimilarity >= 0.7) return 1;
-        return 0;
-      }
-
-      if (bestSimilarity >= 0.95) return 3;
-      if (bestSimilarity >= 0.85) return 2;
-      if (bestSimilarity >= 0.7) return 1;
+      const similarity = calculateSimpleSimilarity(input, canonical);
+      if (similarity >= 0.95) return 3;
+      if (similarity >= 0.85) return 2;
+      if (similarity >= 0.7) return 1;
       return 0;
     }
     
@@ -1059,42 +1044,19 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
 function calculateSimpleSimilarity(a: string, b: string): number {
   if (a === b) return 1;
   if (a.length === 0 || b.length === 0) return 0;
-
-  const distance = levenshteinDistance(a, b);
-  const maxLength = Math.max(a.length, b.length);
-  return Math.max(0, 1 - distance / maxLength);
-}
-
-function levenshteinDistance(a: string, b: string): number {
-  const rows = a.length + 1;
-  const cols = b.length + 1;
-  const dp: number[][] = Array.from({ length: rows }, () => Array(cols).fill(0));
-
-  for (let i = 0; i < rows; i++) dp[i][0] = i;
-  for (let j = 0; j < cols; j++) dp[0][j] = j;
-
-  for (let i = 1; i < rows; i++) {
-    for (let j = 1; j < cols; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
+  
+  // Simple character match ratio
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  
+  let matches = 0;
+  for (let i = 0; i < shorter.length; i++) {
+    if (longer.includes(shorter[i])) {
+      matches++;
     }
   }
-
-  return dp[a.length][b.length];
-}
-
-function isSingleTermAnswer(answer: string): boolean {
-  return answer.trim().length > 0 && !/\s/.test(answer.trim());
-}
-
-function isStrictDefinitionCard(card: Card): boolean {
-  const isDefinitionPrompt = card.front.trim().toLowerCase().startsWith('definition:');
-  const hasTermTag = (card.tags || []).some(tag => tag.toLowerCase() === 'term');
-  return isDefinitionPrompt || hasTermTag;
+  
+  return matches / longer.length;
 }
 
 /**
@@ -1132,7 +1094,7 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
   
   // Always show the correct answer for consistency and reinforcement.
   const correctAnswer = getCorrectAnswerDisplay(card);
-  message += `\nThe answer was: ${correctAnswer}`;
+  message += `. The answer was: ${correctAnswer}`;
   
   showFeedback(message, type);
   

@@ -138,18 +138,6 @@ function gradeText(
     const score = similarity(normalizedInput, answer);
     bestScore = Math.max(bestScore, score);
   }
-
-  // Definition/term cards are strict: exact match only.
-  if (isStrictDefinitionCard(card)) {
-    return 0;
-  }
-
-  // Single-term vocabulary should be strict: typos are not graded as correct.
-  const isSingleTermCard = canonicalAnswers.every(answer => isSingleTermAnswer(answer));
-  if (isSingleTermCard) {
-    if (bestScore >= settings.fuzzyThresholds.low) return 1;
-    return 0;
-  }
   
   // Map score to grade using thresholds
   const thresholds = settings.fuzzyThresholds;
@@ -158,16 +146,6 @@ function gradeText(
   if (bestScore >= thresholds.medium) return 2;
   if (bestScore >= thresholds.low) return 1;
   return 0;
-}
-
-function isSingleTermAnswer(answer: string): boolean {
-  return answer.trim().length > 0 && !/\s/.test(answer.trim());
-}
-
-function isStrictDefinitionCard(card: Card): boolean {
-  const isDefinitionPrompt = card.front.trim().toLowerCase().startsWith('definition:');
-  const hasTermTag = (card.tags || []).some(tag => tag.toLowerCase() === 'term');
-  return isDefinitionPrompt || hasTermTag;
 }
 
 /**
@@ -299,3 +277,4 @@ export function getSimilarityPercentage(
   
   return Math.round(similarity(normalizedInput, normalizedCorrect) * 100);
 }
+
