@@ -48,6 +48,11 @@ const QUIZ_CONTAINER_ID = 'scrolllearn-quiz-root';
 const BLOCKER_ID = 'scrolllearn-scroll-blocker';
 const DELETE_CONFIRM_ID = 'scrolllearn-delete-confirm';
 
+function isExtensionContextInvalidated(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes('extension context invalidated');
+}
+
 /**
  * Initialize content script
  */
@@ -126,6 +131,7 @@ async function loadSettings() {
       settings = response.data;
     }
   } catch (error) {
+    if (isExtensionContextInvalidated(error)) return;
     console.error('[ScrollLearn] Failed to load settings:', error);
   }
 }
@@ -148,6 +154,7 @@ async function loadTodayStats() {
       sessionStats.currentStreak = stats.currentStreak || 0;
     }
   } catch (error) {
+    if (isExtensionContextInvalidated(error)) return;
     console.error('[ScrollLearn] Failed to load stats:', error);
   }
 }
@@ -302,6 +309,7 @@ async function showQuiz() {
     (window as unknown as { ssQuizStartTime: number }).ssQuizStartTime = Date.now();
     
   } catch (error) {
+    if (isExtensionContextInvalidated(error)) return;
     console.error('[ScrollLearn] Failed to get card:', error);
   }
 }
@@ -1284,6 +1292,7 @@ async function handleSkip(card: Card) {
     });
     closeQuiz();
   } catch (error) {
+    if (isExtensionContextInvalidated(error)) return;
     console.error('[ScrollLearn] Failed to skip:', error);
   }
 }
@@ -1316,6 +1325,7 @@ async function handleDelete(card: Card) {
     });
     closeQuiz();
   } catch (error) {
+    if (isExtensionContextInvalidated(error)) return;
     console.error('[ScrollLearn] Failed to delete:', error);
   }
 }
