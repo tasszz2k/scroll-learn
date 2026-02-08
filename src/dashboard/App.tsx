@@ -247,6 +247,10 @@ export default function App() {
             onDeleteDeck={handleDeleteDeck}
             onSaveCard={handleSaveCard}
             onDeleteCard={handleDeleteCard}
+            activeDeckId={settings?.activeDeckId ?? null}
+            onSetActiveDeck={async (deckId) => {
+              await handleSaveSettings({ activeDeckId: deckId });
+            }}
             editCardId={editCardId}
             editDeckId={editDeckId}
             onEditCardHandled={() => { setEditCardId(null); setEditDeckId(null); }}
@@ -263,6 +267,7 @@ export default function App() {
         
         {activeTab === 'settings' && settings && (
           <Settings
+            decks={decks}
             settings={settings}
             onSave={handleSaveSettings}
           />

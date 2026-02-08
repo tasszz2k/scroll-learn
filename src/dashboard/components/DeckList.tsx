@@ -9,6 +9,8 @@ interface DeckListProps {
   onDeleteDeck: (deckId: string) => Promise<Response<void>>;
   onSaveCard: (card: Omit<Card, 'id' | 'due' | 'intervalDays' | 'ease' | 'repetitions' | 'lapses' | 'createdAt' | 'updatedAt'> | Card) => Promise<Response<Card>>;
   onDeleteCard: (cardId: string) => Promise<Response<void>>;
+  activeDeckId?: string | null;
+  onSetActiveDeck?: (deckId: string | null) => Promise<void> | void;
   editCardId?: string | null;
   editDeckId?: string | null;
   onEditCardHandled?: () => void;
@@ -21,6 +23,8 @@ export default function DeckList({
   onDeleteDeck,
   onSaveCard,
   onDeleteCard,
+  activeDeckId,
+  onSetActiveDeck,
   editCardId,
   editDeckId,
   onEditCardHandled,
@@ -219,6 +223,9 @@ export default function DeckList({
                       </div>
                       <div>
                         <h3 className="font-semibold text-surface-900 dark:text-surface-50">{deck.name}</h3>
+                        {activeDeckId === deck.id && (
+                          <p className="text-xs text-primary-600 dark:text-primary-400">Active deck</p>
+                        )}
                         {deck.description && (
                           <p className="text-sm text-surface-500">{deck.description}</p>
                         )}
@@ -268,6 +275,24 @@ export default function DeckList({
                           <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
                         Add Card
+                      </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!onSetActiveDeck) return;
+                          if (activeDeckId === deck.id) {
+                            await onSetActiveDeck(null);
+                          } else {
+                            await onSetActiveDeck(deck.id);
+                          }
+                        }}
+                        className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                          activeDeckId === deck.id
+                            ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
+                            : 'bg-surface-200 text-surface-700 hover:bg-surface-300 dark:bg-surface-700 dark:text-surface-200 dark:hover:bg-surface-600'
+                        }`}
+                      >
+                        {activeDeckId === deck.id ? 'Clear Active' : 'Set Active'}
                       </button>
                       <button
                         onClick={(e) => {

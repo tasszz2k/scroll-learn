@@ -13,7 +13,7 @@ interface ImportPanelProps {
 }
 
 export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPanelProps) {
-  const [format, setFormat] = useState<ImportFormat>('simple');
+  const [format, setFormat] = useState<ImportFormat>('csv');
   const [content, setContent] = useState('');
   const [separator, setSeparator] = useState('|');
   const [selectedDeck, setSelectedDeck] = useState<string>(decks[0]?.id || '');
@@ -877,4 +877,3 @@ Important:
     </div>
   );
 }
-

@@ -53,6 +53,7 @@ export interface FuzzyThresholds {
 export interface Settings {
   showAfterNPosts: number; // Default 5
   pauseMinutesAfterQuiz: number; // Default 0
+  activeDeckId: string | null; // Deck currently prioritized for quizzes
   eliminateChars: string; // Default ".,!?()'\"" 
   lowercaseNormalization: boolean; // Default true
   domainSettings: Record<string, DomainSettings>;
@@ -64,6 +65,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   showAfterNPosts: 5,
   pauseMinutesAfterQuiz: 0,
+  activeDeckId: null,
   eliminateChars: '.,!?()\'"',
   lowercaseNormalization: true,
   domainSettings: {
@@ -292,4 +294,3 @@ export function createDeck(data: NewDeck): Deck {
     updatedAt: now,
   };
 }
-

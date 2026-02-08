@@ -172,6 +172,31 @@ body {
   margin-bottom: 20px;
 }
 
+.deck-selector {
+  margin-bottom: 20px;
+}
+
+.deck-select {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  font-size: 13px;
+  outline: none;
+}
+
+.deck-select:focus {
+  border-color: rgba(14, 165, 233, 0.6);
+}
+
+.deck-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;
@@ -320,4 +345,3 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-

@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import type { Settings as SettingsType, Response } from '../../common/types';
+import type { Deck, Settings as SettingsType, Response } from '../../common/types';
 
 interface SettingsProps {
+  decks: Deck[];
   settings: SettingsType;
   onSave: (settings: Partial<SettingsType>) => Promise<Response<SettingsType>>;
 }
 
-export default function Settings({ settings, onSave }: SettingsProps) {
+export default function Settings({ decks, settings, onSave }: SettingsProps) {
   const [localSettings, setLocalSettings] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -127,6 +128,29 @@ export default function Settings({ settings, onSave }: SettingsProps) {
               <span>30 min</span>
               <span>60 min</span>
             </div>
+          </div>
+
+          {/* Active Deck */}
+          <div>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+              Active card deck
+            </label>
+            <select
+              value={localSettings.activeDeckId || ''}
+              onChange={e => updateSetting('activeDeckId', e.target.value || null)}
+              className="w-full rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+              disabled={decks.length === 0}
+            >
+              <option value="">Auto-select first due deck</option>
+              {decks.map(deck => (
+                <option key={deck.id} value={deck.id}>
+                  {deck.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-surface-500 mt-2">
+              Quizzes stay on this deck until it has no due cards, then switch to the next due deck.
+            </p>
           </div>
         </div>
       </div>
@@ -385,4 +409,3 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     </div>
   );
 }
-

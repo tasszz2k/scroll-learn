@@ -170,29 +170,96 @@ async function handleGetNextCard(domain: string): Promise<Response<Card | null>>
       return { ok: true, data: null };
     }
     
-    // Sort for optimal review order
-    const sorted = sortCardsForReview(dueCards);
-    
     // Get all decks to lookup deck names
     const decks = await storage.getDecks();
     const deckMap = new Map(decks.map(d => [d.id, d.name]));
-    
-    // Find first card that isn't snoozed
-    for (const card of sorted) {
-      if (!(await storage.isCardSnoozed(card.id))) {
-        console.log('[ScrollLearn Background] Returning card:', card.front.substring(0, 30));
-        // Add deck name to the card
-        const deckName = deckMap.get(card.deckId) || card.deckId;
-        return { ok: true, data: { ...card, deckName } };
-      }
+
+    // Sort and filter out snoozed cards first.
+    const sorted = sortCardsForReview(dueCards);
+    const snoozedFlags = await Promise.all(sorted.map(card => storage.isCardSnoozed(card.id)));
+    const availableCards = sorted.filter((_, index) => !snoozedFlags[index]);
+
+    if (availableCards.length === 0) {
+      console.log('[ScrollLearn Background] All due cards are snoozed');
+      return { ok: true, data: null };
     }
-    
-    console.log('[ScrollLearn Background] All due cards are snoozed');
-    return { ok: true, data: null };
+
+    // Keep serving the active deck until it has no due cards, then move to next due deck.
+    const availableDeckIds = getAvailableDeckIds(availableCards, decks);
+    let activeDeckId = settings.activeDeckId;
+
+    // If the configured deck was deleted, reset to auto-selection.
+    if (activeDeckId && !decks.some(deck => deck.id === activeDeckId)) {
+      activeDeckId = null;
+    }
+
+    let selectedDeckId: string | null = null;
+    if (activeDeckId && availableDeckIds.includes(activeDeckId)) {
+      selectedDeckId = activeDeckId;
+    } else if (availableDeckIds.length > 0) {
+      selectedDeckId = activeDeckId
+        ? getNextDeckId(activeDeckId, availableDeckIds, decks)
+        : availableDeckIds[0];
+    }
+
+    if (!selectedDeckId) {
+      return { ok: true, data: null };
+    }
+
+    if (selectedDeckId !== settings.activeDeckId) {
+      await storage.saveSettings({ activeDeckId: selectedDeckId });
+    }
+
+    const selectedCard = availableCards.find(card => card.deckId === selectedDeckId) || availableCards[0];
+    console.log('[ScrollLearn Background] Returning card:', selectedCard.front.substring(0, 30));
+    const deckName = deckMap.get(selectedCard.deckId) || selectedCard.deckId;
+    return { ok: true, data: { ...selectedCard, deckName } };
   } catch (error) {
     console.error('[ScrollLearn Background] Error getting next card:', error);
     return { ok: false, error: String(error) };
   }
+}
+
+function getAvailableDeckIds(cards: Card[], decks: Deck[]): string[] {
+  const cardDeckSet = new Set(cards.map(card => card.deckId));
+  const orderedDeckIds = decks.map(deck => deck.id).filter(deckId => cardDeckSet.has(deckId));
+
+  // Keep unknown deck ids (if any) at the end in card-order.
+  const seen = new Set(orderedDeckIds);
+  for (const card of cards) {
+    if (!seen.has(card.deckId)) {
+      orderedDeckIds.push(card.deckId);
+      seen.add(card.deckId);
+    }
+  }
+
+  return orderedDeckIds;
+}
+
+function getNextDeckId(activeDeckId: string, availableDeckIds: string[], decks: Deck[]): string | null {
+  if (availableDeckIds.length === 0) return null;
+
+  const deckOrder = decks.map(deck => deck.id);
+  const orderedAvailable = deckOrder.filter(deckId => availableDeckIds.includes(deckId));
+  for (const deckId of availableDeckIds) {
+    if (!orderedAvailable.includes(deckId)) {
+      orderedAvailable.push(deckId);
+    }
+  }
+
+  const activeIndex = orderedAvailable.indexOf(activeDeckId);
+  if (activeIndex === -1) {
+    return orderedAvailable[0] || null;
+  }
+
+  for (let offset = 1; offset <= orderedAvailable.length; offset++) {
+    const nextDeckId = orderedAvailable[(activeIndex + offset) % orderedAvailable.length];
+    if (availableDeckIds.includes(nextDeckId)) {
+      return nextDeckId;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -471,4 +538,3 @@ function extractDomainKey(domain: string): string {
 
 // Initialize on script load
 initialize();
-

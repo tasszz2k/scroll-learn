@@ -1,11 +1,12 @@
 import { createRoot } from 'react-dom/client';
 import { useState, useEffect } from 'react';
-import type { Stats, Settings } from '../common/types';
+import type { Deck, Stats, Settings } from '../common/types';
 import './popup.css';
 
 interface PopupState {
   stats: Stats | null;
   settings: Settings | null;
+  decks: Deck[];
   currentSite: string;
   loading: boolean;
 }
@@ -14,6 +15,7 @@ function Popup() {
   const [state, setState] = useState<PopupState>({
     stats: null,
     settings: null,
+    decks: [],
     currentSite: '',
     loading: true,
   });
@@ -30,14 +32,16 @@ function Popup() {
       const currentSite = url?.hostname?.replace(/^(www\.|m\.)/, '') || '';
 
       // Get stats and settings from background
-      const [statsResponse, settingsResponse] = await Promise.all([
+      const [statsResponse, settingsResponse, decksResponse] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_stats' }),
         chrome.runtime.sendMessage({ type: 'get_settings' }),
+        chrome.runtime.sendMessage({ type: 'get_decks' }),
       ]);
 
       setState({
         stats: statsResponse.ok ? statsResponse.data : null,
         settings: settingsResponse.ok ? settingsResponse.data : null,
+        decks: decksResponse.ok ? decksResponse.data : [],
         currentSite,
         loading: false,
       });
@@ -88,6 +92,16 @@ function Popup() {
     chrome.tabs.create({ url: chrome.runtime.getURL('index.html#settings') });
   }
 
+  async function setActiveDeck(deckId: string | null) {
+    const response = await chrome.runtime.sendMessage({
+      type: 'set_settings',
+      settings: { activeDeckId: deckId },
+    });
+    if (response.ok) {
+      setState(prev => ({ ...prev, settings: response.data }));
+    }
+  }
+
   if (state.loading) {
     return (
       <div className="popup-container">
@@ -98,7 +112,7 @@ function Popup() {
     );
   }
 
-  const { stats, currentSite } = state;
+  const { stats, currentSite, decks } = state;
   const siteEnabled = isSiteEnabled();
   const isSocialSite = currentSite.includes('facebook') || currentSite.includes('youtube');
 
@@ -161,6 +175,24 @@ function Popup() {
         </div>
       )}
 
+      {/* Active Deck */}
+      <div className="deck-selector">
+        <div className="section-title">Active Deck</div>
+        <select
+          className="deck-select"
+          value={state.settings?.activeDeckId || ''}
+          onChange={e => setActiveDeck(e.target.value || null)}
+          disabled={decks.length === 0}
+        >
+          <option value="">Auto-select next due deck</option>
+          {decks.map(deck => (
+            <option key={deck.id} value={deck.id}>
+              {deck.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Quick Actions */}
       <div className="section-title">Quick Actions</div>
       <div className="quick-actions">
@@ -220,4 +252,3 @@ if (container) {
   const root = createRoot(container);
   root.render(<Popup />);
 }
-

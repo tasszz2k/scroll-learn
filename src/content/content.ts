@@ -1092,11 +1092,9 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
     message = 'Not quite right';
   }
   
-  // Add correct answer for wrong answers
-  if (grade < 2) {
-    const correctAnswer = getCorrectAnswerDisplay(card);
-    message += `. The answer was: ${correctAnswer}`;
-  }
+  // Always show the correct answer for consistency and reinforcement.
+  const correctAnswer = getCorrectAnswerDisplay(card);
+  message += `. The answer was: ${correctAnswer}`;
   
   showFeedback(message, type);
   
