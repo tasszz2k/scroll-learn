@@ -38,6 +38,7 @@ export default function App() {
     try {
       const result = await chrome.storage.local.get(['editCardId', 'editDeckId']);
       if (result.editCardId && result.editDeckId) {
+        setActiveTab('decks');
         setEditCardId(result.editCardId);
         setEditDeckId(result.editDeckId);
         // Clear the storage
@@ -278,4 +279,3 @@ export default function App() {
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Deck, Card, Response } from '../../common/types';
 import CardEditor from './CardEditor';
 
@@ -32,6 +32,7 @@ export default function DeckList({
   const [showNewCard, setShowNewCard] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckDescription, setNewDeckDescription] = useState('');
+  const pendingScrollCardIdRef = useRef<string | null>(null);
 
   // Handle edit card request from quiz
   useEffect(() => {
@@ -40,10 +41,33 @@ export default function DeckList({
       if (cardToEdit) {
         setExpandedDeck(editDeckId);
         setEditingCard(cardToEdit);
+        pendingScrollCardIdRef.current = cardToEdit.id;
       }
       onEditCardHandled?.();
     }
   }, [editCardId, editDeckId, cards, onEditCardHandled]);
+
+  useEffect(() => {
+    const targetCardId = pendingScrollCardIdRef.current;
+    if (!targetCardId || editingCard?.id !== targetCardId) return;
+
+    let rafId = 0;
+    const timeoutId = window.setTimeout(() => {
+      rafId = window.requestAnimationFrame(() => {
+        const cardContainer = document.getElementById(`card-row-${targetCardId}`);
+        cardContainer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        const firstInput = cardContainer?.querySelector('input, textarea, select') as HTMLElement | null;
+        firstInput?.focus({ preventScroll: true });
+      });
+      pendingScrollCardIdRef.current = null;
+    }, 50);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, [editingCard, expandedDeck]);
 
   function getCardsForDeck(deckId: string): Card[] {
     return cards.filter(c => c.deckId === deckId);
@@ -295,7 +319,7 @@ export default function DeckList({
                         </div>
                       ) : (
                         deckCards.map(card => (
-                          <div key={card.id} className="p-4">
+                          <div key={card.id} id={`card-row-${card.id}`} className="p-4">
                             {editingCard?.id === card.id ? (
                               <CardEditor
                                 card={card}
@@ -405,4 +429,3 @@ export default function DeckList({
     </div>
   );
 }
-

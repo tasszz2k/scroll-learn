@@ -165,13 +165,28 @@ What is red?,Color,mcq-single,Red|Blue|Green,0`;
     expect(result.cards[0].correct).toBe(0);
   });
 
-  it('should error on missing required columns', () => {
+  it('should support multiple accepted text answers via ||', () => {
+    const input = `front,back,kind
+Correct this question,Why is there still downtime?||Why is it still down?,text`;
+
+    const result = parseCSV(input);
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].back).toBe('Why is there still downtime?');
+    expect(result.cards[0].canonicalAnswers).toEqual([
+      'why is there still downtime',
+      'why is it still down',
+    ]);
+  });
+
+  it('should accept question/answer column aliases', () => {
     const input = `question,answer
 Test,Answer`;
     
     const result = parseCSV(input);
-    expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0].message).toContain('Missing required column');
+    expect(result.errors).toHaveLength(0);
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].front).toBe('Test');
+    expect(result.cards[0].back).toBe('Answer');
   });
 
   it('should handle empty input', () => {
@@ -243,4 +258,3 @@ describe('parseJSON', () => {
     expect(result.errors).toHaveLength(2);
   });
 });
-

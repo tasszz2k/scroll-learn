@@ -274,7 +274,15 @@ export function parseCSV(content: string): ParseResult {
       
       // Build canonical answers
       let canonicalAnswers: string[] | undefined;
-      if (kind === 'text' || kind === 'cloze') {
+      if (kind === 'text') {
+        // Allow multiple accepted answers for text cards via "answer1||answer2".
+        const acceptedAnswers = finalBack
+          .split('||')
+          .map(answer => answer.trim())
+          .filter(Boolean);
+        canonicalAnswers = acceptedAnswers.map(answer => normalizeText(answer));
+        finalBack = acceptedAnswers[0] || finalBack;
+      } else if (kind === 'cloze') {
         canonicalAnswers = [normalizeText(finalBack)];
       } else if (kind === 'mcq-single' && options && typeof correct === 'number') {
         canonicalAnswers = [normalizeText(options[correct])];
@@ -546,4 +554,3 @@ export function formatCardForPreview(card: ParsedCard): {
     deck: card.deckName,
   };
 }
-
