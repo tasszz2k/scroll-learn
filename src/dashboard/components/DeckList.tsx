@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Deck, Card, Response } from '../../common/types';
 import CardEditor from './CardEditor';
 
@@ -9,6 +9,9 @@ interface DeckListProps {
   onDeleteDeck: (deckId: string) => Promise<Response<void>>;
   onSaveCard: (card: Omit<Card, 'id' | 'due' | 'intervalDays' | 'ease' | 'repetitions' | 'lapses' | 'createdAt' | 'updatedAt'> | Card) => Promise<Response<Card>>;
   onDeleteCard: (cardId: string) => Promise<Response<void>>;
+  editCardId?: string | null;
+  editDeckId?: string | null;
+  onEditCardHandled?: () => void;
 }
 
 export default function DeckList({
@@ -18,6 +21,9 @@ export default function DeckList({
   onDeleteDeck,
   onSaveCard,
   onDeleteCard,
+  editCardId,
+  editDeckId,
+  onEditCardHandled,
 }: DeckListProps) {
   const [expandedDeck, setExpandedDeck] = useState<string | null>(null);
   const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
@@ -26,6 +32,18 @@ export default function DeckList({
   const [showNewCard, setShowNewCard] = useState(false);
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckDescription, setNewDeckDescription] = useState('');
+
+  // Handle edit card request from quiz
+  useEffect(() => {
+    if (editCardId && editDeckId && cards.length > 0) {
+      const cardToEdit = cards.find(c => c.id === editCardId);
+      if (cardToEdit) {
+        setExpandedDeck(editDeckId);
+        setEditingCard(cardToEdit);
+      }
+      onEditCardHandled?.();
+    }
+  }, [editCardId, editDeckId, cards, onEditCardHandled]);
 
   function getCardsForDeck(deckId: string): Card[] {
     return cards.filter(c => c.deckId === deckId);

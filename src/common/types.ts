@@ -187,6 +187,10 @@ export interface SkipCardMessage {
   snoozeMinutes: number;
 }
 
+export interface OpenDashboardMessage {
+  type: 'open_dashboard';
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -202,7 +206,8 @@ export type Message =
   | GetStatsMessage
   | PauseSiteMessage
   | DisableSiteMessage
-  | SkipCardMessage;
+  | SkipCardMessage
+  | OpenDashboardMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {

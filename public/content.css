@@ -348,6 +348,15 @@
   color: var(--ss-text);
 }
 
+.scrolllearn-quiz-btn-danger {
+  background: var(--ss-error);
+  color: #fff;
+}
+
+.scrolllearn-quiz-btn-danger:hover {
+  filter: brightness(0.95);
+}
+
 .scrolllearn-quiz-toolbar {
   display: flex;
   align-items: center;
@@ -380,6 +389,51 @@
 .scrolllearn-quiz-toolbar-btn svg {
   width: 14px;
   height: 14px;
+}
+
+.scrolllearn-quiz-toolbar-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.scrolllearn-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.scrolllearn-confirm-dialog {
+  width: min(420px, 100%);
+  padding: 18px;
+  border-radius: 10px;
+  border: 1px solid var(--ss-border);
+  background: var(--ss-surface);
+  box-shadow: var(--ss-shadow-lg);
+}
+
+.scrolllearn-confirm-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ss-text);
+}
+
+.scrolllearn-confirm-description {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ss-text-muted);
+}
+
+.scrolllearn-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 /* Scroll blocking overlay */
@@ -469,4 +523,3 @@
   border-radius: 2px;
   transition: width 0.3s ease;
 }
-

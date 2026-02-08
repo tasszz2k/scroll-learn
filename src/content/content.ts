@@ -46,6 +46,7 @@ let sessionStats: SessionStats = {
 // Quiz container ID
 const QUIZ_CONTAINER_ID = 'scrolllearn-quiz-root';
 const BLOCKER_ID = 'scrolllearn-scroll-blocker';
+const DELETE_CONFIRM_ID = 'scrolllearn-delete-confirm';
 
 /**
  * Initialize content script
@@ -606,6 +607,14 @@ function buildQuizHTML(card: Card): string {
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
           Skip
         </button>
+        <button class="scrolllearn-quiz-toolbar-btn" id="ss-edit" aria-label="Edit this card">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          Edit
+        </button>
+        <button class="scrolllearn-quiz-toolbar-btn scrolllearn-quiz-toolbar-btn-danger" id="ss-delete" aria-label="Delete this card">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          Delete
+        </button>
       </div>
     </div>
   `;
@@ -696,7 +705,15 @@ function setupQuizEventListeners(card: Card) {
   // Skip button
   const skipBtn = document.getElementById('ss-skip');
   skipBtn?.addEventListener('click', () => handleSkip(card));
-  
+
+  // Edit button
+  const editBtn = document.getElementById('ss-edit');
+  editBtn?.addEventListener('click', () => handleEdit(card));
+
+  // Delete button
+  const deleteBtn = document.getElementById('ss-delete');
+  deleteBtn?.addEventListener('click', () => handleDelete(card));
+
   // Audio play button
   const playBtn = document.getElementById('ss-play-audio');
   playBtn?.addEventListener('click', () => {
@@ -816,6 +833,9 @@ function handleKeyDown(e: KeyboardEvent) {
   
   const container = document.getElementById(QUIZ_CONTAINER_ID);
   if (!container) return;
+
+  // Pause quiz shortcuts while a confirmation dialog is open.
+  if (document.getElementById(DELETE_CONFIRM_ID)) return;
   
   // Number keys for MCQ
   if (currentCard.kind.startsWith('mcq') && e.key >= '1' && e.key <= '9') {
@@ -1271,6 +1291,108 @@ async function handleSkip(card: Card) {
 }
 
 /**
+ * Handle edit button - opens dashboard to edit the card
+ */
+async function handleEdit(card: Card) {
+  // Store card ID to edit in local storage for dashboard to pick up
+  await chrome.storage.local.set({ editCardId: card.id, editDeckId: card.deckId });
+
+  // Open dashboard via background script
+  await chrome.runtime.sendMessage({ type: 'open_dashboard' });
+  closeQuiz();
+}
+
+/**
+ * Handle delete button - deletes the card after confirmation
+ */
+async function handleDelete(card: Card) {
+  const confirmed = await showDeleteConfirmationDialog();
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await chrome.runtime.sendMessage({
+      type: 'delete_card',
+      cardId: card.id,
+    });
+    closeQuiz();
+  } catch (error) {
+    console.error('[ScrollLearn] Failed to delete:', error);
+  }
+}
+
+/**
+ * Show custom confirmation dialog for destructive card delete action
+ */
+function showDeleteConfirmationDialog(): Promise<boolean> {
+  const container = document.getElementById(QUIZ_CONTAINER_ID);
+  if (!container) return Promise.resolve(false);
+
+  document.getElementById(DELETE_CONFIRM_ID)?.remove();
+
+  return new Promise(resolve => {
+    const dialog = document.createElement('div');
+    dialog.id = DELETE_CONFIRM_ID;
+    dialog.className = 'scrolllearn-quiz-container scrolllearn-confirm-backdrop';
+    dialog.innerHTML = `
+      <div class="scrolllearn-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="ss-confirm-title" aria-describedby="ss-confirm-description">
+        <h3 class="scrolllearn-confirm-title" id="ss-confirm-title">Delete this card?</h3>
+        <p class="scrolllearn-confirm-description" id="ss-confirm-description">This action cannot be undone.</p>
+        <div class="scrolllearn-confirm-actions">
+          <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-ghost" id="ss-confirm-cancel">Cancel</button>
+          <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-danger" id="ss-confirm-delete">Delete</button>
+        </div>
+      </div>
+    `;
+
+    const cancelBtn = dialog.querySelector('#ss-confirm-cancel') as HTMLButtonElement | null;
+    const deleteBtn = dialog.querySelector('#ss-confirm-delete') as HTMLButtonElement | null;
+
+    let settled = false;
+    const close = (result: boolean) => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener('keydown', onKeyDown, true);
+      dialog.remove();
+      resolve(result);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!document.getElementById(DELETE_CONFIRM_ID)) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        close(false);
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'BUTTON') {
+          e.preventDefault();
+          e.stopPropagation();
+          close(true);
+        }
+      }
+    };
+
+    dialog.addEventListener('click', e => {
+      if (e.target === dialog) {
+        close(false);
+      }
+    });
+    cancelBtn?.addEventListener('click', () => close(false));
+    deleteBtn?.addEventListener('click', () => close(true));
+
+    document.body.appendChild(dialog);
+    cancelBtn?.focus();
+    document.addEventListener('keydown', onKeyDown, true);
+  });
+}
+
+/**
  * Close and remove quiz UI
  */
 function closeQuiz() {
@@ -1303,6 +1425,9 @@ function removeQuizUI() {
   // Disable scroll blocking first
   disableScrollBlock();
   
+  const confirmDialog = document.getElementById(DELETE_CONFIRM_ID);
+  confirmDialog?.remove();
+
   const container = document.getElementById(QUIZ_CONTAINER_ID);
   container?.remove();
   
@@ -1325,4 +1450,3 @@ if (document.readyState === 'loading') {
 } else {
   initialize();
 }
-

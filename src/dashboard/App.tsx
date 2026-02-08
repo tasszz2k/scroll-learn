@@ -15,19 +15,38 @@ export default function App() {
   const [stats, setStats] = useState<StatsType | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [editCardId, setEditCardId] = useState<string | null>(null);
+  const [editDeckId, setEditDeckId] = useState<string | null>(null);
 
   // Load initial data
   useEffect(() => {
     loadData();
-    
+
     // Check for dark mode preference
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setDarkMode(prefersDark);
-    
+
     if (prefersDark) {
       document.documentElement.classList.add('dark');
     }
+
+    // Check for edit card request from quiz
+    checkEditCardRequest();
   }, []);
+
+  async function checkEditCardRequest() {
+    try {
+      const result = await chrome.storage.local.get(['editCardId', 'editDeckId']);
+      if (result.editCardId && result.editDeckId) {
+        setEditCardId(result.editCardId);
+        setEditDeckId(result.editDeckId);
+        // Clear the storage
+        await chrome.storage.local.remove(['editCardId', 'editDeckId']);
+      }
+    } catch (error) {
+      console.error('Failed to check edit card request:', error);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -227,6 +246,9 @@ export default function App() {
             onDeleteDeck={handleDeleteDeck}
             onSaveCard={handleSaveCard}
             onDeleteCard={handleDeleteCard}
+            editCardId={editCardId}
+            editDeckId={editDeckId}
+            onEditCardHandled={() => { setEditCardId(null); setEditDeckId(null); }}
           />
         )}
         

@@ -125,7 +125,10 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     
     case 'skip_card':
       return handleSkipCard(message.cardId, message.snoozeMinutes);
-    
+
+    case 'open_dashboard':
+      return handleOpenDashboard();
+
     default:
       return { ok: false, error: 'Unknown message type' };
   }
@@ -439,6 +442,19 @@ async function handleDisableSite(domain: string): Promise<Response<void>> {
 async function handleSkipCard(cardId: string, snoozeMinutes: number): Promise<Response<void>> {
   try {
     await storage.snoozeCard(cardId, snoozeMinutes);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+/**
+ * Open the dashboard in a new tab
+ */
+async function handleOpenDashboard(): Promise<Response<void>> {
+  try {
+    const dashboardUrl = chrome.runtime.getURL('index.html');
+    await chrome.tabs.create({ url: dashboardUrl });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };
