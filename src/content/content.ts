@@ -602,10 +602,6 @@ function buildQuizHTML(card: Card): string {
       ` : ''}
       
       <div class="scrolllearn-quiz-toolbar">
-        <button class="scrolllearn-quiz-toolbar-btn" id="ss-pause" aria-label="Pause for 30 minutes">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-          Pause 30m
-        </button>
         <button class="scrolllearn-quiz-toolbar-btn" id="ss-skip" aria-label="Skip this card">
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
           Skip
@@ -696,10 +692,6 @@ function setupQuizEventListeners(card: Card) {
   // Submit button
   const submitBtn = document.getElementById('ss-submit');
   submitBtn?.addEventListener('click', () => handleSubmit(card));
-  
-  // Pause button
-  const pauseBtn = document.getElementById('ss-pause');
-  pauseBtn?.addEventListener('click', () => handlePause());
   
   // Skip button
   const skipBtn = document.getElementById('ss-skip');
@@ -1259,22 +1251,6 @@ async function loadNextCard() {
   } catch (error) {
     console.error('[ScrollLearn] Failed to load next card:', error);
     closeQuiz();
-  }
-}
-
-/**
- * Handle pause button
- */
-async function handlePause() {
-  try {
-    await chrome.runtime.sendMessage({
-      type: 'pause_site',
-      domain: getDomainKey(),
-      minutes: 30,
-    });
-    closeQuiz();
-  } catch (error) {
-    console.error('[ScrollLearn] Failed to pause:', error);
   }
 }
 
