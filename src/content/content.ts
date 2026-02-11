@@ -17,13 +17,15 @@ import { instagramDetector, isInstagramFeedPage } from './instagram';
 // State
 let currentDetector: DomainDetector | null = null;
 let settings: Settings = DEFAULT_SETTINGS;
-let scrolledPastPostIds: Set<string> = new Set(); // Posts user has scrolled past
+const scrolledPastPostIds: Set<string> = new Set(); // Posts user has scrolled past
 let scrolledPastCount = 0; // Simple counter for posts scrolled past
 let lastScrollY = 0; // Track scroll position to detect direction
 let isQuizActive = false;
 let observer: MutationObserver | null = null;
 let currentCard: Card | null = null;
 let scrollBlockHandler: ((e: Event) => void) | null = null;
+let isRetryMode = false;
+let shuffledIndices: number[] = []; // Track shuffled option order for current MCQ card
 
 // Session stats
 interface SessionStats {
@@ -34,7 +36,7 @@ interface SessionStats {
   sessionIncorrect: number;
   currentStreak: number;
 }
-let sessionStats: SessionStats = {
+const sessionStats: SessionStats = {
   todayTotal: 0,
   todayCorrect: 0,
   todayIncorrect: 0,
@@ -629,21 +631,38 @@ function buildQuizHTML(card: Card): string {
 }
 
 /**
- * Build MCQ options HTML
+ * Fisher-Yates shuffle algorithm
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+/**
+ * Build MCQ options HTML with shuffled order
  */
 function buildMCQOptions(card: Card, isMulti: boolean): string {
   if (!card.options) return '';
-  
-  const options = card.options.map((option, index) => {
-    const key = index + 1;
-    const indicator = isMulti 
+
+  // Create array of indices and shuffle them
+  const indices = card.options.map((_, i) => i);
+  shuffledIndices = shuffleArray(indices);
+
+  const options = shuffledIndices.map((originalIndex, displayPosition) => {
+    const key = displayPosition + 1;
+    const option = card.options![originalIndex];
+    const indicator = isMulti
       ? '<div class="scrolllearn-quiz-checkbox"></div>'
       : '';
-    
+
     return `
-      <button 
-        class="scrolllearn-quiz-option" 
-        data-index="${index}"
+      <button
+        class="scrolllearn-quiz-option"
+        data-index="${originalIndex}"
         aria-pressed="false"
         role="${isMulti ? 'checkbox' : 'radio'}"
       >
@@ -653,7 +672,7 @@ function buildMCQOptions(card: Card, isMulti: boolean): string {
       </button>
     `;
   }).join('');
-  
+
   return `
     <div class="scrolllearn-quiz-options" role="${isMulti ? 'group' : 'radiogroup'}" aria-label="Answer options">
       ${options}
@@ -855,11 +874,15 @@ function handleKeyDown(e: KeyboardEvent) {
     e.preventDefault();
   }
   
-  // Enter to submit
+  // Enter to submit (or confirm during retry mode)
   if (e.key === 'Enter' && !e.shiftKey) {
     const target = e.target as HTMLElement;
     if (target.tagName !== 'BUTTON') {
-      handleSubmit(currentCard);
+      if (isRetryMode) {
+        handleRetrySubmit(currentCard);
+      } else {
+        handleSubmit(currentCard);
+      }
       e.preventDefault();
     }
   }
@@ -967,10 +990,14 @@ async function handleSubmit(card: Card) {
     console.error('[ScrollLearn] Failed to record answer:', error);
   }
   
-  // If wrong answer (grade < 2), show next card after a brief delay
+  // If wrong answer (grade < 2), show retry practice for text/audio/cloze, else next card
   // If correct (grade >= 2), show continue button
   if (grade < 2) {
-    showNextCardButton();
+    if (card.kind === 'text' || card.kind === 'audio' || card.kind === 'cloze') {
+      showRetryPractice(card);
+    } else {
+      showNextCardButton();
+    }
   } else {
     showContinueButton();
   }
@@ -1085,40 +1112,57 @@ function showFeedback(message: string, type: 'success' | 'error' | 'partial') {
 function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
   const container = document.getElementById(QUIZ_CONTAINER_ID);
   if (!container) return;
-  
+
   let type: 'success' | 'error' | 'partial';
   let message: string;
-  
+
   if (grade >= 2) {
     type = 'success';
     message = grade === 3 ? 'Perfect!' : 'Good job!';
+    showFeedback(message, type);
   } else if (grade === 1) {
     type = 'partial';
     message = 'Almost there...';
+    const correctAnswer = getCorrectAnswerDisplay(card);
+    message += `. The answer was: ${correctAnswer}`;
+    showFeedback(message, type);
   } else {
     type = 'error';
-    message = 'Not quite right';
+    // For wrong answers on text/audio/cloze, show diff-style feedback
+    if (card.kind === 'text' || card.kind === 'audio') {
+      const input = document.getElementById('ss-text-input') as HTMLInputElement;
+      const userAnswer = input?.value.trim() || '';
+      const correctAnswer = card.canonicalAnswers?.[0] || card.back;
+      showInitialWrongAnswerDiff(userAnswer, correctAnswer);
+    } else if (card.kind === 'cloze') {
+      const inputs = document.querySelectorAll('.scrolllearn-quiz-cloze-blank input') as NodeListOf<HTMLInputElement>;
+      const userAnswers = Array.from(inputs).map(inp => (inp as HTMLInputElement).value.trim());
+      const expected = card.canonicalAnswers || [];
+      showInitialWrongAnswerDiff(userAnswers.join(' / '), expected.join(' / '));
+    } else {
+      // MCQ - use simple message
+      message = 'Not quite right';
+      const correctAnswer = getCorrectAnswerDisplay(card);
+      message += `. The answer was: ${correctAnswer}`;
+      showFeedback(message, type);
+    }
   }
-  
-  // Always show the correct answer for consistency and reinforcement.
-  const correctAnswer = getCorrectAnswerDisplay(card);
-  message += `. The answer was: ${correctAnswer}`;
-  
-  showFeedback(message, type);
-  
+
   // Highlight correct/incorrect options for MCQ
   if (card.kind.startsWith('mcq')) {
     const options = container.querySelectorAll('.scrolllearn-quiz-option');
-    options.forEach((option, index) => {
+    options.forEach((option) => {
+      const originalIndex = parseInt(option.getAttribute('data-index') || '0');
+
       if (card.kind === 'mcq-single') {
-        if (index === card.correct) {
+        if (originalIndex === card.correct) {
           option.classList.add('correct');
         } else if (option.classList.contains('selected')) {
           option.classList.add('incorrect');
         }
       } else {
         const correct = card.correct as number[];
-        if (correct.includes(index)) {
+        if (correct.includes(originalIndex)) {
           option.classList.add('correct');
         } else if (option.classList.contains('selected')) {
           option.classList.add('incorrect');
@@ -1126,6 +1170,30 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
       }
     });
   }
+}
+
+/**
+ * Show diff-style feedback for initial wrong answer (with reinforcement message)
+ */
+function showInitialWrongAnswerDiff(userAnswer: string, correctAnswer: string) {
+  const feedback = document.getElementById('ss-feedback');
+  if (!feedback) return;
+
+  const inlineDiff = generateInlineDiff(userAnswer, correctAnswer);
+
+  const diffHTML = `
+    <div style="text-align: left; font-size: 13px; line-height: 1.8;">
+      <div style="margin-bottom: 8px; font-weight: 600;">Not quite right — here's the difference:</div>
+      <div style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; padding: 8px; background: #f8fafc; border-radius: 6px; word-break: break-word; margin-bottom: 8px;">
+        ${inlineDiff}
+      </div>
+      <div style="font-size: 12px; color: #64748b;">Now try typing the correct answer below ↓</div>
+    </div>
+  `;
+
+  feedback.innerHTML = diffHTML;
+  feedback.className = 'scrolllearn-quiz-feedback error';
+  feedback.style.display = 'flex';
 }
 
 /**
@@ -1228,11 +1296,190 @@ function showNextCardButton() {
 }
 
 /**
+ * Show retry practice mode — user must retype the correct answer before proceeding
+ */
+function showRetryPractice(card: Card) {
+  isRetryMode = true;
+  const actionsContainer = document.getElementById('ss-actions');
+  if (!actionsContainer) return;
+
+  if (card.kind === 'text' || card.kind === 'audio') {
+    const input = document.getElementById('ss-text-input') as HTMLInputElement;
+    if (input) {
+      input.value = '';
+      input.disabled = false;
+      input.placeholder = 'Type the correct answer to continue...';
+      input.focus();
+    }
+  } else if (card.kind === 'cloze') {
+    const inputs = document.querySelectorAll('.scrolllearn-quiz-cloze-blank input') as NodeListOf<HTMLInputElement>;
+    inputs.forEach(input => {
+      input.value = '';
+      input.disabled = false;
+    });
+    inputs[0]?.focus();
+  }
+
+  actionsContainer.innerHTML = `
+    <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-primary" id="ss-retry-confirm">
+      Confirm
+    </button>
+    <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-secondary" id="ss-retry-skip">
+      Skip & Next
+    </button>
+  `;
+
+  document.getElementById('ss-retry-confirm')?.addEventListener('click', () => handleRetrySubmit(card));
+  document.getElementById('ss-retry-skip')?.addEventListener('click', () => {
+    isRetryMode = false;
+    showNextCardButton();
+  });
+}
+
+/**
+ * Handle retry practice submission — check if the retyped answer matches
+ */
+function handleRetrySubmit(card: Card) {
+  if (card.kind === 'text' || card.kind === 'audio') {
+    const input = document.getElementById('ss-text-input') as HTMLInputElement;
+    if (!input || !input.value.trim()) {
+      showFeedback('Type the correct answer to continue', 'error');
+      return;
+    }
+    const userInput = input.value.trim().toLowerCase();
+    const correct = (card.canonicalAnswers?.[0] || card.back).toLowerCase();
+    if (userInput === correct) {
+      isRetryMode = false;
+      // Clear the feedback since they got it right this time
+      const feedback = document.getElementById('ss-feedback');
+      if (feedback) feedback.style.display = 'none';
+      showNextCardButton();
+    } else {
+      input.classList.add('scrolllearn-shake');
+      setTimeout(() => input.classList.remove('scrolllearn-shake'), 500);
+      const correctAnswer = card.canonicalAnswers?.[0] || card.back;
+      const userOriginal = input.value.trim(); // Keep original casing for diff
+      showRetryDiff(userOriginal, correctAnswer);
+    }
+  } else if (card.kind === 'cloze') {
+    const inputs = document.querySelectorAll('.scrolllearn-quiz-cloze-blank input') as NodeListOf<HTMLInputElement>;
+    const expected = card.canonicalAnswers || [];
+    let allCorrect = true;
+
+    inputs.forEach((input, i) => {
+      const userVal = input.value.trim().toLowerCase();
+      const expVal = (expected[i] || '').toLowerCase();
+      if (userVal !== expVal) {
+        allCorrect = false;
+        input.classList.add('scrolllearn-shake');
+        setTimeout(() => input.classList.remove('scrolllearn-shake'), 500);
+      }
+    });
+
+    if (allCorrect) {
+      isRetryMode = false;
+      // Clear the feedback since they got it right this time
+      const feedback = document.getElementById('ss-feedback');
+      if (feedback) feedback.style.display = 'none';
+      showNextCardButton();
+    } else {
+      // Show diff for cloze blanks
+      const userAnswers = Array.from(inputs).map(inp => (inp as HTMLInputElement).value.trim());
+      showRetryDiff(userAnswers.join(' / '), expected.join(' / '));
+    }
+  }
+}
+
+/**
+ * Generate inline diff HTML with character-level highlighting
+ * Uses case-insensitive comparison but preserves original casing in display
+ */
+function generateInlineDiff(userAnswer: string, correctAnswer: string): string {
+  const userLower = userAnswer.toLowerCase();
+  const correctLower = correctAnswer.toLowerCase();
+
+  // Simple diff: find common prefix and suffix (case-insensitive comparison)
+  let prefixLen = 0;
+  while (prefixLen < userLower.length && prefixLen < correctLower.length &&
+         userLower[prefixLen] === correctLower[prefixLen]) {
+    prefixLen++;
+  }
+
+  let suffixLen = 0;
+  while (suffixLen < userLower.length - prefixLen &&
+         suffixLen < correctLower.length - prefixLen &&
+         userLower[userLower.length - 1 - suffixLen] === correctLower[correctLower.length - 1 - suffixLen]) {
+    suffixLen++;
+  }
+
+  // Use CORRECT answer's casing for prefix/suffix (not user's)
+  const prefix = escapeHTML(correctAnswer.substring(0, prefixLen));
+  const suffix = escapeHTML(correctAnswer.substring(correctAnswer.length - suffixLen));
+
+  const userMiddle = escapeHTML(userAnswer.substring(prefixLen, userAnswer.length - suffixLen));
+  const correctMiddle = escapeHTML(correctAnswer.substring(prefixLen, correctAnswer.length - suffixLen));
+
+  // If completely different, show both on separate lines
+  if (prefixLen === 0 && suffixLen === 0) {
+    return `
+      <div style="margin-bottom: 4px;">
+        <span style="color: #dc2626; background: #fee2e2; padding: 2px 4px; border-radius: 3px; text-decoration: line-through;">${escapeHTML(userAnswer)}</span>
+      </div>
+      <div>
+        <span style="color: #16a34a; background: #dcfce7; padding: 2px 4px; border-radius: 3px; font-weight: 600;">${escapeHTML(correctAnswer)}</span>
+      </div>
+    `;
+  }
+
+  // Show inline diff with highlighted changes
+  // Empty userMiddle means they only have part of the answer
+  if (!userMiddle) {
+    return `
+      <div>
+        ${prefix}<span style="color: #16a34a; background: #dcfce7; padding: 2px 4px; border-radius: 3px; font-weight: 600;">${correctMiddle}</span>${suffix}
+      </div>
+    `;
+  }
+
+  // Both have different middle sections
+  return `
+    <div>
+      ${prefix}<span style="color: #dc2626; background: #fee2e2; padding: 2px 4px; border-radius: 3px; text-decoration: line-through;">${userMiddle}</span><span style="color: #16a34a; background: #dcfce7; padding: 2px 4px; border-radius: 3px; font-weight: 600;">${correctMiddle}</span>${suffix}
+    </div>
+  `;
+}
+
+/**
+ * Show a diff-style comparison between user's answer and correct answer
+ */
+function showRetryDiff(userAnswer: string, correctAnswer: string) {
+  const feedback = document.getElementById('ss-feedback');
+  if (!feedback) return;
+
+  const inlineDiff = generateInlineDiff(userAnswer, correctAnswer);
+
+  const diffHTML = `
+    <div style="text-align: left; font-size: 13px; line-height: 1.8;">
+      <div style="margin-bottom: 8px; font-weight: 600;">Not quite — compare:</div>
+      <div style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; padding: 8px; background: #f8fafc; border-radius: 6px; word-break: break-word;">
+        ${inlineDiff}
+      </div>
+    </div>
+  `;
+
+  feedback.innerHTML = diffHTML;
+  feedback.className = 'scrolllearn-quiz-feedback error';
+  feedback.style.display = 'flex';
+}
+
+/**
  * Load and display the next card
  */
 async function loadNextCard() {
   console.log('[ScrollLearn] Loading next card...');
-  
+  isRetryMode = false;
+  shuffledIndices = [];
+
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'get_next_card_for_domain',
@@ -1406,7 +1653,9 @@ function showDeleteConfirmationDialog(): Promise<boolean> {
 function closeQuiz() {
   removeQuizUI();
   isQuizActive = false;
+  isRetryMode = false;
   currentCard = null;
+  shuffledIndices = [];
   
   // Remove keyboard listener
   document.removeEventListener('keydown', handleKeyDown);
