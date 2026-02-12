@@ -367,6 +367,25 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
               />
             </button>
           </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium text-surface-900 dark:text-surface-50">Allow skip</div>
+              <p className="text-sm text-surface-500">Show Skip button and allow Esc key to skip cards</p>
+            </div>
+            <button
+              onClick={() => updateSetting('allowSkip', !localSettings.allowSkip)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                localSettings.allowSkip ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  localSettings.allowSkip ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
         </div>
       </div>
 

@@ -54,12 +54,13 @@ export interface Settings {
   showAfterNPosts: number; // Default 5
   pauseMinutesAfterQuiz: number; // Default 0
   activeDeckId: string | null; // Deck currently prioritized for quizzes
-  eliminateChars: string; // Default ".,!?()'\"" 
+  eliminateChars: string; // Default ".,!?()'\""
   lowercaseNormalization: boolean; // Default true
   domainSettings: Record<string, DomainSettings>;
   fuzzyThresholds: FuzzyThresholds;
   enableKeyboardShortcuts: boolean; // Default true
   showKeyboardHints: boolean; // Default true
+  allowSkip: boolean; // Default true - allows users to skip cards
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -81,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   enableKeyboardShortcuts: true,
   showKeyboardHints: true,
+  allowSkip: true,
 };
 
 // Review Statistics

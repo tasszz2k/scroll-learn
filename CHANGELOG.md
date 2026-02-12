@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Improved - 2026-02-12
+
+#### Retry Practice UX
+- **Keep original input for editing**: Retry practice mode now preserves the user's incorrect answer instead of clearing it
+  - Users can edit their original answer rather than retyping everything from scratch
+  - Input text is automatically selected for easy replacement if desired
+  - Updated placeholder text to "Edit your answer or retype the correct answer..."
+  - Applies to text, audio, and cloze card types
+  - Better UX for small typos or partially correct answers
+
 ### Fixed - 2026-02-12
 
 #### Correct Answer Display

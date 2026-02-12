@@ -72,7 +72,15 @@ async function initialize() {
   
   // Load settings
   await loadSettings();
-  
+
+  // Listen for settings changes and reload
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.settings) {
+      console.log('[ScrollLearn] Settings changed, reloading...');
+      loadSettings();
+    }
+  });
+
   // Check if site is enabled
   const domainKey = getDomainKey();
   const domainSettings = settings.domainSettings[domainKey];
@@ -608,15 +616,17 @@ function buildQuizHTML(card: Card): string {
       
       ${settings.showKeyboardHints ? `
         <div class="scrolllearn-quiz-keyboard-hint">
-          ${card.kind.startsWith('mcq') ? 'Press 1-4 to select, Enter to submit' : 'Press Enter to submit'}
+          ${card.kind.startsWith('mcq') ? 'Press 1-4 to select, Enter to submit' : 'Press Enter to submit'}${settings.allowSkip ? ', Esc to skip' : ''}
         </div>
       ` : ''}
-      
+
       <div class="scrolllearn-quiz-toolbar">
-        <button class="scrolllearn-quiz-toolbar-btn" id="ss-skip" aria-label="Skip this card">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-          Skip
-        </button>
+        ${settings.allowSkip ? `
+          <button class="scrolllearn-quiz-toolbar-btn" id="ss-skip" aria-label="Skip this card">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            Skip
+          </button>
+        ` : ''}
         <button class="scrolllearn-quiz-toolbar-btn" id="ss-edit" aria-label="Edit this card">
           <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
           Edit
@@ -896,8 +906,8 @@ function handleKeyDown(e: KeyboardEvent) {
     }
   }
   
-  // Escape to skip
-  if (e.key === 'Escape') {
+  // Escape to skip (only if skip is allowed)
+  if (e.key === 'Escape' && settings.allowSkip) {
     handleSkip(currentCard);
     e.preventDefault();
   }
@@ -1283,16 +1293,18 @@ function showContinueButton() {
 function showNextCardButton() {
   const actionsContainer = document.getElementById('ss-actions');
   if (!actionsContainer) return;
-  
+
   actionsContainer.innerHTML = `
     <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-primary" id="ss-next-card">
       Next Question
     </button>
-    <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-secondary" id="ss-skip-continue">
-      Skip & Continue
-    </button>
+    ${settings.allowSkip ? `
+      <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-secondary" id="ss-skip-continue">
+        Skip & Continue
+      </button>
+    ` : ''}
   `;
-  
+
   const nextCardBtn = document.getElementById('ss-next-card');
   nextCardBtn?.addEventListener('click', async () => {
     await loadNextCard();
@@ -1317,34 +1329,40 @@ function showRetryPractice(card: Card) {
   if (card.kind === 'text' || card.kind === 'audio') {
     const input = document.getElementById('ss-text-input') as HTMLInputElement;
     if (input) {
-      input.value = '';
       input.disabled = false;
-      input.placeholder = 'Type the correct answer to continue...';
+      input.placeholder = 'Edit your answer or retype the correct answer...';
       input.focus();
+      // Select all text so user can easily replace if they want
+      input.select();
     }
   } else if (card.kind === 'cloze') {
     const inputs = document.querySelectorAll('.scrolllearn-quiz-cloze-blank input') as NodeListOf<HTMLInputElement>;
     inputs.forEach(input => {
-      input.value = '';
       input.disabled = false;
     });
     inputs[0]?.focus();
+    inputs[0]?.select();
   }
 
   actionsContainer.innerHTML = `
     <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-primary" id="ss-retry-confirm">
       Confirm
     </button>
-    <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-secondary" id="ss-retry-skip">
-      Skip & Next
-    </button>
+    ${settings.allowSkip ? `
+      <button class="scrolllearn-quiz-btn scrolllearn-quiz-btn-secondary" id="ss-retry-skip">
+        Skip & Next
+      </button>
+    ` : ''}
   `;
 
   document.getElementById('ss-retry-confirm')?.addEventListener('click', () => handleRetrySubmit(card));
-  document.getElementById('ss-retry-skip')?.addEventListener('click', () => {
-    isRetryMode = false;
-    showNextCardButton();
-  });
+
+  if (settings.allowSkip) {
+    document.getElementById('ss-retry-skip')?.addEventListener('click', () => {
+      isRetryMode = false;
+      showNextCardButton();
+    });
+  }
 }
 
 /**
@@ -1358,7 +1376,7 @@ function handleRetrySubmit(card: Card) {
       return;
     }
     const userInput = input.value.trim().toLowerCase();
-    const correct = (card.canonicalAnswers?.[0] || card.back).toLowerCase();
+    const correct = card.back.toLowerCase();
     if (userInput === correct) {
       isRetryMode = false;
       // Clear the feedback since they got it right this time
@@ -1375,7 +1393,7 @@ function handleRetrySubmit(card: Card) {
     }
   } else if (card.kind === 'cloze') {
     const inputs = document.querySelectorAll('.scrolllearn-quiz-cloze-blank input') as NodeListOf<HTMLInputElement>;
-    const expected = card.canonicalAnswers || [];
+    const expected = parseClozeAnswersFromBack(card.back);
     let allCorrect = true;
 
     inputs.forEach((input, i) => {
