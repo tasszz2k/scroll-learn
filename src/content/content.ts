@@ -537,9 +537,9 @@ function buildQuizHTML(card: Card): string {
     case 'text':
       inputHTML = `
         <div class="scrolllearn-quiz-input-container">
-          <input 
-            type="text" 
-            class="scrolllearn-quiz-input" 
+          <input
+            type="text"
+            class="scrolllearn-quiz-input"
             id="ss-text-input"
             placeholder="Type your answer..."
             autocomplete="off"
@@ -562,9 +562,9 @@ function buildQuizHTML(card: Card): string {
           <span>Listen and type your answer</span>
         </div>
         <div class="scrolllearn-quiz-input-container">
-          <input 
-            type="text" 
-            class="scrolllearn-quiz-input" 
+          <input
+            type="text"
+            class="scrolllearn-quiz-input"
             id="ss-text-input"
             placeholder="Type what you hear..."
             autocomplete="off"
@@ -681,6 +681,15 @@ function buildMCQOptions(card: Card, isMulti: boolean): string {
 }
 
 /**
+ * Parse cloze answers from card.back for display purposes
+ * card.back format: "answer1, answer2, answer3"
+ */
+function parseClozeAnswersFromBack(back: string): string[] {
+  // Split by comma and trim each answer
+  return back.split(',').map(ans => ans.trim());
+}
+
+/**
  * Build cloze (fill-in-the-blank) HTML
  */
 function buildClozeHTML(card: Card): string {
@@ -747,12 +756,12 @@ function setupQuizEventListeners(card: Card) {
     const audio = document.getElementById('ss-audio-player') as HTMLAudioElement;
     audio?.play();
   });
-  
+
   // Keyboard shortcuts
   if (settings.enableKeyboardShortcuts) {
     document.addEventListener('keydown', handleKeyDown);
   }
-  
+
   // Setup tooltips for stats
   setupTooltips(container);
 }
@@ -1132,12 +1141,14 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
     if (card.kind === 'text' || card.kind === 'audio') {
       const input = document.getElementById('ss-text-input') as HTMLInputElement;
       const userAnswer = input?.value.trim() || '';
-      const correctAnswer = card.canonicalAnswers?.[0] || card.back;
+      // Use card.back for display (has proper capitalization)
+      const correctAnswer = card.back;
       showInitialWrongAnswerDiff(userAnswer, correctAnswer);
     } else if (card.kind === 'cloze') {
       const inputs = document.querySelectorAll('.scrolllearn-quiz-cloze-blank input') as NodeListOf<HTMLInputElement>;
       const userAnswers = Array.from(inputs).map(inp => (inp as HTMLInputElement).value.trim());
-      const expected = card.canonicalAnswers || [];
+      // For cloze, card.back contains the full answer, parse it for blanks
+      const expected = parseClozeAnswersFromBack(card.back);
       showInitialWrongAnswerDiff(userAnswers.join(' / '), expected.join(' / '));
     } else {
       // MCQ - use simple message
@@ -1357,7 +1368,8 @@ function handleRetrySubmit(card: Card) {
     } else {
       input.classList.add('scrolllearn-shake');
       setTimeout(() => input.classList.remove('scrolllearn-shake'), 500);
-      const correctAnswer = card.canonicalAnswers?.[0] || card.back;
+      // Use card.back for display (has proper capitalization)
+      const correctAnswer = card.back;
       const userOriginal = input.value.trim(); // Keep original casing for diff
       showRetryDiff(userOriginal, correctAnswer);
     }
@@ -1383,9 +1395,10 @@ function handleRetrySubmit(card: Card) {
       if (feedback) feedback.style.display = 'none';
       showNextCardButton();
     } else {
-      // Show diff for cloze blanks
+      // Show diff for cloze blanks using original answer from card.back
       const userAnswers = Array.from(inputs).map(inp => (inp as HTMLInputElement).value.trim());
-      showRetryDiff(userAnswers.join(' / '), expected.join(' / '));
+      const expectedOriginal = parseClozeAnswersFromBack(card.back);
+      showRetryDiff(userAnswers.join(' / '), expectedOriginal.join(' / '));
     }
   }
 }

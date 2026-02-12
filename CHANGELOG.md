@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2026-02-12
+
+#### Correct Answer Display
+- **Fixed diff showing normalized answers**: Diff feedback now shows original answer with proper capitalization and punctuation
+  - Previously showed normalized version (lowercase, no punctuation) from `canonicalAnswers`
+  - Now uses `card.back` for display which preserves original formatting
+  - Grading still uses normalized comparison (case-insensitive)
+  - Display shows correct capitalization to help users learn proper formatting
+
 ### Added - 2026-02-11
 
 #### Retry-to-Practice Feature
@@ -39,7 +48,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Technical Details
 
-#### Modified Files
+#### Modified Files (2026-02-12)
+- `src/content/content.ts`:
+  - Fixed `showAnswerFeedback()` to use `card.back` for display instead of `canonicalAnswers`
+  - Fixed `handleRetrySubmit()` to use `card.back` for diff display
+  - Added `parseClozeAnswersFromBack()` helper to extract original answers from card.back
+
+- `CHANGELOG.md`:
+  - Documented correct answer display fix
+
+#### Modified Files (2026-02-11)
 - `src/content/content.ts`:
   - Added `isRetryMode` state flag to track retry practice mode
   - Added `shuffledIndices` array to track MCQ option shuffle order

@@ -118,3 +118,4 @@ When users answer text/audio/cloze cards incorrectly (grade < 2):
 - The `due` field on cards is a Unix timestamp in milliseconds (not seconds)
 - Retry practice uses exact match (no fuzzy matching) — users must type answer exactly right
 - Shuffled MCQ indices are stored in module-level `shuffledIndices` array, reset on card change
+- **Content script CSS**: `public/content.css` is used for content script styles (copied to `dist/` during build). The `src/styles/` directory is for dashboard/popup styles only
