@@ -13,6 +13,8 @@ import { DEFAULT_SETTINGS } from '../common/types';
 import { facebookDetector, getVisiblePosts, type DomainDetector } from './fb';
 import { youtubeDetector, isYouTubeFeedPage, isYouTubeWatchPage } from './youtube';
 import { instagramDetector, isInstagramFeedPage } from './instagram';
+import { similarity } from '../common/fuzzy';
+import { normalizeText } from '../common/parser';
 
 // State
 let currentDetector: DomainDetector | null = null;
@@ -1049,37 +1051,62 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
     
     case 'text':
     case 'audio': {
-      const input = (userAnswer as string).toLowerCase().trim();
-      const canonical = card.canonicalAnswers?.[0]?.toLowerCase() || card.back.toLowerCase();
-      
-      if (input === canonical) return 3;
-      
-      // Simple fuzzy check
-      const similarity = calculateSimpleSimilarity(input, canonical);
-      if (similarity >= 0.95) return 3;
-      if (similarity >= 0.85) return 2;
-      if (similarity >= 0.7) return 1;
+      // Normalize both answers using the same logic as grading.ts
+      const normalizedInput = normalizeText(
+        userAnswer as string,
+        settings.eliminateChars,
+        settings.lowercaseNormalization
+      );
+
+      // Get canonical answer or normalize card.back
+      const canonicalAnswers = card.canonicalAnswers || [
+        normalizeText(card.back, settings.eliminateChars, settings.lowercaseNormalization)
+      ];
+
+      // Check exact match first
+      for (const answer of canonicalAnswers) {
+        if (normalizedInput === answer) return 3;
+      }
+
+      // Find best fuzzy match
+      let bestScore = 0;
+      for (const answer of canonicalAnswers) {
+        const score = calculateSimpleSimilarity(normalizedInput, answer);
+        bestScore = Math.max(bestScore, score);
+      }
+
+      // Use thresholds from settings
+      if (bestScore >= settings.fuzzyThresholds.high) return 3;
+      if (bestScore >= settings.fuzzyThresholds.medium) return 2;
+      if (bestScore >= settings.fuzzyThresholds.low) return 1;
       return 0;
     }
     
     case 'cloze': {
       const inputs = (userAnswer as string).split('|');
       const expected = card.canonicalAnswers || [];
-      
+
       let totalScore = 0;
       for (let i = 0; i < expected.length; i++) {
-        const input = inputs[i]?.toLowerCase() || '';
-        const exp = expected[i]?.toLowerCase() || '';
-        
-        if (input === exp) {
+        const normalizedInput = normalizeText(
+          inputs[i] || '',
+          settings.eliminateChars,
+          settings.lowercaseNormalization
+        );
+        const normalizedExpected = expected[i] || '';
+
+        // Exact match
+        if (normalizedInput === normalizedExpected) {
           totalScore += 3;
         } else {
-          const sim = calculateSimpleSimilarity(input, exp);
-          if (sim >= 0.85) totalScore += 2;
-          else if (sim >= 0.7) totalScore += 1;
+          // Fuzzy match using proper similarity
+          const sim = calculateSimpleSimilarity(normalizedInput, normalizedExpected);
+          if (sim >= settings.fuzzyThresholds.high) totalScore += 3;
+          else if (sim >= settings.fuzzyThresholds.medium) totalScore += 2;
+          else if (sim >= settings.fuzzyThresholds.low) totalScore += 1;
         }
       }
-      
+
       const avgScore = totalScore / expected.length;
       if (avgScore >= 2.5) return 3;
       if (avgScore >= 1.5) return 2;
@@ -1093,24 +1120,12 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
 }
 
 /**
- * Simple similarity calculation for content script
+ * Calculate similarity using proper Levenshtein distance
+ * Normalized answers should be passed in (use normalizeText)
  */
 function calculateSimpleSimilarity(a: string, b: string): number {
-  if (a === b) return 1;
-  if (a.length === 0 || b.length === 0) return 0;
-  
-  // Simple character match ratio
-  const longer = a.length > b.length ? a : b;
-  const shorter = a.length > b.length ? b : a;
-  
-  let matches = 0;
-  for (let i = 0; i < shorter.length; i++) {
-    if (longer.includes(shorter[i])) {
-      matches++;
-    }
-  }
-  
-  return matches / longer.length;
+  // Use the proper Levenshtein-based similarity from fuzzy.ts
+  return similarity(a, b);
 }
 
 /**
@@ -1138,6 +1153,9 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
   if (grade >= 2) {
     type = 'success';
     message = grade === 3 ? 'Perfect!' : 'Good job!';
+    // Always show correct answer for reference, even when correct
+    const correctAnswer = getCorrectAnswerDisplay(card);
+    message += ` The answer: ${correctAnswer}`;
     showFeedback(message, type);
   } else if (grade === 1) {
     type = 'partial';

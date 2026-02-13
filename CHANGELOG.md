@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2026-02-13
+
+#### CRITICAL: Grading System Bug
+- **Fixed broken similarity algorithm accepting wrong answers**: The `calculateSimpleSimilarity` function was fundamentally flawed
+  - **Bug**: Used character existence check (`includes`) instead of positional comparison
+  - **Impact**: Gave 91% similarity to answers that were only 54% similar
+  - **Example**: "could you introduce the guideline" vs "provide instructions on how to" incorrectly matched
+  - **Fix**: Replaced with proper Levenshtein distance-based similarity from `fuzzy.ts`
+  - Now uses same grading logic as `grading.ts` module (proper normalization + fuzzy matching)
+  - Added proper support for `canonicalAnswers` and `settings.fuzzyThresholds`
+
+#### Answer Feedback Display
+- **Always show correct answer for reference**: Even when user answers correctly
+  - Previously only showed "Perfect!" or "Good job!" without displaying expected answer
+  - Now shows: "Perfect! The answer: [expected answer]"
+  - Helps users verify they learned the correct format/phrasing
+  - Especially useful for questions with multiple acceptable answers
+
 ### Improved - 2026-02-12
 
 #### Retry Practice UX
