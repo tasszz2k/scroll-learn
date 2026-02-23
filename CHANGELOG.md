@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Added - 2026-02-23
+## [1.0.0] - 2026-02-23
+
+### Added
 
 #### Blocked Content Breakdown Tooltip
 - **Per-category count on hover**: The "X blocked" badge in the popup now shows a tooltip on hover with a breakdown by category (Reels, Shorts, Sponsored, Suggested, Strangers)
@@ -22,13 +24,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - All three detection layers (CSS injection, MutationObserver, periodic 2s scan) cover navigation buttons to handle Facebook's dynamic React re-renders
   - Skips feed articles, Reels carousel regions, and FeedUnit pagelets to avoid false positives
 
-### Improved - 2026-02-23
+### Improved
 
 #### Popup Layout
 - **Reordered popup sections**: Active Deck selector now appears above Content Blocking toggles for better priority/visibility
 - **Fixed toggle row spacing**: Added 10px vertical margin between toggle rows in Content Blocking section to prevent overlap
 
-### Fixed - 2026-02-13
+### Fixed
 
 #### CRITICAL: Grading System Bug
 - **Fixed broken similarity algorithm accepting wrong answers**: The `calculateSimpleSimilarity` function was fundamentally flawed
@@ -46,8 +48,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Helps users verify they learned the correct format/phrasing
   - Especially useful for questions with multiple acceptable answers
 
-### Improved - 2026-02-12
-
 #### Retry Practice UX
 - **Keep original input for editing**: Retry practice mode now preserves the user's incorrect answer instead of clearing it
   - Users can edit their original answer rather than retyping everything from scratch
@@ -56,16 +56,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Applies to text, audio, and cloze card types
   - Better UX for small typos or partially correct answers
 
-### Fixed - 2026-02-12
-
 #### Correct Answer Display
 - **Fixed diff showing normalized answers**: Diff feedback now shows original answer with proper capitalization and punctuation
   - Previously showed normalized version (lowercase, no punctuation) from `canonicalAnswers`
   - Now uses `card.back` for display which preserves original formatting
   - Grading still uses normalized comparison (case-insensitive)
   - Display shows correct capitalization to help users learn proper formatting
-
-### Added - 2026-02-11
 
 #### Retry-to-Practice Feature
 - **Retry practice mode for incorrect text/audio/cloze answers**: When users answer these card types incorrectly, they must now retype the correct answer before proceeding to reinforce learning
