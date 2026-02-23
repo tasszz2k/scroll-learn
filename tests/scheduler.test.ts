@@ -30,10 +30,10 @@ describe('sm2Update', () => {
       expect(updated.repetitions).toBe(0);
     });
 
-    it('should set interval to 1 day', () => {
+    it('should set interval to 0 days (relearn in 10 minutes)', () => {
       const card = createTestCard({ intervalDays: 30 });
       const updated = sm2Update(card, 0);
-      expect(updated.intervalDays).toBe(1);
+      expect(updated.intervalDays).toBe(0);
     });
 
     it('should reduce ease by 0.2', () => {
@@ -219,8 +219,8 @@ describe('previewNextIntervals', () => {
     const card = createTestCard({ repetitions: 2, intervalDays: 10, ease: 2.5 });
     const previews = previewNextIntervals(card);
     
-    // Grade 0 resets to 1 day
-    expect(previews[0]).toBe('1 day');
+    // Grade 0 resets to 10 minutes (intervalDays = 0)
+    expect(previews[0]).toBe('Less than a day');
   });
 });
 

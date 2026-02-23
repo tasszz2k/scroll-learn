@@ -5,11 +5,12 @@
 <h1 align="center">ScrollLearn</h1>
 
 <p align="center">
-  <strong>Learn while you scroll</strong> - A Chrome extension that injects spaced repetition flashcard quizzes into your social media feeds.
+  <strong>Learn while you scroll</strong> - A Chrome extension that turns social media scrolling into learning time by injecting spaced-repetition flashcard quizzes into your feeds and blocking distracting content.
 </p>
 
 <p align="center">
   <a href="#features">Features</a> •
+  <a href="#screenshots">Screenshots</a> •
   <a href="#installation">Installation</a> •
   <a href="#usage">Usage</a> •
   <a href="#configuration">Configuration</a> •
@@ -28,11 +29,46 @@
   - Multi-Select (check all correct answers)
   - Cloze (fill in the blanks)
   - Audio (listen and respond)
+- **Content Blocking**: Hide distracting content from your feeds
+  - Facebook: Reels, Sponsored posts, Suggested posts, Strangers' posts
+  - Instagram: Reels, Sponsored posts, Suggested posts, Strangers' posts
+  - YouTube: Shorts
+  - Per-category blocked count with hover breakdown
 - **Import Formats**: Quizlet-like simple format, CSV, and JSON
 - **Fuzzy Matching**: Intelligent answer matching with configurable thresholds
 - **Progress Tracking**: Statistics, streaks, and review history
+- **Retry Practice**: Wrong answers on text/cloze/audio cards require retyping the correct answer to reinforce learning
 - **Keyboard Navigation**: Answer quickly with keyboard shortcuts
 - **Customizable**: Configure quiz frequency, matching sensitivity, and more
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/extension.png" alt="Extension Popup" width="320"><br>
+      <b>Extension Popup</b><br>
+      <sub>Quick stats, site controls, content blocking with per-category breakdown</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/deck.png" alt="Deck Management" width="320"><br>
+      <b>Deck Management</b><br>
+      <sub>Create, import, and manage flashcard decks with due card tracking</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/settings.png" alt="Settings Dashboard" width="320"><br>
+      <b>Settings Dashboard</b><br>
+      <sub>Per-site quiz toggles and granular content blocking options</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/quiz.png" alt="Quiz Card" width="320"><br>
+      <b>Quiz Card</b><br>
+      <sub>Flashcard quiz injected directly into your social media feed</sub>
+    </td>
+  </tr>
+</table>
 
 ## Installation
 
@@ -139,6 +175,11 @@ In the **Settings** tab:
 - **Enabled Sites**
   - Toggle Facebook/YouTube/Instagram
 
+- **Content Blocking** (per platform)
+  - Facebook: Hide Reels, Sponsored, Suggested, Strangers' Posts
+  - Instagram: Hide Reels, Sponsored, Suggested, Strangers' Posts
+  - YouTube: Hide Shorts
+
 - **Answer Matching**
   - Characters to ignore
   - Case sensitivity
@@ -158,9 +199,10 @@ src/
 ### Key Components
 
 - **Background Service Worker**: Handles card scheduling, storage, and messaging
-- **Content Scripts**: Detect feed posts and inject quiz UI
-- **Dashboard**: React app for deck/card management and import
-- **Popup**: Quick access to stats and settings
+- **Content Scripts**: Detect feed posts, inject quiz UI, and block unwanted content
+- **Content Blocker**: Hides Reels/Shorts, Sponsored, Suggested, and Strangers' posts using CSS injection, MutationObserver, and periodic scanning
+- **Dashboard**: React app for deck/card management, import, and settings
+- **Popup**: Quick access to stats, content blocking toggles, and per-category blocked counts
 
 ### SM-2 Scheduling
 

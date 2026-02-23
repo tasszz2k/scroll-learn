@@ -51,6 +51,7 @@ Content scripts ↔ Background service worker via `chrome.runtime.sendMessage`. 
 | Fuzzy | `src/common/fuzzy.ts` | Levenshtein, Damerau-Levenshtein, Jaro-Winkler similarity |
 | Parser | `src/common/parser.ts` | Import parsing (Simple, CSV, JSON formats) |
 | Feed detectors | `src/content/fb.ts`, `youtube.ts`, `instagram.ts` | Domain-specific feed post detection |
+| Blocker | `src/content/blocker.ts` | Hides Reels/Shorts, Sponsored, Suggested, Strangers content; tracks per-category counts |
 
 ### Path Alias
 
@@ -110,6 +111,26 @@ When users answer text/audio/cloze cards incorrectly (grade < 2):
 - `data-index` attribute preserves original index for grading
 - Display keys (1, 2, 3, 4) remain sequential
 
+## Content Blocker
+
+The blocker (`src/content/blocker.ts`) hides unwanted content using three detection layers:
+
+1. **CSS injection** -- Immediate, flicker-free hiding for elements with stable selectors (e.g., `div[data-pagelet*="Reels"]`).
+2. **MutationObserver** -- Scans newly added DOM nodes for text-based markers (Sponsored, Suggested) and navigation elements.
+3. **Periodic scan** (every 2s) -- Re-scans unhidden elements to catch late attribute changes from Facebook's React reconciliation.
+
+### Facebook Reels Navigation Hiding
+Facebook renders the Reels button differently across surfaces:
+- **Mobile tab bar**: `<a aria-label="Reels" href="/reel/?s=tab">` -- detected by aria-label + href
+- **Desktop top bar**: `<a aria-label="Reels">` with SVG icon -- detected by aria-label
+- **Desktop sidebar**: Plain `<div>` elements with text "Reels" and no `<a>` wrapper -- detected by walking up from the text `<span>` to the first ancestor containing an icon (`<i>`, `<svg>`, `<img>`) in a sibling branch
+
+### Blocked Count Tracking
+`hideElement(el, category)` accepts a `BlockCategory` (`reels` | `shorts` | `sponsored` | `suggested` | `strangers` | `other`). Counts are stored in a `BlockedCounts` record. The popup queries both `getBlockedCount()` (total) and `getBlockedCounts()` (per-category) via `get_blocked_count` message, and shows a hover tooltip on the badge with a per-category breakdown.
+
+### Facebook Sponsored Detection
+Facebook obfuscates "Sponsored" using character-level `<span>` elements with CSS reordering and decoy characters. Detection uses: `data-ad-rendering-role` attributes, `aria-labelledby` references, `getBoundingClientRect`-based visible text reconstruction, and plain text fallback.
+
 ## Common Gotchas
 
 - Extension context can be invalidated on reload — content scripts handle `chrome.runtime` errors gracefully
@@ -119,3 +140,5 @@ When users answer text/audio/cloze cards incorrectly (grade < 2):
 - Retry practice uses exact match (no fuzzy matching) — users must type answer exactly right
 - Shuffled MCQ indices are stored in module-level `shuffledIndices` array, reset on card change
 - **Content script CSS**: `public/content.css` is used for content script styles (copied to `dist/` during build). The `src/styles/` directory is for dashboard/popup styles only
+- Facebook sidebar nav items are plain `<div>` elements (not `<a>` links) -- href-based selectors don't work for the sidebar Reels button. Use text-based detection with DOM walk-up instead.
+- Facebook dynamically re-renders navigation bars via React -- CSS-only hiding is insufficient for nav elements. Always pair CSS with observer + periodic scan.

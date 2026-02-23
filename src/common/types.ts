@@ -61,6 +61,15 @@ export interface Settings {
   enableKeyboardShortcuts: boolean; // Default true
   showKeyboardHints: boolean; // Default true
   allowSkip: boolean; // Default true - allows users to skip cards
+  hideFacebookReels: boolean;
+  hideFacebookSponsored: boolean;
+  hideFacebookSuggested: boolean;
+  hideInstagramReels: boolean;
+  hideInstagramSponsored: boolean;
+  hideInstagramSuggested: boolean;
+  hideYouTubeShorts: boolean;
+  hideFacebookStrangers: boolean;
+  hideInstagramStrangers: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -83,6 +92,15 @@ export const DEFAULT_SETTINGS: Settings = {
   enableKeyboardShortcuts: true,
   showKeyboardHints: true,
   allowSkip: true,
+  hideFacebookReels: true,
+  hideFacebookSponsored: true,
+  hideFacebookSuggested: true,
+  hideInstagramReels: true,
+  hideInstagramSponsored: true,
+  hideInstagramSuggested: true,
+  hideYouTubeShorts: true,
+  hideFacebookStrangers: true,
+  hideInstagramStrangers: true,
 };
 
 // Review Statistics

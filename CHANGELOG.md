@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2026-02-23
+
+#### Blocked Content Breakdown Tooltip
+- **Per-category count on hover**: The "X blocked" badge in the popup now shows a tooltip on hover with a breakdown by category (Reels, Shorts, Sponsored, Suggested, Strangers)
+  - `hideElement()` now tracks which category triggered each hide
+  - Content script returns both total count and per-category `BlockedCounts` object
+  - Tooltip uses a dark card with per-row label/count layout, positioned above the badge
+
+#### Content Blocker: Facebook Reels Navigation Hiding
+- **Hide Reels buttons across all Facebook navigation surfaces**: The content blocker now hides the Reels button from the mobile tab bar, desktop top bar, and desktop left sidebar
+  - **Mobile tab bar**: CSS + observer targeting `a[aria-label="Reels"][href*="/reel/"]` and parent container via `:has()`
+  - **Desktop top bar**: aria-label-based detection via `hideFacebookReelsNavByText()` finds `[aria-label="Reels"]` elements outside feed articles/regions
+  - **Desktop sidebar**: Text-based detection finds `<span>` elements with exact text "Reels", walks up the DOM to the nav item container (first ancestor containing an icon element in a sibling branch)
+  - All three detection layers (CSS injection, MutationObserver, periodic 2s scan) cover navigation buttons to handle Facebook's dynamic React re-renders
+  - Skips feed articles, Reels carousel regions, and FeedUnit pagelets to avoid false positives
+
+### Improved - 2026-02-23
+
+#### Popup Layout
+- **Reordered popup sections**: Active Deck selector now appears above Content Blocking toggles for better priority/visibility
+- **Fixed toggle row spacing**: Added 10px vertical margin between toggle rows in Content Blocking section to prevent overlap
+
 ### Fixed - 2026-02-13
 
 #### CRITICAL: Grading System Bug

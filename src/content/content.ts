@@ -15,6 +15,7 @@ import { youtubeDetector, isYouTubeFeedPage, isYouTubeWatchPage } from './youtub
 import { instagramDetector, isInstagramFeedPage } from './instagram';
 import { similarity } from '../common/fuzzy';
 import { normalizeText } from '../common/parser';
+import { startBlocker, updateBlocker, getBlockedCount, getBlockedCounts } from './blocker';
 
 // State
 let currentDetector: DomainDetector | null = null;
@@ -75,11 +76,16 @@ async function initialize() {
   // Load settings
   await loadSettings();
 
+  // Start content blocker (independent of quiz system)
+  startBlocker(settings);
+
   // Listen for settings changes and reload
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.settings) {
       console.log('[ScrollLearn] Settings changed, reloading...');
-      loadSettings();
+      loadSettings().then(() => {
+        updateBlocker(settings);
+      });
     }
   });
 
@@ -1749,6 +1755,14 @@ function escapeHTML(str: string): string {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// Handle messages from the popup (blocked count query)
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'get_blocked_count') {
+    sendResponse({ count: getBlockedCount(), counts: getBlockedCounts() });
+    return false;
+  }
+});
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {

@@ -48,6 +48,26 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
 
   const supportedDomains = ['facebook.com', 'youtube.com', 'instagram.com'];
 
+  function renderBlockingToggle(key: keyof SettingsType, label: string, value: boolean) {
+    return (
+      <div className="flex items-center justify-between py-1">
+        <div className="font-medium text-sm text-surface-900 dark:text-surface-50">{label}</div>
+        <button
+          onClick={() => updateSetting(key, !value)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            value ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              value ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -222,6 +242,44 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Content Blocking */}
+      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Content Blocking</h3>
+        <p className="text-sm text-surface-500 mb-6">
+          Hide distracting content from your social media feeds
+        </p>
+
+        {/* Facebook */}
+        <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3">Facebook</div>
+          <div className="space-y-3">
+            {renderBlockingToggle('hideFacebookReels', 'Hide Reels', localSettings.hideFacebookReels)}
+            {renderBlockingToggle('hideFacebookSponsored', 'Hide Sponsored', localSettings.hideFacebookSponsored)}
+            {renderBlockingToggle('hideFacebookSuggested', 'Hide Suggested', localSettings.hideFacebookSuggested)}
+            {renderBlockingToggle('hideFacebookStrangers', "Hide Strangers' Posts", localSettings.hideFacebookStrangers)}
+          </div>
+        </div>
+
+        {/* Instagram */}
+        <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-wider text-pink-600 dark:text-pink-400 mb-3">Instagram</div>
+          <div className="space-y-3">
+            {renderBlockingToggle('hideInstagramReels', 'Hide Reels', localSettings.hideInstagramReels)}
+            {renderBlockingToggle('hideInstagramSponsored', 'Hide Sponsored', localSettings.hideInstagramSponsored)}
+            {renderBlockingToggle('hideInstagramSuggested', 'Hide Suggested', localSettings.hideInstagramSuggested)}
+            {renderBlockingToggle('hideInstagramStrangers', "Hide Strangers' Posts", localSettings.hideInstagramStrangers)}
+          </div>
+        </div>
+
+        {/* YouTube */}
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400 mb-3">YouTube</div>
+          <div className="space-y-3">
+            {renderBlockingToggle('hideYouTubeShorts', 'Hide Shorts', localSettings.hideYouTubeShorts)}
+          </div>
         </div>
       </div>
 

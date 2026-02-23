@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { useState, useEffect } from 'react';
 import type { Deck, Stats, Settings } from '../common/types';
+import type { BlockedCounts } from '../content/blocker';
 import './popup.css';
 
 interface PopupState {
@@ -9,6 +10,8 @@ interface PopupState {
   decks: Deck[];
   currentSite: string;
   loading: boolean;
+  blockedCount: number;
+  blockedCounts: BlockedCounts | null;
 }
 
 function Popup() {
@@ -18,6 +21,8 @@ function Popup() {
     decks: [],
     currentSite: '',
     loading: true,
+    blockedCount: 0,
+    blockedCounts: null,
   });
 
   useEffect(() => {
@@ -38,12 +43,26 @@ function Popup() {
         chrome.runtime.sendMessage({ type: 'get_decks' }),
       ]);
 
+      let blockedCount = 0;
+      let blockedCounts: BlockedCounts | null = null;
+      if (tab?.id) {
+        try {
+          const countResponse = await chrome.tabs.sendMessage(tab.id, { type: 'get_blocked_count' });
+          blockedCount = countResponse?.count || 0;
+          blockedCounts = countResponse?.counts || null;
+        } catch {
+          // Content script may not be running on this tab
+        }
+      }
+
       setState({
         stats: statsResponse.ok ? statsResponse.data : null,
         settings: settingsResponse.ok ? settingsResponse.data : null,
         decks: decksResponse.ok ? decksResponse.data : [],
         currentSite,
         loading: false,
+        blockedCount,
+        blockedCounts,
       });
     } catch (error) {
       console.error('Failed to load popup data:', error);
@@ -92,6 +111,38 @@ function Popup() {
     chrome.tabs.create({ url: chrome.runtime.getURL('index.html#settings') });
   }
 
+  function renderPopupToggle(label: string, checked: boolean, key: keyof Settings) {
+    return (
+      <div className="toggle-row">
+        <div className="toggle-label">
+          <div>
+            <div className="toggle-text">{label}</div>
+          </div>
+        </div>
+        <label className="toggle-switch">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => toggleBlockingSetting(key)}
+          />
+          <span className="toggle-slider"></span>
+        </label>
+      </div>
+    );
+  }
+
+  async function toggleBlockingSetting(key: keyof Settings) {
+    if (!state.settings) return;
+    const newSettings = { ...state.settings, [key]: !state.settings[key] };
+    const response = await chrome.runtime.sendMessage({
+      type: 'set_settings',
+      settings: { [key]: newSettings[key] },
+    });
+    if (response.ok) {
+      setState(prev => ({ ...prev, settings: response.data }));
+    }
+  }
+
   async function setActiveDeck(deckId: string | null) {
     const response = await chrome.runtime.sendMessage({
       type: 'set_settings',
@@ -100,6 +151,25 @@ function Popup() {
     if (response.ok) {
       setState(prev => ({ ...prev, settings: response.data }));
     }
+  }
+
+  function renderBlockedBreakdown(counts: BlockedCounts) {
+    const labels: Record<string, string> = {
+      reels: 'Reels',
+      shorts: 'Shorts',
+      sponsored: 'Sponsored',
+      suggested: 'Suggested',
+      strangers: 'Strangers',
+    };
+    const entries = Object.entries(labels)
+      .filter(([key]) => counts[key as keyof BlockedCounts] > 0)
+      .map(([key, label]) => (
+        <div key={key} className="tooltip-row">
+          <span className="tooltip-label">{label}</span>
+          <span className="tooltip-value">{counts[key as keyof BlockedCounts]}</span>
+        </div>
+      ));
+    return entries.length > 0 ? entries : null;
   }
 
   if (state.loading) {
@@ -112,9 +182,12 @@ function Popup() {
     );
   }
 
-  const { stats, currentSite, decks } = state;
+  const { stats, settings, currentSite, decks } = state;
   const siteEnabled = isSiteEnabled();
-  const isSocialSite = currentSite.includes('facebook') || currentSite.includes('youtube');
+  const isFacebook = currentSite.includes('facebook');
+  const isYouTube = currentSite.includes('youtube');
+  const isInstagram = currentSite.includes('instagram');
+  const isSocialSite = isFacebook || isYouTube || isInstagram;
 
   return (
     <div className="popup-container">
@@ -192,6 +265,46 @@ function Popup() {
           ))}
         </select>
       </div>
+
+      {/* Content Blocking Toggles */}
+      {isSocialSite && settings && (
+        <div className="site-toggle">
+          <div className="blocking-header">
+            <div className="section-title" style={{ padding: '0', fontSize: '11px', marginBottom: '0' }}>Content Blocking</div>
+            {state.blockedCount > 0 && (
+              <span className="blocked-count-badge">
+                {state.blockedCount} blocked
+                {state.blockedCounts && (
+                  <span className="blocked-tooltip">
+                    {renderBlockedBreakdown(state.blockedCounts)}
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+          {isFacebook && (
+            <>
+              {renderPopupToggle('Hide Reels', settings.hideFacebookReels, 'hideFacebookReels')}
+              {renderPopupToggle('Hide Sponsored', settings.hideFacebookSponsored, 'hideFacebookSponsored')}
+              {renderPopupToggle('Hide Suggested', settings.hideFacebookSuggested, 'hideFacebookSuggested')}
+              {renderPopupToggle("Hide Strangers' Posts", settings.hideFacebookStrangers, 'hideFacebookStrangers')}
+            </>
+          )}
+          {isInstagram && (
+            <>
+              {renderPopupToggle('Hide Reels', settings.hideInstagramReels, 'hideInstagramReels')}
+              {renderPopupToggle('Hide Sponsored', settings.hideInstagramSponsored, 'hideInstagramSponsored')}
+              {renderPopupToggle('Hide Suggested', settings.hideInstagramSuggested, 'hideInstagramSuggested')}
+              {renderPopupToggle("Hide Strangers' Posts", settings.hideInstagramStrangers, 'hideInstagramStrangers')}
+            </>
+          )}
+          {isYouTube && (
+            <>
+              {renderPopupToggle('Hide Shorts', settings.hideYouTubeShorts, 'hideYouTubeShorts')}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="section-title">Quick Actions</div>
