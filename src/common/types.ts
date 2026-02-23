@@ -45,9 +45,9 @@ export interface DomainSettings {
 
 export interface FuzzyThresholds {
   exact: number; // Score for exact match (default: grade 3)
-  high: number; // >= this for grade 3 (default: 0.95)
-  medium: number; // >= this for grade 2 (default: 0.85)
-  low: number; // >= this for grade 1 (default: 0.7)
+  high: number;  // >= this for grade 3 (default: 1.0)
+  medium: number; // >= this for grade 2 (default: 1.0)
+  low: number;   // >= this for grade 1 (default: 1.0)
 }
 
 export interface Settings {
@@ -85,9 +85,9 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   fuzzyThresholds: {
     exact: 1.0,
-    high: 0.95,
-    medium: 0.85,
-    low: 0.7,
+    high: 1.0,
+    medium: 1.0,
+    low: 1.0,
   },
   enableKeyboardShortcuts: true,
   showKeyboardHints: true,
