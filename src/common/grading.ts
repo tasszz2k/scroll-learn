@@ -132,19 +132,7 @@ function gradeText(
     }
   }
   
-  // Find best fuzzy match
-  let bestScore = 0;
-  for (const answer of canonicalAnswers) {
-    const score = similarity(normalizedInput, answer);
-    bestScore = Math.max(bestScore, score);
-  }
-  
-  // Map score to grade using thresholds
-  const thresholds = settings.fuzzyThresholds;
-  
-  if (bestScore >= thresholds.high) return 3;
-  if (bestScore >= thresholds.medium) return 2;
-  if (bestScore >= thresholds.low) return 1;
+  // Exact match only (case-insensitive via normalization). No fuzzy tolerance.
   return 0;
 }
 
@@ -176,20 +164,12 @@ function gradeCloze(
       settings.lowercaseNormalization
     );
     
-    // Exact match
+    // Exact match only (case-insensitive via normalization). No fuzzy tolerance.
     if (normalizedActual === expected) {
       grades.push(3);
-      continue;
+    } else {
+      grades.push(0);
     }
-    
-    // Fuzzy match
-    const score = similarity(normalizedActual, expected);
-    const thresholds = settings.fuzzyThresholds;
-    
-    if (score >= thresholds.high) grades.push(3);
-    else if (score >= thresholds.medium) grades.push(2);
-    else if (score >= thresholds.low) grades.push(1);
-    else grades.push(0);
   }
   
   // Average grade

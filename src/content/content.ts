@@ -13,7 +13,6 @@ import { DEFAULT_SETTINGS } from '../common/types';
 import { facebookDetector, getVisiblePosts, type DomainDetector } from './fb';
 import { youtubeDetector, isYouTubeFeedPage, isYouTubeWatchPage } from './youtube';
 import { instagramDetector, isInstagramFeedPage } from './instagram';
-import { similarity } from '../common/fuzzy';
 import { normalizeText } from '../common/parser';
 import { startBlocker, updateBlocker, getBlockedCount, getBlockedCounts } from './blocker';
 
@@ -1069,22 +1068,10 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
         normalizeText(card.back, settings.eliminateChars, settings.lowercaseNormalization)
       ];
 
-      // Check exact match first
+      // Check exact match only (case-insensitive via normalization). No fuzzy tolerance.
       for (const answer of canonicalAnswers) {
         if (normalizedInput === answer) return 3;
       }
-
-      // Find best fuzzy match
-      let bestScore = 0;
-      for (const answer of canonicalAnswers) {
-        const score = calculateSimpleSimilarity(normalizedInput, answer);
-        bestScore = Math.max(bestScore, score);
-      }
-
-      // Use thresholds from settings
-      if (bestScore >= settings.fuzzyThresholds.high) return 3;
-      if (bestScore >= settings.fuzzyThresholds.medium) return 2;
-      if (bestScore >= settings.fuzzyThresholds.low) return 1;
       return 0;
     }
     
@@ -1101,15 +1088,9 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
         );
         const normalizedExpected = expected[i] || '';
 
-        // Exact match
+        // Exact match only (case-insensitive via normalization). No fuzzy tolerance.
         if (normalizedInput === normalizedExpected) {
           totalScore += 3;
-        } else {
-          // Fuzzy match using proper similarity
-          const sim = calculateSimpleSimilarity(normalizedInput, normalizedExpected);
-          if (sim >= settings.fuzzyThresholds.high) totalScore += 3;
-          else if (sim >= settings.fuzzyThresholds.medium) totalScore += 2;
-          else if (sim >= settings.fuzzyThresholds.low) totalScore += 1;
         }
       }
 
@@ -1123,15 +1104,6 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
     default:
       return 0;
   }
-}
-
-/**
- * Calculate similarity using proper Levenshtein distance
- * Normalized answers should be passed in (use normalizeText)
- */
-function calculateSimpleSimilarity(a: string, b: string): number {
-  // Use the proper Levenshtein-based similarity from fuzzy.ts
-  return similarity(a, b);
 }
 
 /**
