@@ -35,6 +35,7 @@
   - YouTube: Shorts
   - Per-category blocked count with hover breakdown
 - **Import Formats**: Quizlet-like simple format, CSV, and JSON
+- **Grammar Police Integration**: AI-powered skill that converts [Grammar Police](https://github.com/tasszz2k/GrammarPolice) exports into flashcard decks, grammar reports, exercises, and related knowledge
 - **Fuzzy Matching**: Intelligent answer matching with configurable thresholds
 - **Progress Tracking**: Statistics, streaks, and review history
 - **Retry Practice**: Wrong answers on text/cloze/audio cards require retyping the correct answer to reinforce learning
@@ -146,6 +147,46 @@ Pick the color,Red,mcq-single,Red|Blue|Green,0
 ]
 ```
 
+### Grammar Police Integration
+
+[Grammar Police](https://github.com/tasszz2k/GrammarPolice) is a macOS menubar app that captures grammar corrections and translations as you work across Slack, VS Code, browsers, and other apps. ScrollLearn includes an AI skill that transforms those exports into structured learning materials.
+
+**Pipeline:**
+
+```
+Grammar Police (daily use) -> Export JSON -> AI Skill -> Learning Materials -> Import CSV into ScrollLearn
+```
+
+**How to use:**
+
+1. Export your correction history from Grammar Police as JSON (see Grammar Police docs for the "Export For Learning" feature)
+2. Place the file at `local-test/data/learning_data_YYYY_MM_DD.json`
+3. Ask your AI agent (Cursor or Claude) to process it:
+   > "Use grammar-police-learn to process `local-test/data/learning_data_2026_03_15.json`"
+4. The skill generates the following in `local-test/data/learning_data_YYYY_MM/`:
+
+   | File | Description |
+   |------|-------------|
+   | `report.md` | Common mistakes, error categories, vocabulary list, month-over-month comparison |
+   | `exercises.md` | Spot-the-error, fill-in-the-blank, rewrite, and vocabulary matching exercises |
+   | `answer_key.md` | Answers for exercises (kept separate for self-testing) |
+   | `related_knowledge.md` | Grammar rules, commonly confused words, professional communication patterns |
+   | `grammar_deck.csv` | Flashcard deck for grammar errors (MCQ, text, cloze) |
+   | `vocabulary_deck.csv` | Flashcard deck for EN-VN vocabulary (both directions) |
+
+5. Import the CSV files into ScrollLearn via the dashboard's import feature
+
+**What the skill does:**
+
+- Filters out minor-only changes (punctuation, capitalization) and tool misinterpretations
+- Independently assesses each correction (Grammar Police uses GPT-4o-mini with limited context, so its corrections are not always accurate)
+- Categorizes errors: spelling, verb form, article, preposition, plural, word choice, sentence structure, professional phrasing
+- Generates a minimum of 100 flashcard questions across both decks with a mix of ~40% MCQ, ~30% text, ~30% cloze
+- Compares with previous months if prior data exists, tracking repeated mistakes and improvements
+- Tailored for DevOps/engineering context -- technical terms (CI/CD, PR, ArgoCD, kubectl) are preserved and used in examples
+
+The skill lives at `.agents/skills/grammar-police-learn/` and is symlinked to both `.cursor/skills/` and `.claude/skills/` for use with either AI agent.
+
 ### Answering Quizzes
 
 When a quiz appears in your feed:
@@ -229,6 +270,8 @@ scroll-learn/
   samples/          # Sample decks
   docs/             # Documentation and sample files
   public/           # Static assets
+  .agents/skills/   # AI agent skills (symlinked to .cursor/skills/ and .claude/skills/)
+  local-test/data/  # Grammar Police exports and generated learning data
 ```
 
 ### Scripts
