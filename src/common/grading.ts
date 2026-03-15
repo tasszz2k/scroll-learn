@@ -108,11 +108,12 @@ function gradeText(
     settings.lowercaseNormalization
   );
   
-  // Get canonical answers
-  const canonicalAnswers = card.canonicalAnswers || [
-    normalizeText(card.back, settings.eliminateChars, settings.lowercaseNormalization)
-  ];
-  
+  // Get canonical answers (normalize them for comparison)
+  const rawAnswers = card.canonicalAnswers || [card.back];
+  const canonicalAnswers = rawAnswers.map(a =>
+    normalizeText(a, settings.eliminateChars, settings.lowercaseNormalization)
+  );
+
   // Check exact match first
   for (const answer of canonicalAnswers) {
     if (normalizedInput === answer) {
@@ -155,15 +156,19 @@ function gradeCloze(
   const grades: number[] = [];
   
   for (let i = 0; i < Math.max(canonicalAnswers.length, userAnswers.length); i++) {
-    const expected = canonicalAnswers[i] || '';
+    const expected = normalizeText(
+      canonicalAnswers[i] || '',
+      settings.eliminateChars,
+      settings.lowercaseNormalization
+    );
     const actual = userAnswers[i] || '';
-    
+
     const normalizedActual = normalizeText(
       actual,
       settings.eliminateChars,
       settings.lowercaseNormalization
     );
-    
+
     // Exact match only (case-insensitive via normalization). No fuzzy tolerance.
     if (normalizedActual === expected) {
       grades.push(3);

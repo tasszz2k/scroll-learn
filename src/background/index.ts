@@ -129,52 +129,78 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     case 'open_dashboard':
       return handleOpenDashboard();
 
+    case 'get_next_study_card':
+      return handleGetNextStudyCard(message.deckId);
+
     default:
       return { ok: false, error: 'Unknown message type' };
   }
 }
 
 /**
- * Get next due card for a domain
+ * Select the next due card, optionally filtered by deck.
+ * Shared logic used by both domain-based and standalone study flows.
+ */
+async function selectNextDueCard(filterDeckId?: string): Promise<Card | null> {
+  // When filtering by deck, fetch that deck's cards directly to avoid the 100-card limit
+  // missing cards from the target deck.
+  const now = Date.now();
+  let dueCards: Card[];
+  if (filterDeckId) {
+    const deckCards = await storage.getCards(filterDeckId);
+    dueCards = deckCards.filter(c => c.due <= now);
+  } else {
+    dueCards = await storage.getDueCards(100);
+  }
+  if (dueCards.length === 0) return null;
+
+  const decks = await storage.getDecks();
+  const deckMap = new Map(decks.map(d => [d.id, d.name]));
+
+  const sorted = sortCardsForReview(dueCards);
+  const snoozedFlags = await Promise.all(sorted.map(card => storage.isCardSnoozed(card.id)));
+  const availableCards = sorted.filter((_, index) => !snoozedFlags[index]);
+
+  if (availableCards.length === 0) return null;
+
+  const selectedCard = availableCards[0];
+  const deckName = deckMap.get(selectedCard.deckId) || selectedCard.deckId;
+  return { ...selectedCard, deckName };
+}
+
+/**
+ * Get next due card for a domain (content script flow)
  */
 async function handleGetNextCard(domain: string): Promise<Response<Card | null>> {
   try {
     console.log('[ScrollLearn Background] Getting next card for domain:', domain);
-    
+
     // Check if site is paused
     if (await storage.isSitePaused(domain)) {
       console.log('[ScrollLearn Background] Site is paused');
       return { ok: true, data: null };
     }
-    
+
     // Check if site is disabled in settings
     const settings = await storage.getSettings();
     const domainKey = extractDomainKey(domain);
     const domainSettings = settings.domainSettings[domainKey];
-    
+
     if (domainSettings && !domainSettings.enabled) {
       console.log('[ScrollLearn Background] Site is disabled');
       return { ok: true, data: null };
     }
-    
-    // Get all cards first for debugging
-    const allCards = await storage.getCards();
-    console.log('[ScrollLearn Background] Total cards in storage:', allCards.length);
-    
-    // Get due cards
+
+    // Get due cards using shared logic with deck rotation
     const dueCards = await storage.getDueCards(100);
-    console.log('[ScrollLearn Background] Due cards:', dueCards.length);
-    
     if (dueCards.length === 0) {
-      console.log('[ScrollLearn Background] No due cards. Make sure you have imported cards!');
+      console.log('[ScrollLearn Background] No due cards');
       return { ok: true, data: null };
     }
-    
-    // Get all decks to lookup deck names
+
     const decks = await storage.getDecks();
     const deckMap = new Map(decks.map(d => [d.id, d.name]));
 
-    // Sort and filter out snoozed cards first.
     const sorted = sortCardsForReview(dueCards);
     const snoozedFlags = await Promise.all(sorted.map(card => storage.isCardSnoozed(card.id)));
     const availableCards = sorted.filter((_, index) => !snoozedFlags[index]);
@@ -188,7 +214,6 @@ async function handleGetNextCard(domain: string): Promise<Response<Card | null>>
     const availableDeckIds = getAvailableDeckIds(availableCards, decks);
     let activeDeckId = settings.activeDeckId;
 
-    // If the configured deck was deleted, reset to auto-selection.
     if (activeDeckId && !decks.some(deck => deck.id === activeDeckId)) {
       activeDeckId = null;
     }
@@ -216,6 +241,18 @@ async function handleGetNextCard(domain: string): Promise<Response<Card | null>>
     return { ok: true, data: { ...selectedCard, deckName } };
   } catch (error) {
     console.error('[ScrollLearn Background] Error getting next card:', error);
+    return { ok: false, error: String(error) };
+  }
+}
+
+/**
+ * Get next due card for standalone study (no domain checks, no deck rotation side effects)
+ */
+async function handleGetNextStudyCard(deckId?: string): Promise<Response<Card | null>> {
+  try {
+    const card = await selectNextDueCard(deckId);
+    return { ok: true, data: card };
+  } catch (error) {
     return { ok: false, error: String(error) };
   }
 }

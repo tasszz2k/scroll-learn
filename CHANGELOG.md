@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+#### Standalone Study Mode
+- **Study tab in dashboard**: New dedicated study session for continuous learning without scrolling social media
+  - Auto-starts session on mount — no "Start" button needed
+  - Persistent deck selector at top using `settings.activeDeckId` (synced with popup and content script)
+  - Session stats bar with colored pills: deck name (purple), reviewed count (blue), accuracy (green), score (teal/red), streak (orange)
+  - Supports all card types: text, mcq-single, mcq-multi, cloze, audio
+  - Keyboard shortcuts: 1-4 for MCQ selection, Enter to submit, Escape to skip
+  - Retry-to-practice mode for wrong text/audio/cloze answers
+  - Session complete view with reviewed/accuracy/streak summary
+  - Edit and Delete card actions during study
+- **Colorful MCQ options**: Each option has a distinct color theme (blue, violet, amber, emerald, rose, cyan) with matching number badges; selected state uses orange highlight
+- **Cloze feedback rendering**: Feedback view renders cloze blanks as highlighted inline pills instead of raw `{{answer}}` syntax
+- **"Study Now" button in popup**: Quick action to open dashboard Study tab directly
+- **`get_next_study_card` message type**: Background handler for standalone study (no domain checks or deck rotation side effects)
+- **Hash-based routing**: Dashboard URL hashes (`#study`, `#decks`, `#import`, `#settings`, `#stats`) for direct navigation
+
+### Fixed
+
+#### Grading: Canonical Answer Normalization
+- **Fixed text/cloze grading always marking correct answers as wrong**: `canonicalAnswers` from card data were compared raw against normalized user input
+  - Both sides are now normalized before comparison
+  - Affects `gradeText()` and `gradeCloze()` in `src/common/grading.ts`
+
+#### Study Session State Persistence
+- **Fixed session stats resetting on every answer**: `loadData()` set `loading=true` which unmounted the entire app, destroying StudySession's local state (streak, reviewed count, accuracy)
+  - `loadData(showLoading)` now accepts a boolean parameter; study session refreshes silently with `showLoading=false`
+
 ## [1.0.0] - 2026-02-23
 
 ### Added

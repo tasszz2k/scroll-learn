@@ -52,6 +52,7 @@ Content scripts ↔ Background service worker via `chrome.runtime.sendMessage`. 
 | Parser | `src/common/parser.ts` | Import parsing (Simple, CSV, JSON formats) |
 | Feed detectors | `src/content/fb.ts`, `youtube.ts`, `instagram.ts` | Domain-specific feed post detection |
 | Blocker | `src/content/blocker.ts` | Hides Reels/Shorts, Sponsored, Suggested, Strangers content; tracks per-category counts |
+| Study Session | `src/dashboard/components/study/` | Standalone study mode — StudySession, QuizCard, AnswerFeedback, utils |
 
 ### Path Alias
 
@@ -139,6 +140,9 @@ Facebook obfuscates "Sponsored" using character-level `<span>` elements with CSS
 - The `due` field on cards is a Unix timestamp in milliseconds (not seconds)
 - Retry practice uses exact match (no fuzzy matching) — users must type answer exactly right
 - Shuffled MCQ indices are stored in module-level `shuffledIndices` array, reset on card change
+- Dashboard `loadData(showLoading)` accepts a boolean — pass `false` when refreshing from study session to avoid unmounting components and losing local state (streak, stats)
+- Dashboard uses hash-based routing (`#study`, `#decks`, `#import`, `#settings`, `#stats`) — the popup links to these hashes directly
+- The `selectNextDueCard(filterDeckId?)` helper in background is shared between domain-based and standalone study flows. When filtering by deck, it fetches deck-specific cards directly (not from the global 100-card limit) to avoid missing cards
 - **Content script CSS**: `public/content.css` is used for content script styles (copied to `dist/` during build). The `src/styles/` directory is for dashboard/popup styles only
 - Facebook sidebar nav items are plain `<div>` elements (not `<a>` links) -- href-based selectors don't work for the sidebar Reels button. Use text-based detection with DOM walk-up instead.
 - Facebook dynamically re-renders navigation bars via React -- CSS-only hiding is insufficient for nav elements. Always pair CSS with observer + periodic scan.

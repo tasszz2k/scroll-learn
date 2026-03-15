@@ -3,12 +3,25 @@ import DeckList from './components/DeckList';
 import ImportPanel from './components/ImportPanel';
 import Settings from './components/Settings';
 import Stats from './components/Stats';
+import StudySession from './components/study/StudySession';
 import type { Deck, Card, Settings as SettingsType, Stats as StatsType } from '../common/types';
 
-type Tab = 'decks' | 'import' | 'settings' | 'stats';
+type Tab = 'decks' | 'import' | 'settings' | 'stats' | 'study';
+
+const HASH_TO_TAB: Record<string, Tab> = {
+  '#decks': 'decks',
+  '#import': 'import',
+  '#settings': 'settings',
+  '#stats': 'stats',
+  '#study': 'study',
+};
+
+function getTabFromHash(): Tab {
+  return HASH_TO_TAB[window.location.hash] || 'decks';
+}
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('decks');
+  const [activeTab, setActiveTabState] = useState<Tab>(getTabFromHash);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
   const [settings, setSettings] = useState<SettingsType | null>(null);
@@ -17,6 +30,11 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [editCardId, setEditCardId] = useState<string | null>(null);
   const [editDeckId, setEditDeckId] = useState<string | null>(null);
+
+  function setActiveTab(tab: Tab) {
+    setActiveTabState(tab);
+    window.location.hash = `#${tab}`;
+  }
 
   // Load initial data
   useEffect(() => {
@@ -32,6 +50,13 @@ export default function App() {
 
     // Check for edit card request from quiz
     checkEditCardRequest();
+
+    // Listen for hash changes
+    function onHashChange() {
+      setActiveTabState(getTabFromHash());
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
   async function checkEditCardRequest() {
@@ -49,8 +74,8 @@ export default function App() {
     }
   }
 
-  async function loadData() {
-    setLoading(true);
+  async function loadData(showLoading = true) {
+    if (showLoading) setLoading(true);
     try {
       const [decksRes, cardsRes, settingsRes, statsRes] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_decks' }),
@@ -66,7 +91,7 @@ export default function App() {
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }
 
@@ -128,6 +153,16 @@ export default function App() {
   }
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    {
+      id: 'study',
+      label: 'Study',
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
+        </svg>
+      ),
+    },
     {
       id: 'decks',
       label: 'Decks',
@@ -239,6 +274,16 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {activeTab === 'study' && settings && (
+          <StudySession
+            decks={decks}
+            cards={cards}
+            settings={settings}
+            onDataChange={() => loadData(false)}
+            onSaveSettings={handleSaveSettings}
+          />
+        )}
+
         {activeTab === 'decks' && (
           <DeckList
             decks={decks}

@@ -213,6 +213,11 @@ export interface OpenDashboardMessage {
   type: 'open_dashboard';
 }
 
+export interface GetNextStudyCardMessage {
+  type: 'get_next_study_card';
+  deckId?: string;
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -229,7 +234,8 @@ export type Message =
   | PauseSiteMessage
   | DisableSiteMessage
   | SkipCardMessage
-  | OpenDashboardMessage;
+  | OpenDashboardMessage
+  | GetNextStudyCardMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {
