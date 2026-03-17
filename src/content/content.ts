@@ -606,9 +606,11 @@ function buildQuizHTML(card: Card): string {
       
       ${statsHTML}
       
+      ${card.kind !== 'cloze' ? `
       <div class="scrolllearn-quiz-question" id="ss-question">
         ${escapeHTML(card.front)}
       </div>
+      ` : ''}
       
       ${optionsHTML}
       ${inputHTML}
