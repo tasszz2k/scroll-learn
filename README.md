@@ -9,12 +9,17 @@
 </p>
 
 <p align="center">
+  <a href="https://tasszz2k.github.io/scroll-learn/"><strong>Install page</strong></a> •
   <a href="#features">Features</a> •
   <a href="#screenshots">Screenshots</a> •
   <a href="#installation">Installation</a> •
   <a href="#usage">Usage</a> •
   <a href="#configuration">Configuration</a> •
   <a href="#contributing">Contributing</a>
+</p>
+
+<p align="center">
+  <a href="https://tasszz2k.github.io/scroll-learn/">tasszz2k.github.io/scroll-learn</a> — one-click installer for macOS + Chrome.
 </p>
 
 ---
@@ -96,6 +101,16 @@
 </table>
 
 ## Installation
+
+### One-click (recommended)
+
+Visit **<https://tasszz2k.github.io/scroll-learn/>** and click **Download installer**.
+You'll get `scroll-learn-installer.zip` — double-click it in Finder to extract
+`install.command`, then right-click the extracted file → **Open** (macOS prompts
+about unsigned scripts the first time only). Future updates land with a single
+click — no terminal, no re-downloading.
+
+See [INSTALL.md](INSTALL.md) for a terminal-only fallback.
 
 ### Development Build
 

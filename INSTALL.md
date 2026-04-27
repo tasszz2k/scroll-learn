@@ -10,11 +10,13 @@ no re-downloading.
 
 ## Recommended: install from the landing page
 
-Visit **<https://tasszz2k.github.io/scroll-learn/>** and click
-**Download installer**. Then in Finder, **right-click `install.command` -> Open**
-(macOS warns about unsigned scripts the first time only).
+1. Visit **<https://tasszz2k.github.io/scroll-learn/>** and click **Download installer** -- you get `scroll-learn-installer.zip`.
+2. **Double-click the zip** in Finder to extract `install.command`.
+3. **Right-click `install.command` -> Open** (macOS warns about unsigned scripts the first time only -- click **Open**).
 
-The rest of the flow is identical to the terminal install below.
+A Terminal window opens and the rest of the flow is identical to the terminal install below.
+
+> Why a zip? `.command` files lose their executable bit when downloaded directly over HTTP, so macOS refuses to run them. The zip preserves Unix permissions on extraction.
 
 ---
 
