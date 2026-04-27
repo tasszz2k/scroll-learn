@@ -239,7 +239,15 @@ function Popup() {
     <div className="popup-container">
       {/* Header — block-S monogram + serif title + status dot */}
       <header className="popup-header">
-        <div className="popup-mark">S</div>
+        <div className="popup-mark" aria-label="Scroll Learn">
+          <svg width="22" height="22" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="14" y="16" width="36" height="3" fill="#FBF8F2" />
+            <rect x="14" y="26" width="28" height="3" fill="#FBF8F2" />
+            <rect x="14" y="36" width="32" height="3" fill="#FBF8F2" />
+            <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="#C96442" strokeWidth="3" strokeLinecap="round" />
+            <circle cx="50" cy="46" r="3" fill="#C96442" />
+          </svg>
+        </div>
         <div className="popup-title">
           <h1>Scroll Learn</h1>
           <p>Learn while you scroll</p>
