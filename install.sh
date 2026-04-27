@@ -89,21 +89,31 @@ echo
 echo "Next: load it in Chrome."
 echo
 echo "  1. A Chrome window will open at chrome://extensions"
-echo "  2. Toggle 'Developer mode' (top right)"
-echo "  3. Click 'Load unpacked'"
-echo "  4. Select this folder:"
-echo "       $EXT_DIR"
-echo "  5. Copy the extension ID from the ScrollLearn card"
+echo "  2. Toggle 'Developer mode' (top right of the page)"
+echo "  3. A Finder window will open with the 'extension' folder highlighted."
+echo "     Easiest path: DRAG the highlighted 'extension' folder onto the"
+echo "     chrome://extensions tab. Chrome accepts the drop and loads it."
+echo
+echo "     If you'd rather click 'Load unpacked':"
+echo "       - Click 'Load unpacked' in chrome://extensions"
+echo "       - The folder ~/.scroll-learn is HIDDEN by default in macOS dialogs."
+echo "       - Press  Cmd+Shift+.  inside the dialog to reveal hidden folders,"
+echo "         OR press  Cmd+Shift+G  and paste:  $EXT_DIR"
+echo
+echo "  4. Copy the extension ID from the ScrollLearn card"
 echo
 
 if [[ -t 0 ]]; then
-  read -rp "Press Enter to open Chrome..."
+  read -rp "Press Enter to open Chrome and reveal the extension folder..."
 else
   echo "(non-interactive shell — open chrome://extensions yourself)"
 fi
 
 # `open` may fail if Chrome isn't installed at the default path; that's fine.
 open -a "Google Chrome" "chrome://extensions" 2>/dev/null || true
+# Reveal the extension dir in Finder so the user can drag it onto Chrome
+# without fighting the hidden-dotfile filter in the Load-unpacked dialog.
+open -R "$EXT_DIR" 2>/dev/null || true
 
 echo
 read -rp "Paste the extension ID here: " EXT_ID < /dev/tty

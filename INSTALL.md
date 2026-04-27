@@ -32,7 +32,13 @@ This downloads the latest release into `~/.scroll-learn/`, opens
 `chrome://extensions` for you, and walks you through:
 
 1. Toggle **Developer mode** (top right of `chrome://extensions`)
-2. Click **Load unpacked**, pick `~/.scroll-learn/extension`
+2. The installer also opens a **Finder window** with the `extension`
+   folder highlighted -- **drag that folder onto the Chrome tab** and
+   Chrome will load it as an unpacked extension.
+   - If you prefer **Load unpacked**: the `~/.scroll-learn` folder is
+     hidden in macOS dialogs by default. Press **Cmd+Shift+.** inside
+     the dialog to reveal hidden folders, or **Cmd+Shift+G** and paste
+     `~/.scroll-learn/extension`.
 3. Copy the **extension ID** from the ScrollLearn card
 4. Paste it back into the terminal when prompted
 5. Reload the extension once
