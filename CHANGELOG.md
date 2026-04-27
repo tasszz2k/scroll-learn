@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.4](https://github.com/tasszz2k/scroll-learn/compare/v1.1.3...v1.1.4) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ci:** drop pnpm cache key (no pnpm-lock.yaml in tree) ([21c14fc](https://github.com/tasszz2k/scroll-learn/commit/21c14fc6f4cf9bef2b8ddf21bce2e3099004cce0))
+
 ## [1.1.3](https://github.com/tasszz2k/scroll-learn/compare/v1.1.2...v1.1.3) (2026-04-27)
 
 
