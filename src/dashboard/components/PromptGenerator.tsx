@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 export type PromptOutputFormat = 'simple' | 'csv' | 'json';
-export type CardTypeOption = 'text' | 'mcq-single' | 'mixed';
+export type CardTypeOption = 'text' | 'mcq-single' | 'cloze' | 'mixed';
 export type PromptMode = 'general' | 'translation';
 export type TranslationDirection = 'en->vi' | 'vi->en';
 export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
@@ -30,12 +30,36 @@ interface PromptGeneratorProps {
 
 function formatInstructionsFor(format: PromptOutputFormat): string {
   if (format === 'csv') {
-    return `Use CSV with headers: deck,kind,front,back,options,correct,tags. For MCQ, use pipe-separated options and 0-based correct index.`;
+    return `Use CSV with this exact header row:
+deck,kind,front,back,options,correct,fuzziness,mediaUrl,tags
+
+Column rules:
+- deck: deck name (string)
+- kind: text | mcq-single | mcq-multi | cloze (defaults to text if blank)
+- front: question text shown to the learner. For cloze, embed the answer in {{double-braces}}, e.g. "I {{have}} already discussed this."
+- back: answer text. For text cards keep it 1-5 words. For multiple accepted answers separate with || (double pipe). For MCQ, may be left blank (derived from options[correct]).
+- options: MCQ only. Exactly 4 pipe-separated options: opt1|opt2|opt3|opt4. Leave blank for non-MCQ.
+- correct: MCQ only. 0-based index of the correct option.
+- fuzziness: leave empty.
+- mediaUrl: leave empty.
+- tags: optional pipe-separated topical tags, e.g. transition|academic.
+
+Quoting: wrap any field that contains a comma, double-quote, or newline in double quotes; double an internal quote to escape it. Example MCQ row:
+Vocab,mcq-single,"What does 'meanwhile' mean?",,trong khi đó|do đó|tương tự|chắc chắn,0,,,transition`;
   }
   if (format === 'simple') {
-    return `Use simple format, one card per line:\nQuestion|Answer\nFor MCQ: Question|CorrectAnswer|Wrong1|Wrong2|Wrong3`;
+    return `Use simple format, one card per line:
+Question|Answer            (text)
+Question|Answer1||Answer2  (text with multiple accepted answers, joined by || on the back)
+Question|CorrectAnswer|Wrong1|Wrong2|Wrong3   (MCQ — first answer after the question is correct, rest are distractors)
+For cloze, write the question with {{answer}} braces and put the answer after the pipe.`;
   }
-  return `Use JSON: [{ "front": "...", "back": "...", "kind": "text" }, ...]`;
+  return `Use JSON. Each card is an object:
+{ "deck": "...", "kind": "text|mcq-single|mcq-multi|cloze", "front": "...", "back": "...", "options": ["a","b","c","d"], "correct": 0, "tags": ["tag1"] }
+- For text: kind="text", omit options/correct.
+- For MCQ: kind="mcq-single", provide exactly 4 options and a 0-based correct index. back is optional.
+- For cloze: kind="cloze", front contains {{answer}}, back contains the answer word.
+- Output a single JSON array.`;
 }
 
 function buildGeneralPrompt(
@@ -46,10 +70,12 @@ function buildGeneralPrompt(
 ): string {
   const cardTypeInstructions =
     cardType === 'text'
-      ? 'Generate only text-based question and answer pairs.'
+      ? 'Generate only text-based question and answer pairs. Keep answers 1-5 words; use || to list multiple accepted answers.'
       : cardType === 'mcq-single'
-        ? 'Generate multiple choice questions with 4 options each. The first option after the question should be the correct answer.'
-        : 'Generate a mix of text-based Q&A and multiple choice questions.';
+        ? 'Generate multiple-choice questions with exactly 4 options each. Distractors must be plausible (semantically close but wrong), not trivially wrong.'
+        : cardType === 'cloze'
+          ? 'Generate fill-in-the-blank cloze cards: each front is a sentence with the target word wrapped in {{double-braces}}, and the back contains just that word.'
+          : 'Mix card types in roughly these proportions: ~40% mcq-single, ~30% text, ~30% cloze. Vary which kind tests which item; do not generate three identical-shape cards in a row.';
   const formatInstructions = formatInstructionsFor(outputFormat);
   const trimmed = userContent.trim();
   const isRawData = trimmed.length > 200 || trimmed.includes('\n');
@@ -71,44 +97,63 @@ function buildTranslationPrompt(
     : ['Vietnamese', 'English'];
   const cardTypeInstructions =
     cardType === 'text'
-      ? `Generate ONLY text translation cards: front = ${src}, back = ${tgt}.`
+      ? `Generate ONLY text translation cards: front = ${src}, back = ${tgt}. Keep each answer 1-5 words; use || on the back when several translations are equally acceptable (e.g. "meanwhile" -> "trong khi đó||cùng lúc đó").`
       : cardType === 'mcq-single'
-        ? `Generate ONLY multiple-choice cards: question shows a ${src} word/phrase, options are 4 ${tgt} candidates with one correct.`
-        : `Mix ~70% text translation cards (front = ${src}, back = ${tgt}) and ~30% multiple-choice cards (question = ${src} item, 4 ${tgt} options).`;
+        ? `Generate ONLY multiple-choice cards: question shows a ${src} word/phrase or short context, options are exactly 4 ${tgt} candidates, one correct.`
+        : cardType === 'cloze'
+          ? `Generate ONLY cloze (fill-in-the-blank) cards. Front = a short ${src} sentence (preferably drawn from the source notes) with the target word in {{double-braces}}. Back = just that word.`
+          : `Mix card kinds in roughly these proportions: ~40% mcq-single, ~30% text translation, ~30% cloze. Vary the kind across the same cluster so the learner meets each concept in multiple shapes.`;
   const formatInstructions = formatInstructionsFor(outputFormat);
+  const isToVietnamese = direction === 'en->vi';
   return `You are creating ${tgt}-learning flashcards from notes a learner highlighted while reading ${src} content on the web.
 
-LEARNER LEVEL (CEFR): ${CEFR_DESCRIPTIONS[englishLevel]}
-Tailor BOTH the chosen vocabulary and the wording of translations / distractors to this level. Skip items that are clearly far below the learner's level (already trivially known) or far above (rare jargon they cannot use yet) unless they are central to the source.
+LEARNER PROFILE
+- CEFR English level: ${CEFR_DESCRIPTIONS[englishLevel]}
+- The learner is a software / DevOps engineer. Treat technical terms as daily vocabulary, NOT noise: helm, kubectl, namespace, rollout, ArgoCD, CI, CD, VPA, HPA, PR, LGTM, cluster, deployment, pod, ingress, etc. should be preserved in their original English form on cards (no need to "translate" PR or kubectl).
+- Tailor vocabulary, sentence complexity, and distractor difficulty to the CEFR level. Skip items the learner already knows trivially OR cannot yet use, unless they are central to the source.
 
-Source notes (one item per line, possibly noisy):
+SOURCE NOTES (one item per line, possibly noisy)
 ---
 ${userContent.trim()}
 ---
 
-CLEANING (do this BEFORE writing any cards):
+CLEANING (do this BEFORE writing any cards)
 1. Deduplicate exact and near-duplicate items (case-insensitive). If "meanwhile" appears 3 times, keep ONE.
-2. Drop UI / site-chrome noise such as: "Main menu", "View history", "View source", "Donate", "Create account", "Log in", "Talk", "active", lone "Welcome", "From today's featured article", search/login labels, navigation breadcrumbs, button text. Anything that is clearly site UI rather than reading content.
+2. Drop UI / site-chrome noise: "Main menu", "View history", "View source", "Donate", "Create account", "Log in", "Talk", "active", lone "Welcome", "From today's featured article", login labels, navigation breadcrumbs, button text. Anything that is clearly site UI rather than reading content.
 3. Drop fragments that are pure punctuation, lone numbers, or single function words with no learning value (e.g. "the", "of", "a").
 4. Keep meaningful vocabulary, idioms, collocations, transitional phrases (e.g. "meanwhile", "thus", "likewise", "due to"), and full sentences worth translating.
 
-CONNECT THE DOTS (treat the whole list as ONE coherent reading session, not isolated lines):
+CONNECT THE DOTS (treat the whole list as ONE coherent reading session, not isolated lines)
 1. Read the entire source first and form a mental model of the topic(s) and register before writing any card.
-2. Cluster related items: synonyms / near-synonyms (e.g. "meanwhile" + "likewise" + "thus" are all logical-flow connectors), items from the same domain (e.g. anything about enzyme kinetics), collocations and their head nouns, etc.
-3. Prefer cards that REUSE context from the source. When a word appears in a sentence in the notes, base the example on that sentence rather than inventing a generic one. When a paragraph defines a concept, build cards that draw on the paragraph's own framing.
-4. Build at least a few cards that contrast or relate clustered items: "Which of these means 'as a result'?" with thus / meanwhile / likewise / undoubtedly as options; or "Pick the sentence where 'meanwhile' fits best" using shapes of the captured sentences. These contrast/usage cards are more valuable than four separate isolated translations of near-synonyms.
-5. For long passages (e.g. the Enzyme kinetics paragraph), produce ONE full-sentence translation card AND 2-4 vocabulary cards drawn from that same passage, plus optionally a comprehension MCQ ("According to the passage, what does enzyme kinetics study?"). The vocabulary cards should reference the passage's usage in their hint or tag, so the learner sees the items as connected, not floating words.
-6. Order the output by topic cluster, not by source line order. Cards in the same cluster should be adjacent.
+2. Cluster related items: synonyms / near-synonyms (e.g. "meanwhile" + "likewise" + "thus" are all logical-flow connectors), items from the same domain (e.g. enzyme kinetics terminology), collocations and their head nouns, etc.
+3. Reuse the source's own context. When a word appears in a sentence in the notes, base the example on that sentence rather than inventing a generic one. When a paragraph defines a concept, build cards that draw on the paragraph's own framing.
+4. Include a few contrast / disambiguation cards across cluster mates rather than four isolated translations of near-synonyms. Pull MCQ distractors from OTHER items in the same cluster.
+5. For long passages, produce ONE full-sentence translation card AND 2-4 vocabulary cards from that passage, plus optionally a comprehension MCQ. Shared cluster -> shared tag.
+6. For the SAME high-value item, generate 2-3 reinforcement cards in different shapes (a translation card + a cloze using the source sentence + an MCQ contrasting it with cluster mates). The CSV deduper will keep only exact duplicates, so vary the question wording.
+7. Order the output by topic cluster, not by source line order. Cards in the same cluster should be adjacent.
 
-CARD GENERATION:
-- Target up to ${cardCount} cards. If the cleaned source has fewer learnable items, return fewer cards rather than padding with junk.
-- Front = ${src} item as a learner would encounter it (favour the form found in the source over a dictionary headword when they differ). Back = concise, natural ${tgt} translation. If the ${src} item has multiple senses, pick the sense that fits the captured context, and include a brief usage hint or example sentence drawn from the source.
+CARD KIND GUIDANCE
+- text translation: front = ${src} item exactly as the learner met it (favour source form over dictionary headword); back = concise, natural ${tgt} translation, 1-5 words, with || separating equally valid alternatives.
+- mcq-single: front asks for the meaning OR best-fitting word in a short ${src} context. Exactly 4 ${tgt} options, one correct, three plausible cluster-mate distractors. Avoid trivially wrong options.
+- cloze: front is a short ${src} sentence (lifted or lightly adapted from the source) with the target word in {{double-braces}}; back is just that word. Cloze is great for testing collocations and connectors in context.
+- Bidirectional vocab (mixed mode only): for each high-value vocab item, include at least one ${src}->${tgt} card AND one ${tgt}->${src} card so the learner can recall in both directions.
 - ${cardTypeInstructions}
-- For MCQ distractors: prefer pulling distractors from OTHER items in the same cluster within this source (e.g. when testing "meanwhile", use "thus" / "likewise" / "undoubtedly" as distractors). This forces the learner to disambiguate items they actually saw together. Fall back to invented plausible distractors only when the cluster is too small.
-- Use a deck name that reflects the dominant topic of the source (e.g. "Logical Connectors", "Enzyme Kinetics", "Wikipedia Vocab"); use "Vocab" only if the source has no clear theme.
-- Tags: short topical tags drawn from the clusters you identified (e.g. "transition", "academic", "biology"). Items in the same cluster should share a tag.
 
-OUTPUT FORMAT:
+LANGUAGE QUALITY
+${isToVietnamese
+  ? `- Vietnamese answers MUST use proper diacritics (tiếng Việt có dấu). Write "bỏ qua" not "bo qua", "tổng hợp" not "tong hop", "trong khi đó" not "trong khi do". This is non-negotiable on every Vietnamese field, including options, tags, and example sentences.
+- Pick the most natural register for each item; avoid stiff word-for-word translations when an idiomatic Vietnamese phrase exists.`
+  : `- English answers should be natural and idiomatic. Match the register of the source (academic, casual, technical) rather than defaulting to formal business English.
+- Preserve technical terms (kubectl, ArgoCD, etc.) in their original English form even on the back of a Vietnamese-fronted card.`}
+
+DECK & TAGS
+- Deck name: reflect the dominant topic of the source (e.g. "Logical Connectors", "Enzyme Kinetics", "Wikipedia Vocab"). Use "Vocab" only if the source has no clear theme.
+- Tags: short topical tags drawn from the clusters (e.g. transition, academic, biology, devops). Items in the same cluster share a tag.
+
+VOLUME
+- Target up to ${cardCount} cards total. If the cleaned source has fewer learnable items, return fewer cards rather than padding with junk. Better 30 sharp cards than 60 with filler.
+
+OUTPUT FORMAT
 ${formatInstructions}
 
 Output ONLY the data in the specified format. No commentary, no explanations, no markdown code fences.`;
@@ -215,6 +260,7 @@ export default function PromptGenerator({
                 <option value="mixed">Mixed</option>
                 <option value="text">Text only</option>
                 <option value="mcq-single">MCQ only</option>
+                <option value="cloze">Cloze only</option>
               </select>
             </div>
             {isTranslation && (
