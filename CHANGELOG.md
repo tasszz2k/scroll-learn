@@ -4,6 +4,14 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.6](https://github.com/tasszz2k/scroll-learn/compare/v1.1.5...v1.1.6) (2026-04-27)
+
+
+### Bug Fixes
+
+* **install:** help users find the hidden ~/.scroll-learn dir ([bba5ad3](https://github.com/tasszz2k/scroll-learn/commit/bba5ad30a988d7ae256363b431d2093590110fbb))
+* **updater:** clear update banner after install / manual reload ([64654a6](https://github.com/tasszz2k/scroll-learn/commit/64654a60e6fb2ed481b02c9807e0d5378ab79679))
+
 ## [1.1.5](https://github.com/tasszz2k/scroll-learn/compare/v1.1.4...v1.1.5) (2026-04-27)
 
 
