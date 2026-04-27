@@ -1,14 +1,19 @@
 {
   "manifest_version": 3,
   "name": "ScrollLearn",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Learn while you scroll - quizzes injected into social feeds with spaced repetition.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "alarms", "tabs", "nativeMessaging"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "nativeMessaging"
+  ],
   "host_permissions": [
     "https://www.facebook.com/*",
     "https://m.facebook.com/*",
@@ -37,14 +42,24 @@
         "https://*.youtube.com/*",
         "https://*.instagram.com/*"
       ],
-      "js": ["src/content/content.ts"],
-      "css": ["content.css"],
+      "js": [
+        "src/content/content.ts"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/notes.ts"],
-      "css": ["content.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/notes.ts"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ]

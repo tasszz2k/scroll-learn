@@ -4,6 +4,23 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.0](https://github.com/tasszz2k/scroll-learn/compare/v1.0.0...v1.1.0) (2026-04-27)
+
+
+### Features
+
+* add Grammar Police integration for enhanced learning materials ([8b76106](https://github.com/tasszz2k/scroll-learn/commit/8b761062c42f8dd4ad8cf30d04e1617769a4f5ca))
+* add standalone study mode with colorful UI and fix grading bugs ([b8c518b](https://github.com/tasszz2k/scroll-learn/commit/b8c518b2bce91ec10ded214faade64799024c43c))
+* capture text selections into a Notes tab with EN-VI export ([5742d97](https://github.com/tasszz2k/scroll-learn/commit/5742d978a8683a7b99124a26f07a94f6ec600bc1))
+* **notes:** auto-translate captured notes ([dadf5e7](https://github.com/tasszz2k/scroll-learn/commit/dadf5e72c1ab107e4af75d19566038af0fe35c14))
+* **updater:** in-app auto-updater with native messaging helper ([911aad2](https://github.com/tasszz2k/scroll-learn/commit/911aad2e261ec02bdffa9a98b2f354ab449d73a2))
+
+
+### Bug Fixes
+
+* **content:** hide raw cloze template shown above interactive blanks ([2d52557](https://github.com/tasszz2k/scroll-learn/commit/2d525576465c995af0b20873ba52adc360d664f8))
+* update fuzzy thresholds to improve grading accuracy ([d4cd8e9](https://github.com/tasszz2k/scroll-learn/commit/d4cd8e97e5ee900efedd561694494f883abba164))
+
 ## [Unreleased]
 
 ### Added
