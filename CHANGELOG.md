@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.0](https://github.com/tasszz2k/scroll-learn/compare/v1.2.0...v1.3.0) (2026-04-27)
+
+
+### Features
+
+* **notes:** teach AI prompt to connect the dots across notes ([f726c09](https://github.com/tasszz2k/scroll-learn/commit/f726c09cf67b47b4e559809a91d69fb565ccb8ac))
+
 ## [1.2.0](https://github.com/tasszz2k/scroll-learn/compare/v1.1.7...v1.2.0) (2026-04-27)
 
 
