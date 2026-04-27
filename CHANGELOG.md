@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.0](https://github.com/tasszz2k/scroll-learn/compare/v1.4.0...v1.5.0) (2026-04-27)
+
+
+### Features
+
+* **notes:** bias AI prompt toward English-answer cards ([a62fa80](https://github.com/tasszz2k/scroll-learn/commit/a62fa80d50478674bd3bed96f61fc751aec3c130))
+
 ## [1.4.0](https://github.com/tasszz2k/scroll-learn/compare/v1.3.0...v1.4.0) (2026-04-27)
 
 
