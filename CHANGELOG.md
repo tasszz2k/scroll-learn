@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.6.0](https://github.com/tasszz2k/scroll-learn/compare/v1.5.0...v1.6.0) (2026-04-27)
+
+
+### Features
+
+* **decks:** card preview with revealed answers ([185825d](https://github.com/tasszz2k/scroll-learn/commit/185825d9330cff18d0cea9bd1c40b76ce6576596))
+
 ## [1.5.0](https://github.com/tasszz2k/scroll-learn/compare/v1.4.0...v1.5.0) (2026-04-27)
 
 
