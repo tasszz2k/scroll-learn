@@ -4,6 +4,14 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.3](https://github.com/tasszz2k/scroll-learn/compare/v1.1.2...v1.1.3) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ci:** switch install step to pnpm ([f8a26c8](https://github.com/tasszz2k/scroll-learn/commit/f8a26c83b5c6f9baa289afbb017a6c172990f9b9))
+* **landing:** make Download installer link trigger a download ([50347f9](https://github.com/tasszz2k/scroll-learn/commit/50347f9a31057591f232e7dd7e8630a3928eeb36))
+
 ## [1.1.2](https://github.com/tasszz2k/scroll-learn/compare/v1.1.1...v1.1.2) (2026-04-27)
 
 
