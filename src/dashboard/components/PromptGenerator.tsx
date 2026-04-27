@@ -91,15 +91,22 @@ CLEANING (do this BEFORE writing any cards):
 2. Drop UI / site-chrome noise such as: "Main menu", "View history", "View source", "Donate", "Create account", "Log in", "Talk", "active", lone "Welcome", "From today's featured article", search/login labels, navigation breadcrumbs, button text. Anything that is clearly site UI rather than reading content.
 3. Drop fragments that are pure punctuation, lone numbers, or single function words with no learning value (e.g. "the", "of", "a").
 4. Keep meaningful vocabulary, idioms, collocations, transitional phrases (e.g. "meanwhile", "thus", "likewise", "due to"), and full sentences worth translating.
-5. For long paragraphs, ALSO extract 2-4 high-value vocabulary items as separate cards in addition to the full-sentence card.
+
+CONNECT THE DOTS (treat the whole list as ONE coherent reading session, not isolated lines):
+1. Read the entire source first and form a mental model of the topic(s) and register before writing any card.
+2. Cluster related items: synonyms / near-synonyms (e.g. "meanwhile" + "likewise" + "thus" are all logical-flow connectors), items from the same domain (e.g. anything about enzyme kinetics), collocations and their head nouns, etc.
+3. Prefer cards that REUSE context from the source. When a word appears in a sentence in the notes, base the example on that sentence rather than inventing a generic one. When a paragraph defines a concept, build cards that draw on the paragraph's own framing.
+4. Build at least a few cards that contrast or relate clustered items: "Which of these means 'as a result'?" with thus / meanwhile / likewise / undoubtedly as options; or "Pick the sentence where 'meanwhile' fits best" using shapes of the captured sentences. These contrast/usage cards are more valuable than four separate isolated translations of near-synonyms.
+5. For long passages (e.g. the Enzyme kinetics paragraph), produce ONE full-sentence translation card AND 2-4 vocabulary cards drawn from that same passage, plus optionally a comprehension MCQ ("According to the passage, what does enzyme kinetics study?"). The vocabulary cards should reference the passage's usage in their hint or tag, so the learner sees the items as connected, not floating words.
+6. Order the output by topic cluster, not by source line order. Cards in the same cluster should be adjacent.
 
 CARD GENERATION:
 - Target up to ${cardCount} cards. If the cleaned source has fewer learnable items, return fewer cards rather than padding with junk.
-- Front = ${src} item exactly as a learner would encounter it. Back = concise, natural ${tgt} translation. If the ${src} word has multiple senses, pick the sense that fits the captured context, or include a brief usage hint in the back.
+- Front = ${src} item as a learner would encounter it (favour the form found in the source over a dictionary headword when they differ). Back = concise, natural ${tgt} translation. If the ${src} item has multiple senses, pick the sense that fits the captured context, and include a brief usage hint or example sentence drawn from the source.
 - ${cardTypeInstructions}
-- For MCQ distractors: pick plausible ${tgt} words/phrases that are semantically close but wrong. Avoid trivially wrong options.
-- Use the deck name "Vocab" (or a more specific topical name if the content is clearly about one subject).
-- Tags: add short topical tags when obvious (e.g. "transition", "academic", "biology"); leave empty otherwise.
+- For MCQ distractors: prefer pulling distractors from OTHER items in the same cluster within this source (e.g. when testing "meanwhile", use "thus" / "likewise" / "undoubtedly" as distractors). This forces the learner to disambiguate items they actually saw together. Fall back to invented plausible distractors only when the cluster is too small.
+- Use a deck name that reflects the dominant topic of the source (e.g. "Logical Connectors", "Enzyme Kinetics", "Wikipedia Vocab"); use "Vocab" only if the source has no clear theme.
+- Tags: short topical tags drawn from the clusters you identified (e.g. "transition", "academic", "biology"). Items in the same cluster should share a tag.
 
 OUTPUT FORMAT:
 ${formatInstructions}
