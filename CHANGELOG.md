@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.2](https://github.com/tasszz2k/scroll-learn/compare/v1.1.1...v1.1.2) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ci:** pin npm to 10.5.2 to dodge exit-handler bug ([ae295b1](https://github.com/tasszz2k/scroll-learn/commit/ae295b1bd6dc476a0eaa4734565df96df20db3b0))
+
 ## [1.1.1](https://github.com/tasszz2k/scroll-learn/compare/v1.1.0...v1.1.1) (2026-04-27)
 
 
