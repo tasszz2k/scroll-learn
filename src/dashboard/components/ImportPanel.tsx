@@ -2,10 +2,9 @@ import { useState, useRef } from 'react';
 import type { Deck, Card, ParsedCard, Response } from '../../common/types';
 import { parseSimpleFormat, parseCSV, parseJSON } from '../../common/parser';
 import EditorialHeader from './EditorialHeader';
+import PromptGenerator from './PromptGenerator';
 
 type ImportFormat = 'simple' | 'csv' | 'json';
-type PromptOutputFormat = 'simple' | 'csv' | 'json';
-type CardTypeOption = 'text' | 'mcq-single' | 'mixed';
 
 interface ImportPanelProps {
   decks: Deck[];
@@ -63,48 +62,7 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showAllCards, setShowAllCards] = useState(false);
 
-  // Prompt Generator
   const [showPromptGenerator, setShowPromptGenerator] = useState(false);
-  const [promptInput, setPromptInput] = useState('');
-  const [promptCardCount, setPromptCardCount] = useState(20);
-  const [promptOutputFormat, setPromptOutputFormat] = useState<PromptOutputFormat>('csv');
-  const [promptCardType, setPromptCardType] = useState<CardTypeOption>('mixed');
-  const [generatedPrompt, setGeneratedPrompt] = useState('');
-  const [promptCopied, setPromptCopied] = useState(false);
-
-  function generatePrompt() {
-    const cardTypeInstructions =
-      promptCardType === 'text'
-        ? 'Generate only text-based question and answer pairs.'
-        : promptCardType === 'mcq-single'
-          ? 'Generate multiple choice questions with 4 options each. The first option after the question should be the correct answer.'
-          : 'Generate a mix of text-based Q&A and multiple choice questions.';
-    let formatInstructions: string;
-    if (promptOutputFormat === 'csv') {
-      formatInstructions = `Use CSV with headers: deck,kind,front,back,options,correct,tags. For MCQ, use pipe-separated options and 0-based correct index.`;
-    } else if (promptOutputFormat === 'simple') {
-      formatInstructions = `Use simple format, one card per line:\nQuestion|Answer\nFor MCQ: Question|CorrectAnswer|Wrong1|Wrong2|Wrong3`;
-    } else {
-      formatInstructions = `Use JSON: [{ "front": "...", "back": "...", "kind": "text" }, ...]`;
-    }
-    const userContent = promptInput.trim();
-    const isRawData = userContent.length > 200 || userContent.includes('\n');
-    const prompt = isRawData
-      ? `Convert the following content into ${promptCardCount} flashcards.\n\n---\n${userContent}\n---\n\n${cardTypeInstructions}\n\n${formatInstructions}\n\nOutput ONLY the data in the specified format.`
-      : `Create ${promptCardCount} flashcards on: ${userContent || '[topic]'}\n\n${cardTypeInstructions}\n\n${formatInstructions}\n\nOutput ONLY the data in the specified format.`;
-    setGeneratedPrompt(prompt);
-    setPromptCopied(false);
-  }
-
-  async function copyPrompt() {
-    try {
-      await navigator.clipboard.writeText(generatedPrompt);
-      setPromptCopied(true);
-      setTimeout(() => setPromptCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  }
 
   function handleParse() {
     let result;
@@ -205,81 +163,7 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
         }
       />
 
-      {/* AI Prompt Generator (collapsible, editorial) */}
-      {showPromptGenerator && (
-        <div className="card-flat" style={{ padding: 24, marginBottom: 32 }}>
-          <div className="eyebrow">Prompt generator · for ChatGPT, Claude, etc.</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 14 }}>
-            <div>
-              <label className="eyebrow" style={{ display: 'block', marginBottom: 8 }}>Topic or raw text</label>
-              <textarea
-                className="input-editorial"
-                value={promptInput}
-                onChange={e => setPromptInput(e.target.value)}
-                placeholder="A topic (e.g., 'Spanish basics') or paste content"
-                style={{ minHeight: 100, fontFamily: 'inherit', resize: 'vertical' }}
-              />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 12 }}>
-                <div>
-                  <label className="eyebrow" style={{ display: 'block', marginBottom: 6 }}>Cards</label>
-                  <input
-                    type="number"
-                    className="input-editorial"
-                    value={promptCardCount}
-                    onChange={e => setPromptCardCount(parseInt(e.target.value) || 20)}
-                    min={1}
-                    max={100}
-                  />
-                </div>
-                <div>
-                  <label className="eyebrow" style={{ display: 'block', marginBottom: 6 }}>Format</label>
-                  <select
-                    className="input-editorial"
-                    value={promptOutputFormat}
-                    onChange={e => setPromptOutputFormat(e.target.value as PromptOutputFormat)}
-                  >
-                    <option value="csv">CSV</option>
-                    <option value="simple">Simple</option>
-                    <option value="json">JSON</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="eyebrow" style={{ display: 'block', marginBottom: 6 }}>Type</label>
-                  <select
-                    className="input-editorial"
-                    value={promptCardType}
-                    onChange={e => setPromptCardType(e.target.value as CardTypeOption)}
-                  >
-                    <option value="mixed">Mixed</option>
-                    <option value="text">Text only</option>
-                    <option value="mcq-single">MCQ only</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ marginTop: 14 }}>
-                <button onClick={generatePrompt} className="btn btn-clay" type="button">
-                  Generate prompt
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="eyebrow" style={{ display: 'block', marginBottom: 8 }}>Generated prompt</label>
-              <textarea
-                className="input-editorial"
-                readOnly
-                value={generatedPrompt}
-                placeholder="Click 'Generate prompt' to see the result"
-                style={{ minHeight: 220, fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace", fontSize: 12, resize: 'vertical' }}
-              />
-              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
-                <button onClick={copyPrompt} disabled={!generatedPrompt} className="btn btn-ghost" type="button">
-                  {promptCopied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPromptGenerator && <PromptGenerator />}
 
       {/* Two-column main */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 40 }}>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Note, Settings as SettingsType } from '../../common/types';
 import { detectVietnamese, translateMany, type TranslateLang } from '../../common/translate';
 import EditorialHeader from './EditorialHeader';
+import PromptGenerator from './PromptGenerator';
 
 interface NotesPanelProps {
   notes: Note[];
@@ -36,6 +37,8 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
   const [toDate, setToDate] = useState<string | null>(null);
   const [plainCopy, setPlainCopy] = useState<CopyState>({ kind: 'idle' });
   const [pairsCopy, setPairsCopy] = useState<CopyState>({ kind: 'idle' });
+  const [showPromptGenerator, setShowPromptGenerator] = useState(false);
+  const [showClearAfterGenerate, setShowClearAfterGenerate] = useState(false);
 
   // Anchor "now" once per mount; the panel session is short-lived.
   const [now] = useState(() => Date.now());
@@ -90,11 +93,26 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
   }
 
   function buildPlain(): string {
-    return filtered
-      .map(n => n.text.trim())
-      .filter(Boolean)
-      .map(text => `- ${text.replace(/\s*\n\s*/g, ' ')}`)
-      .join('\n');
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const n of filtered) {
+      const text = n.text.trim().replace(/\s*\n\s*/g, ' ');
+      if (!text) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(`- ${text}`);
+    }
+    return out.join('\n');
+  }
+
+  function uniqueFilteredCount(): number {
+    const seen = new Set<string>();
+    for (const n of filtered) {
+      const t = n.text.trim().toLowerCase();
+      if (t) seen.add(t);
+    }
+    return seen.size;
   }
 
   async function handleCopyPlain() {
@@ -185,6 +203,14 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
         sub="Highlights from allowlisted sites. Copy them out to build flashcards in the Import tab."
         action={
           <div className="flex items-center" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setShowPromptGenerator(s => !s)}
+              disabled={notes.length === 0 && !showPromptGenerator}
+            >
+              {showPromptGenerator ? 'Hide AI prompt' : 'AI prompt'}
+            </button>
             <button onClick={onRefresh} className="btn btn-ghost" type="button">
               Refresh
             </button>
@@ -204,6 +230,69 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
           </div>
         }
       />
+
+      {showPromptGenerator && (
+        <>
+          <PromptGenerator
+            initialInput={buildPlain()}
+            inputPlaceholder="Filtered notes will be used as source. Edit to refine, or paste your own."
+            defaultCardCount={Math.max(20, uniqueFilteredCount() * 2)}
+            mode="translation"
+            defaultDirection={settings.noteTranslateDirection === 'vi->en' ? 'vi->en' : 'en->vi'}
+            onGenerated={() => setShowClearAfterGenerate(true)}
+          />
+          {showClearAfterGenerate && notes.length > 0 && (
+            <div
+              className="card-flat"
+              style={{
+                padding: '14px 18px',
+                marginTop: -20,
+                marginBottom: 32,
+                background: 'rgba(184,146,58,.08)',
+                borderColor: 'rgba(184,146,58,.30)',
+                color: '#6E5A20',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span>
+                Prompt generated. Done with these notes? Clear them so new captures start fresh.
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ padding: '6px 12px', fontSize: 12 }}
+                  onClick={() => setShowClearAfterGenerate(false)}
+                >
+                  Keep notes
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    background: 'transparent',
+                    color: 'var(--rose)',
+                    border: '1px solid var(--rose)',
+                    padding: '6px 12px',
+                    fontSize: 12,
+                  }}
+                  onClick={async () => {
+                    await handleClearAll();
+                    setShowClearAfterGenerate(false);
+                  }}
+                >
+                  Clear all notes
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {allowlistEmpty && notes.length === 0 && (
         <div
