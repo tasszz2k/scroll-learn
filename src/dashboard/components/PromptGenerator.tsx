@@ -109,8 +109,8 @@ function buildTranslationPrompt(
 
 LEARNER PROFILE
 - CEFR English level: ${CEFR_DESCRIPTIONS[englishLevel]}
-- The learner is a software / DevOps engineer. Treat technical terms as daily vocabulary, NOT noise: helm, kubectl, namespace, rollout, ArgoCD, CI, CD, VPA, HPA, PR, LGTM, cluster, deployment, pod, ingress, etc. should be preserved in their original English form on cards (no need to "translate" PR or kubectl).
 - Tailor vocabulary, sentence complexity, and distractor difficulty to the CEFR level. Skip items the learner already knows trivially OR cannot yet use, unless they are central to the source.
+- Preserve domain-specific terms in their source form when there is no natural translation in the target language (proper nouns, brand names, technical jargon, abbreviations, code identifiers). Do NOT force a translation that nobody actually uses.
 
 SOURCE NOTES (one item per line, possibly noisy)
 ---
@@ -144,11 +144,11 @@ ${isToVietnamese
   ? `- Vietnamese answers MUST use proper diacritics (tiếng Việt có dấu). Write "bỏ qua" not "bo qua", "tổng hợp" not "tong hop", "trong khi đó" not "trong khi do". This is non-negotiable on every Vietnamese field, including options, tags, and example sentences.
 - Pick the most natural register for each item; avoid stiff word-for-word translations when an idiomatic Vietnamese phrase exists.`
   : `- English answers should be natural and idiomatic. Match the register of the source (academic, casual, technical) rather than defaulting to formal business English.
-- Preserve technical terms (kubectl, ArgoCD, etc.) in their original English form even on the back of a Vietnamese-fronted card.`}
+- Preserve untranslatable domain terms (proper nouns, brand names, technical jargon) in their original form on the back as well; do not invent forced English equivalents.`}
 
 DECK & TAGS
 - Deck name: reflect the dominant topic of the source (e.g. "Logical Connectors", "Enzyme Kinetics", "Wikipedia Vocab"). Use "Vocab" only if the source has no clear theme.
-- Tags: short topical tags drawn from the clusters (e.g. transition, academic, biology, devops). Items in the same cluster share a tag.
+- Tags: short topical tags drawn from the clusters (e.g. transition, academic, biology). Items in the same cluster share a tag.
 
 VOLUME
 - Target up to ${cardCount} cards total. If the cleaned source has fewer learnable items, return fewer cards rather than padding with junk. Better 30 sharp cards than 60 with filler.
