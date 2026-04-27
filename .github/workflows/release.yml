@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created || steps.release-post-merge.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name || steps.release-post-merge.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version || steps.release-post-merge.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge release PR
+        if: steps.release.outputs.prs_created == 'true' && steps.release.outputs.releases_created != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh pr list --repo "${{ github.repository }}" --state open --json number,headRefName \
+            -q '[.[] | select(.headRefName | startswith("release-please--branches--main"))][0].number')
+          if [ -n "$PR" ]; then
+            gh pr merge "$PR" --squash --repo "${{ github.repository }}"
+          fi
+
+      - uses: googleapis/release-please-action@v4
+        id: release-post-merge
+        if: steps.release.outputs.prs_created == 'true' && steps.release.outputs.releases_created != 'true'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Verify version match
+        run: |
+          set -euo pipefail
+          MANIFEST_VERSION=$(node -p "require('./dist/manifest.json').version")
+          EXPECTED="${{ needs.release-please.outputs.version }}"
+          if [ "$MANIFEST_VERSION" != "$EXPECTED" ]; then
+            echo "Version mismatch: dist/manifest.json has $MANIFEST_VERSION, expected $EXPECTED" >&2
+            exit 1
+          fi
+          echo "Verified v$MANIFEST_VERSION"
+
+      - name: Stage release bundle
+        run: |
+          set -euo pipefail
+          mkdir -p release-bundle/extension
+          cp -R dist/. release-bundle/extension/
+          cp scripts/updater/scrolllearn-updater.py release-bundle/
+
+      - name: Package release zip
+        run: |
+          cd release-bundle
+          zip -r "../scrolllearn-${{ needs.release-please.outputs.version }}.zip" .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrolllearn-${{ needs.release-please.outputs.version }}
+          path: scrolllearn-${{ needs.release-please.outputs.version }}.zip
+
+      - name: Attach assets to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: |
+            scrolllearn-${{ needs.release-please.outputs.version }}.zip
+            docs/install.command
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
