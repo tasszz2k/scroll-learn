@@ -50,6 +50,8 @@ export interface FuzzyThresholds {
   low: number;   // >= this for grade 1 (default: 1.0)
 }
 
+export type TranslateDirection = 'auto' | 'en->vi' | 'vi->en';
+
 export interface Settings {
   showAfterNPosts: number; // Default 5
   pauseMinutesAfterQuiz: number; // Default 0
@@ -70,6 +72,11 @@ export interface Settings {
   hideYouTubeShorts: boolean;
   hideFacebookStrangers: boolean;
   hideInstagramStrangers: boolean;
+  // Note capture
+  noteCaptureAllowlist: string[];
+  noteMinLength: number;
+  noteRetentionDays: number;
+  noteTranslateDirection: TranslateDirection;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -101,7 +108,23 @@ export const DEFAULT_SETTINGS: Settings = {
   hideYouTubeShorts: true,
   hideFacebookStrangers: true,
   hideInstagramStrangers: true,
+  noteCaptureAllowlist: [],
+  noteMinLength: 2,
+  noteRetentionDays: 0,
+  noteTranslateDirection: 'auto',
 };
+
+// Notes feature
+export interface Note {
+  id: string;
+  text: string;
+  url: string;
+  pageTitle: string;
+  domain: string;
+  createdAt: number;
+}
+
+export type NewNote = Omit<Note, 'id' | 'createdAt'>;
 
 // Review Statistics
 export interface ReviewRecord {
@@ -218,6 +241,24 @@ export interface GetNextStudyCardMessage {
   deckId?: string;
 }
 
+export interface SaveNoteMessage {
+  type: 'save_note';
+  note: NewNote;
+}
+
+export interface GetNotesMessage {
+  type: 'get_notes';
+}
+
+export interface DeleteNoteMessage {
+  type: 'delete_note';
+  noteId: string;
+}
+
+export interface ClearNotesMessage {
+  type: 'clear_notes';
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -235,7 +276,11 @@ export type Message =
   | DisableSiteMessage
   | SkipCardMessage
   | OpenDashboardMessage
-  | GetNextStudyCardMessage;
+  | GetNextStudyCardMessage
+  | SaveNoteMessage
+  | GetNotesMessage
+  | DeleteNoteMessage
+  | ClearNotesMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {
@@ -287,6 +332,7 @@ export const STORAGE_KEYS = {
   REVIEW_HISTORY: 'scrolllearn_review_history',
   PAUSED_SITES: 'scrolllearn_paused_sites',
   DUE_QUEUE: 'scrolllearn_due_queue',
+  NOTES: 'scrolllearn_notes',
 } as const;
 
 // Generate unique ID
@@ -318,5 +364,14 @@ export function createDeck(data: NewDeck): Deck {
     id: generateId(),
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+// Create new note with defaults
+export function createNote(data: NewNote): Note {
+  return {
+    ...data,
+    id: generateId(),
+    createdAt: Date.now(),
   };
 }

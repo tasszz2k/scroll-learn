@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import type { Deck, Settings as SettingsType, Response } from '../../common/types';
+import { useEffect, useRef, useState } from 'react';
+import type { Deck, Settings as SettingsType, Response, TranslateDirection } from '../../common/types';
+import { parseRegexEntry, validateAllowlistEntry } from '../../common/allowlist';
 
 interface SettingsProps {
   decks: Deck[];
@@ -7,10 +8,53 @@ interface SettingsProps {
   onSave: (settings: Partial<SettingsType>) => Promise<Response<SettingsType>>;
 }
 
+function normalizeAllowlistInput(raw: string): string {
+  const value = raw.trim();
+  if (!value) return '';
+  // Regex entries are stored verbatim — don't lowercase or strip path-looking parts.
+  if (parseRegexEntry(value)) return value;
+  let host = value.toLowerCase();
+  host = host.replace(/^[a-z]+:\/\//, '');
+  host = host.split('/')[0];
+  host = host.replace(/^(www\.|m\.)/, '');
+  return host;
+}
+
 export default function Settings({ decks, settings, onSave }: SettingsProps) {
   const [localSettings, setLocalSettings] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [allowlistInput, setAllowlistInput] = useState('');
+  const [allowlistError, setAllowlistError] = useState<string | null>(null);
+  const [noteAutoSaveStatus, setNoteAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const noteAutoSaveSkipFirst = useRef(true);
+
+  // Auto-save Note Capture fields (debounced) so users don't need to click "Save Changes"
+  // for allowlist / min length / retention / translate direction.
+  useEffect(() => {
+    if (noteAutoSaveSkipFirst.current) {
+      noteAutoSaveSkipFirst.current = false;
+      return;
+    }
+    setNoteAutoSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      await onSave({
+        noteCaptureAllowlist: localSettings.noteCaptureAllowlist,
+        noteMinLength: localSettings.noteMinLength,
+        noteRetentionDays: localSettings.noteRetentionDays,
+        noteTranslateDirection: localSettings.noteTranslateDirection,
+      });
+      setNoteAutoSaveStatus('saved');
+      setTimeout(() => setNoteAutoSaveStatus('idle'), 1500);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [
+    localSettings.noteCaptureAllowlist,
+    localSettings.noteMinLength,
+    localSettings.noteRetentionDays,
+    localSettings.noteTranslateDirection,
+    onSave,
+  ]);
 
   async function handleSave() {
     setSaving(true);
@@ -43,6 +87,37 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
     setLocalSettings({
       ...localSettings,
       fuzzyThresholds: { ...localSettings.fuzzyThresholds, [key]: value },
+    });
+  }
+
+  function addAllowlistDomain() {
+    const entry = normalizeAllowlistInput(allowlistInput);
+    if (!entry) {
+      setAllowlistError(null);
+      return;
+    }
+    const validation = validateAllowlistEntry(entry);
+    if (validation === 'invalid-regex') {
+      setAllowlistError('Invalid regex pattern');
+      return;
+    }
+    if (localSettings.noteCaptureAllowlist.includes(entry)) {
+      setAllowlistInput('');
+      setAllowlistError(null);
+      return;
+    }
+    setLocalSettings({
+      ...localSettings,
+      noteCaptureAllowlist: [...localSettings.noteCaptureAllowlist, entry],
+    });
+    setAllowlistInput('');
+    setAllowlistError(null);
+  }
+
+  function removeAllowlistDomain(entry: string) {
+    setLocalSettings({
+      ...localSettings,
+      noteCaptureAllowlist: localSettings.noteCaptureAllowlist.filter(d => d !== entry),
     });
   }
 
@@ -279,6 +354,163 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
           <div className="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400 mb-3">YouTube</div>
           <div className="space-y-3">
             {renderBlockingToggle('hideYouTubeShorts', 'Hide Shorts', localSettings.hideYouTubeShorts)}
+          </div>
+        </div>
+      </div>
+
+      {/* Note Capture */}
+      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-surface-900 dark:text-surface-50">Note Capture</h3>
+          <span
+            className={`text-xs font-medium transition-opacity ${
+              noteAutoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'
+            } ${noteAutoSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' : 'text-surface-500'}`}
+          >
+            {noteAutoSaveStatus === 'saving' ? 'Saving...' : noteAutoSaveStatus === 'saved' ? 'Saved' : ''}
+          </span>
+        </div>
+        <p className="text-sm text-surface-500 mb-4">
+          Save every text selection on listed sites to your Notes tab. Changes here save automatically. Captured notes are kept separate from your flashcard decks.
+        </p>
+
+        <div className="space-y-6">
+          {/* Allowlist */}
+          <div>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+              Allowed domains
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="flex-1 rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 font-mono"
+                value={allowlistInput}
+                onChange={e => {
+                  setAllowlistInput(e.target.value);
+                  if (allowlistError) setAllowlistError(null);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addAllowlistDomain();
+                  }
+                }}
+                placeholder="example.com  or  /.*\\.wikipedia\\.org$/"
+              />
+              <button
+                onClick={addAllowlistDomain}
+                disabled={!allowlistInput.trim()}
+                className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500"
+              >
+                Add
+              </button>
+            </div>
+            {allowlistError && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">{allowlistError}</p>
+            )}
+            <p className="text-xs text-surface-500 mt-2">
+              Capture is disabled when this list is empty. Plain entries match the page's hostname exactly (without <code>www.</code>/<code>m.</code>). Wrap a pattern in <code>/.../</code> to use a JS regex (e.g. <code>/.*\.wikipedia\.org$/</code> for all Wikipedia subdomains).
+            </p>
+            {localSettings.noteCaptureAllowlist.length > 0 && (
+              <ul className="mt-3 divide-y divide-surface-100 dark:divide-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+                {localSettings.noteCaptureAllowlist.map(entry => {
+                  const isRegex = parseRegexEntry(entry) !== null;
+                  return (
+                    <li
+                      key={entry}
+                      className="flex items-center justify-between gap-2 px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded ${
+                            isRegex
+                              ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+                              : 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
+                          }`}
+                        >
+                          {isRegex ? 'regex' : 'host'}
+                        </span>
+                        <span className="font-mono text-sm text-surface-800 dark:text-surface-200 truncate">
+                          {entry}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => removeAllowlistDomain(entry)}
+                        className="text-xs text-surface-500 hover:text-red-600 dark:hover:text-red-400 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                        aria-label={`Remove ${entry}`}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Min length */}
+          <div>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+              Minimum selection length
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              className="w-32 rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+              value={localSettings.noteMinLength}
+              onChange={e => {
+                const parsed = parseInt(e.target.value, 10);
+                if (Number.isFinite(parsed)) {
+                  updateSetting('noteMinLength', Math.max(1, Math.min(50, parsed)));
+                }
+              }}
+            />
+            <p className="text-xs text-surface-500 mt-1">
+              Selections shorter than this are ignored.
+            </p>
+          </div>
+
+          {/* Retention days */}
+          <div>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+              Retention (days)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={365}
+              className="w-32 rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+              value={localSettings.noteRetentionDays}
+              onChange={e => {
+                const parsed = parseInt(e.target.value, 10);
+                if (Number.isFinite(parsed)) {
+                  updateSetting('noteRetentionDays', Math.max(0, Math.min(365, parsed)));
+                }
+              }}
+            />
+            <p className="text-xs text-surface-500 mt-1">
+              Notes older than this are deleted automatically. <strong>0</strong> keeps notes forever.
+            </p>
+          </div>
+
+          {/* Translate direction */}
+          <div>
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+              Translation direction (for "Copy EN↔VI pairs")
+            </label>
+            <select
+              className="w-full rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+              value={localSettings.noteTranslateDirection}
+              onChange={e => updateSetting('noteTranslateDirection', e.target.value as TranslateDirection)}
+            >
+              <option value="auto">Auto-detect</option>
+              <option value="en->vi">English → Vietnamese</option>
+              <option value="vi->en">Vietnamese → English</option>
+            </select>
+            <p className="text-xs text-surface-500 mt-1">
+              Translation runs only when you click "Copy EN↔VI pairs" on the Notes tab. Uses Google's public translate endpoint.
+            </p>
           </div>
         </div>
       </div>

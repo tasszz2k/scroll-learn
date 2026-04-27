@@ -1,4 +1,4 @@
-import type { Card, Deck, Settings, Stats, ReviewRecord } from './types';
+import type { Card, Deck, Note, Settings, Stats, ReviewRecord } from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './types';
 
 // Batch size for chunked operations
@@ -289,6 +289,57 @@ export async function snoozeCard(cardId: string, minutes: number): Promise<void>
 export async function isCardSnoozed(cardId: string): Promise<boolean> {
   const cards = await getSnoozedCards();
   return cards.some(c => c.cardId === cardId);
+}
+
+// Notes Operations
+const NOTE_DEDUPE_WINDOW_MS = 5000;
+
+export async function getNotes(): Promise<Note[]> {
+  return get<Note[]>(STORAGE_KEYS.NOTES, []);
+}
+
+export async function saveNote(note: Note): Promise<Note> {
+  const notes = await getNotes();
+
+  // Dedupe: if the most recent note has identical text+domain within the window, return it
+  const recent = notes
+    .filter(n => n.text === note.text && n.domain === note.domain)
+    .sort((a, b) => b.createdAt - a.createdAt)[0];
+  if (recent && note.createdAt - recent.createdAt < NOTE_DEDUPE_WINDOW_MS) {
+    return recent;
+  }
+
+  // Replace if id collides, otherwise append
+  const index = notes.findIndex(n => n.id === note.id);
+  if (index >= 0) {
+    notes[index] = note;
+  } else {
+    notes.push(note);
+  }
+
+  await set(STORAGE_KEYS.NOTES, notes);
+  return note;
+}
+
+export async function deleteNote(noteId: string): Promise<void> {
+  const notes = await getNotes();
+  await set(STORAGE_KEYS.NOTES, notes.filter(n => n.id !== noteId));
+}
+
+export async function clearNotes(): Promise<void> {
+  await set(STORAGE_KEYS.NOTES, []);
+}
+
+export async function pruneNotesOlderThan(days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const notes = await getNotes();
+  const cutoff = Date.now() - days * 86400000;
+  const kept = notes.filter(n => n.createdAt >= cutoff);
+  const removed = notes.length - kept.length;
+  if (removed > 0) {
+    await set(STORAGE_KEYS.NOTES, kept);
+  }
+  return removed;
 }
 
 // Export all cards as JSON

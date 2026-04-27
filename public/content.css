@@ -523,3 +523,26 @@
   border-radius: 2px;
   transition: width 0.3s ease;
 }
+
+/* Note capture toast */
+.scrolllearn-note-toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 2147483647;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  font: 500 13px/1.2 'Segoe UI', system-ui, -apple-system, sans-serif;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.scrolllearn-note-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

@@ -1,11 +1,12 @@
-import type { Message, Response, Card, Deck, Settings, Stats, Grade } from '../common/types';
-import { createCard, createDeck } from '../common/types';
+import type { Message, Response, Card, Deck, Note, NewNote, Settings, Stats, Grade } from '../common/types';
+import { createCard, createDeck, createNote } from '../common/types';
 import * as storage from '../common/storage';
 import { sm2Update, sortCardsForReview } from './scheduler';
 
 // Alarm names
 const ALARM_REFRESH_QUEUE = 'refresh_due_queue';
 const ALARM_CLEANUP = 'cleanup_expired';
+const ALARM_PRUNE_NOTES = 'prune_notes';
 
 /**
  * Initialize background service worker
@@ -13,14 +14,22 @@ const ALARM_CLEANUP = 'cleanup_expired';
 function initialize() {
   // Set up message listener
   chrome.runtime.onMessage.addListener(handleMessage);
-  
+
   // Set up alarms for periodic tasks
   setupAlarms();
-  
+
   // Listen for alarm events
   chrome.alarms.onAlarm.addListener(handleAlarm);
-  
+
+  // Run a prune sweep on startup to catch missed alarm runs
+  pruneNotesNow().catch(err => console.error('[ScrollLearn] Initial note prune failed:', err));
+
   console.log('[ScrollLearn] Background service worker initialized');
+}
+
+async function pruneNotesNow(): Promise<void> {
+  const settings = await storage.getSettings();
+  await storage.pruneNotesOlderThan(settings.noteRetentionDays);
 }
 
 /**
@@ -31,10 +40,15 @@ function setupAlarms() {
   chrome.alarms.create(ALARM_REFRESH_QUEUE, {
     periodInMinutes: 60,
   });
-  
+
   // Cleanup expired pauses/snoozes every 30 minutes
   chrome.alarms.create(ALARM_CLEANUP, {
     periodInMinutes: 30,
+  });
+
+  // Prune old notes twice daily
+  chrome.alarms.create(ALARM_PRUNE_NOTES, {
+    periodInMinutes: 60 * 12,
   });
 }
 
@@ -52,6 +66,10 @@ async function handleAlarm(alarm: chrome.alarms.Alarm) {
       // Cleanup expired pauses and snoozes
       await storage.getPausedSites();
       await storage.getSnoozedCards();
+      break;
+
+    case ALARM_PRUNE_NOTES:
+      await pruneNotesNow();
       break;
   }
 }
@@ -131,6 +149,18 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
 
     case 'get_next_study_card':
       return handleGetNextStudyCard(message.deckId);
+
+    case 'save_note':
+      return handleSaveNote(message.note);
+
+    case 'get_notes':
+      return handleGetNotes();
+
+    case 'delete_note':
+      return handleDeleteNote(message.noteId);
+
+    case 'clear_notes':
+      return handleClearNotes();
 
     default:
       return { ok: false, error: 'Unknown message type' };
@@ -559,6 +589,46 @@ async function handleOpenDashboard(): Promise<Response<void>> {
   try {
     const dashboardUrl = chrome.runtime.getURL('index.html');
     await chrome.tabs.create({ url: dashboardUrl });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+/**
+ * Save a captured selection as a note
+ */
+async function handleSaveNote(noteData: NewNote): Promise<Response<Note>> {
+  try {
+    const note = createNote(noteData);
+    const saved = await storage.saveNote(note);
+    return { ok: true, data: saved };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleGetNotes(): Promise<Response<Note[]>> {
+  try {
+    const notes = await storage.getNotes();
+    return { ok: true, data: notes };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleDeleteNote(noteId: string): Promise<Response<void>> {
+  try {
+    await storage.deleteNote(noteId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleClearNotes(): Promise<Response<void>> {
+  try {
+    await storage.clearNotes();
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };

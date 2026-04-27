@@ -13,7 +13,8 @@
     "https://www.facebook.com/*",
     "https://m.facebook.com/*",
     "https://www.youtube.com/*",
-    "https://www.instagram.com/*"
+    "https://www.instagram.com/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "src/background/index.ts",
@@ -37,6 +38,12 @@
         "https://*.instagram.com/*"
       ],
       "js": ["src/content/content.ts"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/notes.ts"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

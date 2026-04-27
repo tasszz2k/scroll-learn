@@ -12,6 +12,7 @@ interface PopupState {
   loading: boolean;
   blockedCount: number;
   blockedCounts: BlockedCounts | null;
+  notesCount: number;
 }
 
 function Popup() {
@@ -23,6 +24,7 @@ function Popup() {
     loading: true,
     blockedCount: 0,
     blockedCounts: null,
+    notesCount: 0,
   });
 
   useEffect(() => {
@@ -37,10 +39,11 @@ function Popup() {
       const currentSite = url?.hostname?.replace(/^(www\.|m\.)/, '') || '';
 
       // Get stats and settings from background
-      const [statsResponse, settingsResponse, decksResponse] = await Promise.all([
+      const [statsResponse, settingsResponse, decksResponse, notesResponse] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_stats' }),
         chrome.runtime.sendMessage({ type: 'get_settings' }),
         chrome.runtime.sendMessage({ type: 'get_decks' }),
+        chrome.runtime.sendMessage({ type: 'get_notes' }),
       ]);
 
       let blockedCount = 0;
@@ -63,6 +66,7 @@ function Popup() {
         loading: false,
         blockedCount,
         blockedCounts,
+        notesCount: notesResponse?.ok && Array.isArray(notesResponse.data) ? notesResponse.data.length : 0,
       });
     } catch (error) {
       console.error('Failed to load popup data:', error);
@@ -105,6 +109,10 @@ function Popup() {
 
   function openImport() {
     chrome.tabs.create({ url: chrome.runtime.getURL('index.html#import') });
+  }
+
+  function openNotes() {
+    chrome.tabs.create({ url: chrome.runtime.getURL('index.html#notes') });
   }
 
   function openSettings() {
@@ -328,6 +336,19 @@ function Popup() {
             <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
           </svg>
           <span>Manage Decks</span>
+          <svg className="arrow" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+          </svg>
+        </button>
+
+        <button className="action-btn" onClick={openNotes}>
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+          </svg>
+          <span>Notes</span>
+          {state.notesCount > 0 && (
+            <span className="action-btn-count">{state.notesCount}</span>
+          )}
           <svg className="arrow" viewBox="0 0 24 24" fill="currentColor">
             <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
           </svg>

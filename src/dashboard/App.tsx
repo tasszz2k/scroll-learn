@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import DeckList from './components/DeckList';
 import ImportPanel from './components/ImportPanel';
+import NotesPanel from './components/NotesPanel';
 import Settings from './components/Settings';
 import Stats from './components/Stats';
 import StudySession from './components/study/StudySession';
-import type { Deck, Card, Settings as SettingsType, Stats as StatsType } from '../common/types';
+import type { Deck, Card, Note, Settings as SettingsType, Stats as StatsType } from '../common/types';
 
-type Tab = 'decks' | 'import' | 'settings' | 'stats' | 'study';
+type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study';
 
 const HASH_TO_TAB: Record<string, Tab> = {
   '#decks': 'decks',
+  '#notes': 'notes',
   '#import': 'import',
   '#settings': 'settings',
   '#stats': 'stats',
@@ -24,6 +26,7 @@ export default function App() {
   const [activeTab, setActiveTabState] = useState<Tab>(getTabFromHash);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [stats, setStats] = useState<StatsType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,17 +80,19 @@ export default function App() {
   async function loadData(showLoading = true) {
     if (showLoading) setLoading(true);
     try {
-      const [decksRes, cardsRes, settingsRes, statsRes] = await Promise.all([
+      const [decksRes, cardsRes, settingsRes, statsRes, notesRes] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_decks' }),
         chrome.runtime.sendMessage({ type: 'get_cards' }),
         chrome.runtime.sendMessage({ type: 'get_settings' }),
         chrome.runtime.sendMessage({ type: 'get_stats' }),
+        chrome.runtime.sendMessage({ type: 'get_notes' }),
       ]);
 
       if (decksRes.ok) setDecks(decksRes.data || []);
       if (cardsRes.ok) setCards(cardsRes.data || []);
       if (settingsRes.ok) setSettings(settingsRes.data);
       if (statsRes.ok) setStats(statsRes.data);
+      if (notesRes.ok) setNotes(notesRes.data || []);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -172,6 +177,19 @@ export default function App() {
           <rect x="14" y="3" width="7" height="7" rx="1" />
           <rect x="3" y="14" width="7" height="7" rx="1" />
           <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+      ),
+    },
+    {
+      id: 'notes',
+      label: 'Notes',
+      icon: (
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
         </svg>
       ),
     },
@@ -302,6 +320,14 @@ export default function App() {
           />
         )}
         
+        {activeTab === 'notes' && settings && (
+          <NotesPanel
+            notes={notes}
+            settings={settings}
+            onRefresh={() => loadData(false)}
+          />
+        )}
+
         {activeTab === 'import' && (
           <ImportPanel
             decks={decks}
