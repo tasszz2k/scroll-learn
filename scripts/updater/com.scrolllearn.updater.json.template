@@ -1,0 +1,9 @@
+{
+  "name": "com.scrolllearn.updater",
+  "description": "ScrollLearn auto-updater",
+  "path": "__SCRIPT_PATH__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__EXTENSION_ID__/"
+  ]
+}

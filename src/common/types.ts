@@ -267,6 +267,19 @@ export interface ClearNotesMessage {
   type: 'clear_notes';
 }
 
+export interface CheckForUpdateMessage {
+  type: 'check_for_update';
+  force?: boolean;
+}
+
+export interface GetUpdateInfoMessage {
+  type: 'get_update_info';
+}
+
+export interface InstallUpdateMessage {
+  type: 'install_update';
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -288,7 +301,10 @@ export type Message =
   | SaveNoteMessage
   | GetNotesMessage
   | DeleteNoteMessage
-  | ClearNotesMessage;
+  | ClearNotesMessage
+  | CheckForUpdateMessage
+  | GetUpdateInfoMessage
+  | InstallUpdateMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {
@@ -341,7 +357,20 @@ export const STORAGE_KEYS = {
   PAUSED_SITES: 'scrolllearn_paused_sites',
   DUE_QUEUE: 'scrolllearn_due_queue',
   NOTES: 'scrolllearn_notes',
+  UPDATE_INFO: 'scrolllearn_update_info',
 } as const;
+
+// Update Info
+export interface UpdateInfo {
+  currentVersion: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  downloadUrl: string | null;
+  releaseUrl: string | null;
+  releaseNotes: string | null;
+  checkedAt: number;
+  error?: string;
+}
 
 // Generate unique ID
 export function generateId(): string {

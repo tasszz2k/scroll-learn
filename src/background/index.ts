@@ -1,8 +1,16 @@
-import type { Message, Response, Card, Deck, Note, NewNote, Settings, Stats, Grade, TranslateLang } from '../common/types';
+import type { Message, Response, Card, Deck, Note, NewNote, Settings, Stats, Grade, TranslateLang, UpdateInfo } from '../common/types';
 import { createCard, createDeck, createNote } from '../common/types';
 import * as storage from '../common/storage';
 import { detectVietnamese, translate } from '../common/translate';
 import { sm2Update, sortCardsForReview } from './scheduler';
+import {
+  ALARM_CHECK_UPDATE,
+  checkForUpdate,
+  getStoredUpdateInfo,
+  handleUpdateAlarm,
+  installUpdate,
+  setupUpdateAlarm,
+} from './updater';
 
 // Alarm names
 const ALARM_REFRESH_QUEUE = 'refresh_due_queue';
@@ -24,6 +32,9 @@ function initialize() {
 
   // Run a prune sweep on startup to catch missed alarm runs
   pruneNotesNow().catch(err => console.error('[ScrollLearn] Initial note prune failed:', err));
+
+  // Run an update check on startup so the badge shows up promptly
+  checkForUpdate().catch(err => console.error('[ScrollLearn] Initial update check failed:', err));
 
   console.log('[ScrollLearn] Background service worker initialized');
 }
@@ -51,6 +62,9 @@ function setupAlarms() {
   chrome.alarms.create(ALARM_PRUNE_NOTES, {
     periodInMinutes: 60 * 12,
   });
+
+  // Check for new releases every 6 hours
+  setupUpdateAlarm();
 }
 
 /**
@@ -71,6 +85,10 @@ async function handleAlarm(alarm: chrome.alarms.Alarm) {
 
     case ALARM_PRUNE_NOTES:
       await pruneNotesNow();
+      break;
+
+    case ALARM_CHECK_UPDATE:
+      await handleUpdateAlarm();
       break;
   }
 }
@@ -163,8 +181,35 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     case 'clear_notes':
       return handleClearNotes();
 
+    case 'check_for_update':
+      return handleCheckForUpdate(message.force);
+
+    case 'get_update_info':
+      return handleGetUpdateInfo();
+
+    case 'install_update':
+      return installUpdate();
+
     default:
       return { ok: false, error: 'Unknown message type' };
+  }
+}
+
+async function handleCheckForUpdate(force?: boolean): Promise<Response<UpdateInfo>> {
+  try {
+    const info = await checkForUpdate(force);
+    return { ok: true, data: info };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleGetUpdateInfo(): Promise<Response<UpdateInfo | null>> {
+  try {
+    const info = await getStoredUpdateInfo();
+    return { ok: true, data: info };
+  } catch (error) {
+    return { ok: false, error: String(error) };
   }
 }
 

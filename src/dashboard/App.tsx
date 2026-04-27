@@ -5,6 +5,7 @@ import NotesPanel from './components/NotesPanel';
 import Settings from './components/Settings';
 import Stats from './components/Stats';
 import StudySession from './components/study/StudySession';
+import UpdateBanner from './components/UpdateBanner';
 import type { Deck, Card, Note, Settings as SettingsType, Stats as StatsType } from '../common/types';
 
 type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study';
@@ -175,6 +176,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--paper)' }}>
+      <UpdateBanner />
       {/* Editorial header */}
       <header
         className="sticky top-0 z-50"
