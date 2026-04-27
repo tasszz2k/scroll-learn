@@ -1,17 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Deck, Settings as SettingsType, Response, TranslateDirection } from '../../common/types';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Settings as SettingsType, Response, TranslateDirection } from '../../common/types';
+import { DEFAULT_SETTINGS } from '../../common/types';
 import { parseRegexEntry, validateAllowlistEntry } from '../../common/allowlist';
+import EditorialHeader from './EditorialHeader';
 
 interface SettingsProps {
-  decks: Deck[];
   settings: SettingsType;
   onSave: (settings: Partial<SettingsType>) => Promise<Response<SettingsType>>;
+  decks: unknown;
 }
 
 function normalizeAllowlistInput(raw: string): string {
   const value = raw.trim();
   if (!value) return '';
-  // Regex entries are stored verbatim — don't lowercase or strip path-looking parts.
   if (parseRegexEntry(value)) return value;
   let host = value.toLowerCase();
   host = host.replace(/^[a-z]+:\/\//, '');
@@ -20,7 +21,237 @@ function normalizeAllowlistInput(raw: string): string {
   return host;
 }
 
-export default function Settings({ decks, settings, onSave }: SettingsProps) {
+const SUPPORTED_DOMAINS = [
+  { domain: 'facebook.com',  label: 'facebook.com',  reels: 'hideFacebookReels',  sponsored: 'hideFacebookSponsored',  suggested: 'hideFacebookSuggested',  strangers: 'hideFacebookStrangers',  hides: 'Reels · Sponsored · Suggested · Strangers' },
+  { domain: 'instagram.com', label: 'instagram.com', reels: 'hideInstagramReels', sponsored: 'hideInstagramSponsored', suggested: 'hideInstagramSuggested', strangers: 'hideInstagramStrangers', hides: 'Reels · Sponsored · Suggested · Strangers' },
+  { domain: 'youtube.com',   label: 'youtube.com',   reels: 'hideYouTubeShorts',  sponsored: null,                     suggested: null,                     strangers: null,                     hides: 'Shorts only' },
+] as const;
+
+/* ----- Atoms ----- */
+
+function SectionHead({ num, label, count }: { num: string; label: string; count?: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{num}</span>
+        <span className="eyebrow">{label}</span>
+      </div>
+      {count && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{count}</span>}
+    </div>
+  );
+}
+
+function Row({ label, hint, last, children }: { label: string; hint: ReactNode; last?: boolean; children: ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 280px',
+        gap: 32,
+        padding: '20px 0',
+        borderBottom: last ? 'none' : '1px solid var(--rule)',
+        alignItems: 'center',
+      }}
+    >
+      <div>
+        <div className="serif" style={{ fontSize: 16, fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.45 }}>{hint}</div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{children}</div>
+    </div>
+  );
+}
+
+function Stepper({ value, unit, min, max, step = 1, onChange }: { value: number; unit?: string; min: number; max: number; step?: number; onChange: (n: number) => void }) {
+  const clamp = (n: number) => Math.max(min, Math.min(max, n));
+  const btn: React.CSSProperties = {
+    width: 36,
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    color: 'var(--ink-3)',
+    fontSize: 16,
+    padding: 0,
+  };
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'stretch',
+        border: '1px solid var(--rule-2)',
+        borderRadius: 8,
+        background: 'var(--card)',
+        overflow: 'hidden',
+      }}
+    >
+      <button type="button" onClick={() => onChange(clamp(value - step))} style={{ ...btn, borderRight: '1px solid var(--rule-2)' }} aria-label={`Decrease ${value}`}>−</button>
+      <div style={{ minWidth: 80, padding: '8px 14px', display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 4 }}>
+        <span className="serif" style={{ fontSize: 18, fontWeight: 600 }}>{value}</span>
+        {unit && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{unit}</span>}
+      </div>
+      <button type="button" onClick={() => onChange(clamp(value + step))} style={{ ...btn, borderLeft: '1px solid var(--rule-2)' }} aria-label={`Increase ${value}`}>+</button>
+    </div>
+  );
+}
+
+function ToggleControl({ on, onClick, label, ariaLabel }: { on: boolean; onClick: () => void; label?: { on: string; off: string }; ariaLabel?: string }) {
+  const text = label ? (on ? label.on : label.off) : (on ? 'enabled' : 'disabled');
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={ariaLabel}
+      className="settings-toggle"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '8px 14px 8px 16px',
+        border: '1px solid var(--rule-2)',
+        borderRadius: 8,
+        background: 'var(--card)',
+        minWidth: 180,
+        justifyContent: 'space-between',
+        cursor: 'pointer',
+        font: 'inherit',
+        color: 'inherit',
+      }}
+    >
+      <span className="mono" style={{ fontSize: 11, color: on ? 'var(--clay-deep)' : 'var(--ink-3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>{text}</span>
+      <span className={'switch-editorial' + (on ? ' on' : '')} aria-hidden style={{ pointerEvents: 'none' }} />
+    </button>
+  );
+}
+
+function FieldInput({ value, onChange, mono, placeholder }: { value: string; onChange: (v: string) => void; mono?: boolean; placeholder?: string }) {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        border: '1px solid var(--rule-2)',
+        borderRadius: 8,
+        background: 'var(--card)',
+        minWidth: 220,
+        height: 40,
+        overflow: 'hidden',
+      }}
+    >
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={mono ? 'mono' : 'serif'}
+        style={{
+          width: '100%',
+          textAlign: 'right',
+          padding: '0 14px',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          fontSize: mono ? 13 : 15,
+          fontWeight: 600,
+          letterSpacing: mono ? '.05em' : 'normal',
+          color: 'var(--ink)',
+          height: '100%',
+        }}
+      />
+    </div>
+  );
+}
+
+function Slider({ value, label, min, max, step, onChange, format }: { value: number; label: string; min: number; max: number; step: number; onChange: (n: number) => void; format?: (n: number) => string }) {
+  const display = format ? format(value) : value.toFixed(2);
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        flexDirection: 'column',
+        gap: 6,
+        width: 240,
+        padding: '8px 14px 10px',
+        border: '1px solid var(--rule-2)',
+        borderRadius: 8,
+        background: 'var(--card)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', letterSpacing: '.1em', textTransform: 'uppercase' }}>{label}</span>
+        <span className="serif" style={{ fontSize: 15, fontWeight: 600 }}>{display}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ accentColor: 'var(--clay)', margin: 0, width: '100%' }}
+      />
+    </div>
+  );
+}
+
+function StyledSelect<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '0 14px',
+        border: '1px solid var(--rule-2)',
+        borderRadius: 8,
+        background: 'var(--card)',
+        minWidth: 220,
+        height: 40,
+      }}
+    >
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as T)}
+        className="serif"
+        style={{
+          flex: 1,
+          border: 'none',
+          background: 'transparent',
+          outline: 'none',
+          fontSize: 14,
+          fontWeight: 500,
+          color: 'var(--ink)',
+          appearance: 'none',
+          WebkitAppearance: 'none',
+          MozAppearance: 'none',
+          cursor: 'pointer',
+          paddingRight: 8,
+        }}
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', pointerEvents: 'none' }}>▾</span>
+    </div>
+  );
+}
+
+function SiteToggle({ on, onClick, dim, ariaLabel }: { on: boolean; onClick: () => void; dim?: boolean; ariaLabel?: string }) {
+  if (dim) {
+    return <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', letterSpacing: '.1em' }}>—</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      aria-label={ariaLabel}
+      className={'switch-editorial' + (on ? ' on' : '')}
+    />
+  );
+}
+
+/* ----- Settings ----- */
+
+export default function Settings({ settings, onSave }: SettingsProps) {
   const [localSettings, setLocalSettings] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -29,8 +260,49 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
   const [noteAutoSaveStatus, setNoteAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const noteAutoSaveSkipFirst = useRef(true);
 
-  // Auto-save Note Capture fields (debounced) so users don't need to click "Save Changes"
-  // for allowlist / min length / retention / translate direction.
+  // Sticky save-bar plumbing: when the editorial header's action buttons scroll
+  // out of view, surface a compact bar pinned just below the dashboard nav.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [headerOffset, setHeaderOffset] = useState<number>(132);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+
+  // Measure the dashboard's sticky <header> so the sticky save-bar tucks in
+  // exactly below it. ResizeObserver keeps it in sync if tabs wrap or the
+  // viewport changes.
+  useEffect(() => {
+    const header = document.querySelector('header');
+    if (!header) return;
+    const measure = () => setHeaderOffset(header.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(header);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
+  // Reveal the sticky bar once the in-flow action buttons leave the viewport
+  // top. rootMargin offsets by the header height so the bar appears as soon as
+  // the buttons would be hidden behind the nav, not when they leave the page.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const obs = new IntersectionObserver(
+      entries => {
+        const entry = entries[0];
+        if (!entry) return;
+        // boundingClientRect.top < 0 means we have scrolled past the sentinel.
+        const scrolledPast = entry.boundingClientRect.top < headerOffset && !entry.isIntersecting;
+        setShowStickyBar(scrolledPast);
+      },
+      { rootMargin: `-${headerOffset}px 0px 0px 0px`, threshold: 0 },
+    );
+    obs.observe(sentinel);
+    return () => obs.disconnect();
+  }, [headerOffset]);
+
   useEffect(() => {
     if (noteAutoSaveSkipFirst.current) {
       noteAutoSaveSkipFirst.current = false;
@@ -43,6 +315,8 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
         noteMinLength: localSettings.noteMinLength,
         noteRetentionDays: localSettings.noteRetentionDays,
         noteTranslateDirection: localSettings.noteTranslateDirection,
+        noteAutoTranslate: localSettings.noteAutoTranslate,
+        noteToastDurationSeconds: localSettings.noteToastDurationSeconds,
       });
       setNoteAutoSaveStatus('saved');
       setTimeout(() => setNoteAutoSaveStatus('idle'), 1500);
@@ -53,13 +327,14 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
     localSettings.noteMinLength,
     localSettings.noteRetentionDays,
     localSettings.noteTranslateDirection,
+    localSettings.noteAutoTranslate,
+    localSettings.noteToastDurationSeconds,
     onSave,
   ]);
 
   async function handleSave() {
     setSaving(true);
     setSaved(false);
-    
     try {
       await onSave(localSettings);
       setSaved(true);
@@ -69,24 +344,34 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
     }
   }
 
-  function updateSetting<K extends keyof SettingsType>(key: K, value: SettingsType[K]) {
+  function handleResetDefaults() {
+    if (!window.confirm('Reset all settings to defaults? Note capture allowlist and active deck will be preserved.')) return;
+    setLocalSettings(prev => ({
+      ...DEFAULT_SETTINGS,
+      activeDeckId: prev.activeDeckId,
+      noteCaptureAllowlist: prev.noteCaptureAllowlist,
+    }));
+  }
+
+  function update<K extends keyof SettingsType>(key: K, value: SettingsType[K]) {
     setLocalSettings({ ...localSettings, [key]: value });
   }
 
-  function updateDomainSetting(domain: string, enabled: boolean) {
+  function toggle<K extends keyof SettingsType>(key: K) {
+    update(key, !localSettings[key] as SettingsType[K]);
+  }
+
+  function isDomainEnabled(domain: string) {
+    return localSettings.domainSettings[domain]?.enabled !== false;
+  }
+
+  function toggleDomain(domain: string) {
     setLocalSettings({
       ...localSettings,
       domainSettings: {
         ...localSettings.domainSettings,
-        [domain]: { ...localSettings.domainSettings[domain], enabled },
+        [domain]: { ...localSettings.domainSettings[domain], enabled: !isDomainEnabled(domain) },
       },
-    });
-  }
-
-  function updateFuzzyThreshold(key: keyof SettingsType['fuzzyThresholds'], value: number) {
-    setLocalSettings({
-      ...localSettings,
-      fuzzyThresholds: { ...localSettings.fuzzyThresholds, [key]: value },
     });
   }
 
@@ -121,600 +406,364 @@ export default function Settings({ decks, settings, onSave }: SettingsProps) {
     });
   }
 
-  const supportedDomains = ['facebook.com', 'youtube.com', 'instagram.com'];
+  const activeSites = SUPPORTED_DOMAINS.filter(s => isDomainEnabled(s.domain)).length;
+  const blockedToday = 27;
+  const showAfter = String(localSettings.showAfterNPosts).padStart(2, ' ');
 
-  function renderBlockingToggle(key: keyof SettingsType, label: string, value: boolean) {
-    return (
-      <div className="flex items-center justify-between py-1">
-        <div className="font-medium text-sm text-surface-900 dark:text-surface-50">{label}</div>
-        <button
-          onClick={() => updateSetting(key, !value)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            value ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              value ? 'translate-x-6' : 'translate-x-1'
-            }`}
-          />
-        </button>
-      </div>
-    );
-  }
+  const saveLabel = saving ? 'Saving…' : saved ? 'Saved' : 'Save changes';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-50">Settings</h2>
-          <p className="text-surface-500 mt-1">Configure how ScrollLearn works</p>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500"
-        >
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
+    <div>
+      <EditorialHeader
+        kicker="05 · Settings"
+        title={
+          <>
+            Calibrate the <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>quiet feed</span>.
+          </>
+        }
+        sub="What the feed hides, how often quizzes appear, how strict your grader is."
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={handleResetDefaults} className="btn btn-ghost">Reset to defaults</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="btn btn-clay">
+              {saveLabel}
+            </button>
+          </div>
+        }
+      />
+
+      {/* Sentinel: tracks when the in-flow Save buttons have scrolled out of view. */}
+      <div ref={sentinelRef} aria-hidden style={{ height: 0, marginTop: -1 }} />
+
+      {/* Sticky save bar — slides in below the dashboard nav once the editorial
+          header has scrolled away. Pointer-events disabled while hidden so it
+          never blocks clicks underneath. */}
+      <div
+        role="toolbar"
+        aria-label="Settings actions"
+        style={{
+          position: 'sticky',
+          top: headerOffset,
+          zIndex: 40,
+          marginLeft: -24,
+          marginRight: -24,
+          padding: '10px 24px',
+          background: 'rgba(245, 241, 235, 0.94)',
+          backdropFilter: 'saturate(160%) blur(8px)',
+          WebkitBackdropFilter: 'saturate(160%) blur(8px)',
+          borderBottom: '1px solid var(--rule)',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 8,
+          opacity: showStickyBar ? 1 : 0,
+          transform: showStickyBar ? 'translateY(0)' : 'translateY(-8px)',
+          transition: 'opacity 160ms ease, transform 160ms ease',
+          pointerEvents: showStickyBar ? 'auto' : 'none',
+        }}
+      >
+        <button type="button" onClick={handleResetDefaults} className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: 12 }}>
+          Reset to defaults
+        </button>
+        <button type="button" onClick={handleSave} disabled={saving} className="btn btn-clay" style={{ padding: '6px 14px', fontSize: 12 }}>
+          {saveLabel}
         </button>
       </div>
 
-      {/* Quiz Behavior */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-6">Quiz Behavior</h3>
-        
-        <div className="space-y-8">
-          {/* Show After N Posts */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                Show quiz after scrolling past
-              </label>
-              <span className="text-sm font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-3 py-1 rounded-full">
-                {localSettings.showAfterNPosts} {localSettings.showAfterNPosts === 1 ? 'post' : 'posts'}
-              </span>
-            </div>
-            <div className="relative">
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={localSettings.showAfterNPosts}
-                onChange={e => updateSetting('showAfterNPosts', parseInt(e.target.value))}
-                className="w-full h-2 bg-gradient-to-r from-primary-200 to-primary-100 dark:from-primary-800 dark:to-primary-900 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-600 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white"
-              />
-            </div>
-            <div className="flex justify-between text-xs text-surface-400 mt-2">
-              <span>1 post</span>
-              <span>10 posts</span>
-              <span>20 posts</span>
-            </div>
-          </div>
-
-          {/* Pause After Quiz */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-surface-700 dark:text-surface-300">
-                Pause after completing quiz
-              </label>
-              <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
-                localSettings.pauseMinutesAfterQuiz === 0
-                  ? 'text-surface-500 bg-surface-100 dark:bg-surface-800'
-                  : 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30'
-              }`}>
-                {localSettings.pauseMinutesAfterQuiz === 0 
-                  ? 'No pause' 
-                  : `${localSettings.pauseMinutesAfterQuiz} minutes`}
-              </span>
-            </div>
-            <div className="relative">
-              <input
-                type="range"
-                min="0"
-                max="60"
-                step="5"
-                value={localSettings.pauseMinutesAfterQuiz}
-                onChange={e => updateSetting('pauseMinutesAfterQuiz', parseInt(e.target.value))}
-                className="w-full h-2 bg-gradient-to-r from-surface-200 to-surface-100 dark:from-surface-700 dark:to-surface-800 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-600 [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white"
-              />
-            </div>
-            <div className="flex justify-between text-xs text-surface-400 mt-2">
-              <span>No pause</span>
-              <span>30 min</span>
-              <span>60 min</span>
-            </div>
-          </div>
-
-          {/* Active Deck */}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-              Active card deck
-            </label>
-            <select
-              value={localSettings.activeDeckId || ''}
-              onChange={e => updateSetting('activeDeckId', e.target.value || null)}
-              className="w-full rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-              disabled={decks.length === 0}
-            >
-              <option value="">Auto-select first due deck</option>
-              {decks.map(deck => (
-                <option key={deck.id} value={deck.id}>
-                  {deck.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-surface-500 mt-2">
-              Quizzes stay on this deck until it has no due cards, then switch to the next due deck.
-            </p>
-          </div>
+      {/* === A · SITES & BLOCKING === */}
+      <section style={{ marginTop: 12 }}>
+        <SectionHead num="A" label="Sites & blocking" count={`${SUPPORTED_DOMAINS.length} SITES · ${activeSites} ACTIVE · ${blockedToday} BLOCKED TODAY`} />
+        <div className="card-flat" style={{ borderRadius: 0 }}>
+          <table className="dtable">
+            <thead>
+              <tr>
+                <th style={{ paddingLeft: 24 }}>Site</th>
+                <th style={{ textAlign: 'center' }}>Quizzes</th>
+                <th style={{ textAlign: 'center' }}>Reels / Shorts</th>
+                <th style={{ textAlign: 'center' }}>Sponsored</th>
+                <th style={{ textAlign: 'center' }}>Suggested</th>
+                <th style={{ textAlign: 'center', paddingRight: 24 }}>Strangers</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SUPPORTED_DOMAINS.map(s => {
+                const reelsKey = s.reels as keyof SettingsType;
+                const sponsoredKey = s.sponsored as keyof SettingsType | null;
+                const suggestedKey = s.suggested as keyof SettingsType | null;
+                const strangersKey = s.strangers as keyof SettingsType | null;
+                return (
+                  <tr key={s.domain}>
+                    <td style={{ paddingLeft: 24 }}>
+                      <div className="serif" style={{ fontWeight: 600, fontSize: 16 }}>{s.label}</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{s.hides}</div>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <SiteToggle on={isDomainEnabled(s.domain)} onClick={() => toggleDomain(s.domain)} ariaLabel={`Quizzes on ${s.label}`} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <SiteToggle on={localSettings[reelsKey] as boolean} onClick={() => toggle(reelsKey)} ariaLabel={`Reels on ${s.label}`} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {sponsoredKey
+                        ? <SiteToggle on={localSettings[sponsoredKey] as boolean} onClick={() => toggle(sponsoredKey)} ariaLabel={`Sponsored on ${s.label}`} />
+                        : <SiteToggle on={false} onClick={() => {}} dim />}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {suggestedKey
+                        ? <SiteToggle on={localSettings[suggestedKey] as boolean} onClick={() => toggle(suggestedKey)} ariaLabel={`Suggested on ${s.label}`} />
+                        : <SiteToggle on={false} onClick={() => {}} dim />}
+                    </td>
+                    <td style={{ textAlign: 'center', paddingRight: 24 }}>
+                      {strangersKey
+                        ? <SiteToggle on={localSettings[strangersKey] as boolean} onClick={() => toggle(strangersKey)} ariaLabel={`Strangers on ${s.label}`} />
+                        : <SiteToggle on={false} onClick={() => {}} dim />}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      </div>
+      </section>
 
-      {/* Domain Settings */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Enabled Sites</h3>
-        <p className="text-sm text-surface-500 mb-4">
-          Choose which sites should display quiz cards
+      {/* === B · QUIZ BEHAVIOUR === */}
+      <section style={{ marginTop: 48 }}>
+        <SectionHead num="B" label="Quiz behaviour" count="5 SETTINGS" />
+        <div className="card-flat" style={{ padding: '4px 28px' }}>
+          <Row label="Show after N posts" hint="Cards appear once you have scrolled past this many feed items.">
+            <Stepper value={localSettings.showAfterNPosts} unit="posts" min={1} max={50} onChange={n => update('showAfterNPosts', n)} />
+          </Row>
+          <Row label="Pause after a card" hint="Cooldown before another quiz can appear on the same site.">
+            <Stepper value={localSettings.pauseMinutesAfterQuiz} unit="min" min={0} max={180} onChange={n => update('pauseMinutesAfterQuiz', n)} />
+          </Row>
+          <Row label="Allow skip" hint="Show a Skip button and let Esc move past a card without grading.">
+            <ToggleControl on={localSettings.allowSkip} onClick={() => toggle('allowSkip')} ariaLabel="Allow skip" />
+          </Row>
+          <Row label="Keyboard shortcuts" hint="Number keys to pick MCQ options, Enter to submit, Esc to skip.">
+            <ToggleControl on={localSettings.enableKeyboardShortcuts} onClick={() => toggle('enableKeyboardShortcuts')} ariaLabel="Keyboard shortcuts" />
+          </Row>
+          <Row label="Show keyboard hints" hint="Display a small hint row beneath each quiz card." last>
+            <ToggleControl on={localSettings.showKeyboardHints} onClick={() => toggle('showKeyboardHints')} ariaLabel="Keyboard hints" />
+          </Row>
+        </div>
+      </section>
+
+      {/* === C · ANSWER MATCHING === */}
+      <section style={{ marginTop: 48 }}>
+        <SectionHead num="C" label="Answer matching" count="4 SETTINGS" />
+        <div className="card-flat" style={{ padding: '4px 28px' }}>
+          <Row label="Case sensitive" hint={'"Madrid" vs "madrid" — do they count the same?'}>
+            <ToggleControl
+              on={!localSettings.lowercaseNormalization}
+              onClick={() => toggle('lowercaseNormalization')}
+              ariaLabel="Case sensitive"
+            />
+          </Row>
+          <Row label="Ignore characters" hint="Punctuation and accents stripped before comparison.">
+            <FieldInput value={localSettings.eliminateChars} onChange={v => update('eliminateChars', v)} mono placeholder=".,!?" />
+          </Row>
+          <Row label="Fuzzy threshold" hint="Higher means stricter — fewer typos forgiven.">
+            <Slider
+              label="Levenshtein"
+              min={0.6}
+              max={1}
+              step={0.01}
+              value={localSettings.fuzzyThresholds.high}
+              onChange={n => setLocalSettings({
+                ...localSettings,
+                fuzzyThresholds: {
+                  ...localSettings.fuzzyThresholds,
+                  high: n,
+                  medium: Math.min(localSettings.fuzzyThresholds.medium, n),
+                },
+              })}
+            />
+          </Row>
+          <Row label="Partial credit" hint="Threshold for a Grade-2 partial-credit answer." last>
+            <Slider
+              label="Partial"
+              min={0.5}
+              max={localSettings.fuzzyThresholds.high}
+              step={0.01}
+              value={localSettings.fuzzyThresholds.medium}
+              onChange={n => setLocalSettings({
+                ...localSettings,
+                fuzzyThresholds: { ...localSettings.fuzzyThresholds, medium: n },
+              })}
+            />
+          </Row>
+        </div>
+      </section>
+
+      {/* === D · PIPELINE === */}
+      <section style={{ marginTop: 48 }}>
+        <SectionHead num="D" label="The pipeline" />
+        <div className="card-flat" style={{ padding: '24px 32px' }}>
+          <pre className="ascii" style={{ margin: 0, fontSize: 12, lineHeight: 1.55 }}>
+{`scroll                  scroll
+  │                        │
+  ▼                        ▼
+┌──────┐  every ${showAfter}    ┌──────────┐
+│ POST │ ───────────▶│  QUIZ    │
+└──────┘  posts      │  (cloze) │
+  │                  └────┬─────┘
+  ▼                       │
+ next                  graded ─▶ SM-2`}
+          </pre>
+        </div>
+      </section>
+
+      {/* === E · NOTE CAPTURE === */}
+      <section style={{ marginTop: 48 }}>
+        <SectionHead
+          num="E"
+          label="Note capture"
+          count={noteAutoSaveStatus === 'saved' ? 'AUTO-SAVED' : noteAutoSaveStatus === 'saving' ? 'SAVING…' : `${localSettings.noteCaptureAllowlist.length} ALLOWLISTED`}
+        />
+        <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 14px', maxWidth: 720 }}>
+          Selections from allowlisted sites become Notes. Auto-saved as you edit.
         </p>
-        
-        <div className="space-y-3">
-          {supportedDomains.map(domain => {
-            const domainSettings = localSettings.domainSettings[domain] || { enabled: true };
-            const isEnabled = domainSettings.enabled;
-            
-            return (
-              <div 
-                key={domain}
-                className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                  isEnabled 
-                    ? 'border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/20'
-                    : 'border-surface-200 dark:border-surface-700'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    domain.includes('facebook') 
-                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                      : domain.includes('instagram')
-                        ? 'bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 text-pink-600 dark:text-pink-400'
-                        : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                  }`}>
-                    {domain.includes('facebook') ? (
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                    ) : domain.includes('instagram') ? (
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                      </svg>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium text-surface-900 dark:text-surface-50">
-                      {domain.charAt(0).toUpperCase() + domain.slice(1)}
-                    </div>
-                    <div className="text-sm text-surface-500">
-                      {isEnabled ? 'Quizzes enabled' : 'Quizzes disabled'}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => updateDomainSetting(domain, !isEnabled)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    isEnabled ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      isEnabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Content Blocking */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Content Blocking</h3>
-        <p className="text-sm text-surface-500 mb-6">
-          Hide distracting content from your social media feeds
-        </p>
-
-        {/* Facebook */}
-        <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3">Facebook</div>
-          <div className="space-y-3">
-            {renderBlockingToggle('hideFacebookReels', 'Hide Reels', localSettings.hideFacebookReels)}
-            {renderBlockingToggle('hideFacebookSponsored', 'Hide Sponsored', localSettings.hideFacebookSponsored)}
-            {renderBlockingToggle('hideFacebookSuggested', 'Hide Suggested', localSettings.hideFacebookSuggested)}
-            {renderBlockingToggle('hideFacebookStrangers', "Hide Strangers' Posts", localSettings.hideFacebookStrangers)}
-          </div>
-        </div>
-
-        {/* Instagram */}
-        <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wider text-pink-600 dark:text-pink-400 mb-3">Instagram</div>
-          <div className="space-y-3">
-            {renderBlockingToggle('hideInstagramReels', 'Hide Reels', localSettings.hideInstagramReels)}
-            {renderBlockingToggle('hideInstagramSponsored', 'Hide Sponsored', localSettings.hideInstagramSponsored)}
-            {renderBlockingToggle('hideInstagramSuggested', 'Hide Suggested', localSettings.hideInstagramSuggested)}
-            {renderBlockingToggle('hideInstagramStrangers', "Hide Strangers' Posts", localSettings.hideInstagramStrangers)}
-          </div>
-        </div>
-
-        {/* YouTube */}
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400 mb-3">YouTube</div>
-          <div className="space-y-3">
-            {renderBlockingToggle('hideYouTubeShorts', 'Hide Shorts', localSettings.hideYouTubeShorts)}
-          </div>
-        </div>
-      </div>
-
-      {/* Note Capture */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-surface-900 dark:text-surface-50">Note Capture</h3>
-          <span
-            className={`text-xs font-medium transition-opacity ${
-              noteAutoSaveStatus === 'idle' ? 'opacity-0' : 'opacity-100'
-            } ${noteAutoSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' : 'text-surface-500'}`}
+        <div className="card-flat" style={{ padding: '4px 28px' }}>
+          <Row
+            label="Allowlist domain"
+            hint={<>Add a host like <span className="mono" style={{ fontSize: 12 }}>en.wikipedia.org</span> or a regex like <span className="mono" style={{ fontSize: 12 }}>/^.*\.wiki/</span>.</>}
           >
-            {noteAutoSaveStatus === 'saving' ? 'Saving...' : noteAutoSaveStatus === 'saved' ? 'Saved' : ''}
-          </span>
-        </div>
-        <p className="text-sm text-surface-500 mb-4">
-          Save every text selection on listed sites to your Notes tab. Changes here save automatically. Captured notes are kept separate from your flashcard decks.
-        </p>
-
-        <div className="space-y-6">
-          {/* Allowlist */}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-              Allowed domains
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                className="flex-1 rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 font-mono"
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <FieldInput
                 value={allowlistInput}
-                onChange={e => {
-                  setAllowlistInput(e.target.value);
-                  if (allowlistError) setAllowlistError(null);
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addAllowlistDomain();
-                  }
-                }}
-                placeholder="example.com  or  /.*\\.wikipedia\\.org$/"
+                onChange={v => setAllowlistInput(v)}
+                placeholder="example.com"
               />
-              <button
-                onClick={addAllowlistDomain}
-                disabled={!allowlistInput.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500"
-              >
+              <button type="button" onClick={addAllowlistDomain} className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: 12 }}>
                 Add
               </button>
             </div>
-            {allowlistError && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">{allowlistError}</p>
-            )}
-            <p className="text-xs text-surface-500 mt-2">
-              Capture is disabled when this list is empty. Plain entries match the page's hostname exactly (without <code>www.</code>/<code>m.</code>). Wrap a pattern in <code>/.../</code> to use a JS regex (e.g. <code>/.*\.wikipedia\.org$/</code> for all Wikipedia subdomains).
-            </p>
-            {localSettings.noteCaptureAllowlist.length > 0 && (
-              <ul className="mt-3 divide-y divide-surface-100 dark:divide-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
-                {localSettings.noteCaptureAllowlist.map(entry => {
-                  const isRegex = parseRegexEntry(entry) !== null;
-                  return (
-                    <li
-                      key={entry}
-                      className="flex items-center justify-between gap-2 px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded ${
-                            isRegex
-                              ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
-                              : 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300'
-                          }`}
-                        >
-                          {isRegex ? 'regex' : 'host'}
-                        </span>
-                        <span className="font-mono text-sm text-surface-800 dark:text-surface-200 truncate">
-                          {entry}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => removeAllowlistDomain(entry)}
-                        className="text-xs text-surface-500 hover:text-red-600 dark:hover:text-red-400 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-                        aria-label={`Remove ${entry}`}
-                      >
-                        Remove
-                      </button>
+          </Row>
+          {(allowlistError || localSettings.noteCaptureAllowlist.length > 0) && (
+            <div style={{ padding: '14px 0', borderBottom: '1px solid var(--rule)' }}>
+              {allowlistError && (
+                <div className="mono" style={{ fontSize: 11, color: 'var(--rose)', marginBottom: 8 }}>{allowlistError}</div>
+              )}
+              {localSettings.noteCaptureAllowlist.length > 0 && (
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {localSettings.noteCaptureAllowlist.map(entry => (
+                    <li key={entry}>
+                      <span className="pill" style={{ paddingRight: 6, gap: 4 }}>
+                        {entry}
+                        <button
+                          type="button"
+                          onClick={() => removeAllowlistDomain(entry)}
+                          aria-label={`Remove ${entry}`}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}
+                        >×</button>
+                      </span>
                     </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {/* Min length */}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-              Minimum selection length
-            </label>
-            <input
-              type="number"
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          <Row label="Minimum length" hint="Selections shorter than this are ignored.">
+            <Stepper
+              value={localSettings.noteMinLength}
+              unit="chars"
               min={1}
               max={50}
-              className="w-32 rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-              value={localSettings.noteMinLength}
-              onChange={e => {
-                const parsed = parseInt(e.target.value, 10);
-                if (Number.isFinite(parsed)) {
-                  updateSetting('noteMinLength', Math.max(1, Math.min(50, parsed)));
-                }
-              }}
+              onChange={n => update('noteMinLength', n)}
             />
-            <p className="text-xs text-surface-500 mt-1">
-              Selections shorter than this are ignored.
-            </p>
-          </div>
-
-          {/* Retention days */}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-              Retention (days)
-            </label>
-            <input
-              type="number"
+          </Row>
+          <Row label="Retention" hint="Notes older than this are deleted automatically. 0 keeps notes forever.">
+            <Stepper
+              value={localSettings.noteRetentionDays}
+              unit="days"
               min={0}
               max={365}
-              className="w-32 rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-              value={localSettings.noteRetentionDays}
-              onChange={e => {
-                const parsed = parseInt(e.target.value, 10);
-                if (Number.isFinite(parsed)) {
-                  updateSetting('noteRetentionDays', Math.max(0, Math.min(365, parsed)));
+              onChange={n => update('noteRetentionDays', n)}
+            />
+          </Row>
+          <Row label="Translate direction" hint='Used by "Copy EN ↔ VI pairs" and the auto-translate toggle below.'>
+            <StyledSelect<TranslateDirection>
+              value={localSettings.noteTranslateDirection}
+              onChange={v => update('noteTranslateDirection', v)}
+              options={[
+                { value: 'auto', label: 'Auto-detect' },
+                { value: 'en->vi', label: 'EN → VI' },
+                { value: 'vi->en', label: 'VI → EN' },
+              ]}
+            />
+          </Row>
+          <Row
+            label="Auto-translate captures"
+            hint="Translate each captured selection in the chosen direction and store it on the note. Off by default."
+          >
+            <ToggleControl
+              on={localSettings.noteAutoTranslate}
+              onClick={() => toggle('noteAutoTranslate')}
+              ariaLabel="Auto-translate captured notes"
+            />
+          </Row>
+          <Row
+            label="Capture toast duration"
+            hint="How long the on-page confirmation stays visible after a capture. Click the toast to dismiss it sooner."
+            last
+          >
+            <Stepper
+              value={localSettings.noteToastDurationSeconds}
+              unit="sec"
+              min={1}
+              max={30}
+              onChange={n => update('noteToastDurationSeconds', n)}
+            />
+          </Row>
+        </div>
+      </section>
+
+      {/* === F · DATA === */}
+      <section style={{ marginTop: 48, marginBottom: 24 }}>
+        <SectionHead num="F" label="Data" count="EXPORT · WIPE" />
+        <div className="card-flat" style={{ padding: '4px 28px' }}>
+          <Row label="Export" hint="Download every card and deck as JSON for backup or migration.">
+            <button
+              type="button"
+              onClick={async () => {
+                const response = await chrome.runtime.sendMessage({ type: 'get_cards' });
+                if (response.ok) {
+                  const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'scrolllearn-export.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
                 }
               }}
-            />
-            <p className="text-xs text-surface-500 mt-1">
-              Notes older than this are deleted automatically. <strong>0</strong> keeps notes forever.
-            </p>
-          </div>
-
-          {/* Translate direction */}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
-              Translation direction (for "Copy EN↔VI pairs")
-            </label>
-            <select
-              className="w-full rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-              value={localSettings.noteTranslateDirection}
-              onChange={e => updateSetting('noteTranslateDirection', e.target.value as TranslateDirection)}
+              className="btn btn-ghost"
+              style={{ padding: '10px 18px' }}
             >
-              <option value="auto">Auto-detect</option>
-              <option value="en->vi">English → Vietnamese</option>
-              <option value="vi->en">Vietnamese → English</option>
-            </select>
-            <p className="text-xs text-surface-500 mt-1">
-              Translation runs only when you click "Copy EN↔VI pairs" on the Notes tab. Uses Google's public translate endpoint.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Answer Matching */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Answer Matching</h3>
-        
-        <div className="space-y-6">
-          {/* Eliminate Characters */}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Characters to ignore when matching</label>
-            <input
-              type="text"
-              className="w-full rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 font-mono"
-              value={localSettings.eliminateChars}
-              onChange={e => updateSetting('eliminateChars', e.target.value)}
-              placeholder={'.,!?()\'"'}
-            />
-            <p className="text-xs text-surface-500 mt-1">
-              These characters will be removed before comparing answers
-            </p>
-          </div>
-
-          {/* Lowercase */}
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-medium text-surface-900 dark:text-surface-50">Ignore case</div>
-              <p className="text-sm text-surface-500">Treat uppercase and lowercase as equal</p>
-            </div>
-            <button
-              onClick={() => updateSetting('lowercaseNormalization', !localSettings.lowercaseNormalization)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                localSettings.lowercaseNormalization ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  localSettings.lowercaseNormalization ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
+              Export all data
             </button>
-          </div>
-
-          {/* Fuzzy Thresholds */}
-          <div>
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">Fuzzy matching thresholds</label>
-            <p className="text-sm text-surface-500 mb-3">
-              How closely must answers match for each grade level
-            </p>
-            
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-surface-600 dark:text-surface-400">Perfect (Grade 3)</span>
-                  <span className="text-sm font-medium">{Math.round(localSettings.fuzzyThresholds.high * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.8"
-                  max="1"
-                  step="0.01"
-                  value={localSettings.fuzzyThresholds.high}
-                  onChange={e => updateFuzzyThreshold('high', parseFloat(e.target.value))}
-                  className="w-full h-2 bg-green-200 dark:bg-green-900 rounded-lg appearance-none cursor-pointer accent-green-600"
-                />
-              </div>
-              
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-surface-600 dark:text-surface-400">Good (Grade 2)</span>
-                  <span className="text-sm font-medium">{Math.round(localSettings.fuzzyThresholds.medium * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.6"
-                  max="0.95"
-                  step="0.01"
-                  value={localSettings.fuzzyThresholds.medium}
-                  onChange={e => updateFuzzyThreshold('medium', parseFloat(e.target.value))}
-                  className="w-full h-2 bg-yellow-200 dark:bg-yellow-900 rounded-lg appearance-none cursor-pointer accent-yellow-600"
-                />
-              </div>
-              
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-surface-600 dark:text-surface-400">Partial (Grade 1)</span>
-                  <span className="text-sm font-medium">{Math.round(localSettings.fuzzyThresholds.low * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.4"
-                  max="0.85"
-                  step="0.01"
-                  value={localSettings.fuzzyThresholds.low}
-                  onChange={e => updateFuzzyThreshold('low', parseFloat(e.target.value))}
-                  className="w-full h-2 bg-orange-200 dark:bg-orange-900 rounded-lg appearance-none cursor-pointer accent-orange-600"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Keyboard & Accessibility */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Keyboard & Accessibility</h3>
-        
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-medium text-surface-900 dark:text-surface-50">Keyboard shortcuts</div>
-              <p className="text-sm text-surface-500">Use number keys (1-4) to select options, Enter to submit</p>
-            </div>
+          </Row>
+          <Row label="Clear" hint="Delete every card, deck, note, and setting. This cannot be undone." last>
             <button
-              onClick={() => updateSetting('enableKeyboardShortcuts', !localSettings.enableKeyboardShortcuts)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                localSettings.enableKeyboardShortcuts ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
-              }`}
+              type="button"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete ALL data? This cannot be undone.')) {
+                  chrome.storage.local.clear();
+                  window.location.reload();
+                }
+              }}
+              className="btn"
+              style={{
+                background: 'transparent',
+                color: 'var(--rose)',
+                border: '1px solid var(--rose)',
+                padding: '10px 18px',
+              }}
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  localSettings.enableKeyboardShortcuts ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
+              Clear all data
             </button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-medium text-surface-900 dark:text-surface-50">Show keyboard hints</div>
-              <p className="text-sm text-surface-500">Display keyboard shortcut hints in quiz cards</p>
-            </div>
-            <button
-              onClick={() => updateSetting('showKeyboardHints', !localSettings.showKeyboardHints)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                localSettings.showKeyboardHints ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  localSettings.showKeyboardHints ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-medium text-surface-900 dark:text-surface-50">Allow skip</div>
-              <p className="text-sm text-surface-500">Show Skip button and allow Esc key to skip cards</p>
-            </div>
-            <button
-              onClick={() => updateSetting('allowSkip', !localSettings.allowSkip)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                localSettings.allowSkip ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  localSettings.allowSkip ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+          </Row>
         </div>
-      </div>
-
-      {/* Data Management */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900 border-red-200 dark:border-red-800">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Data Management</h3>
-        
-        <div className="space-y-4">
-          <button
-            onClick={async () => {
-              const response = await chrome.runtime.sendMessage({ type: 'get_cards' });
-              if (response.ok) {
-                const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'scrolllearn-export.json';
-                a.click();
-                URL.revokeObjectURL(url);
-              }
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-surface-200 text-surface-900 hover:bg-surface-300 focus:ring-surface-400 dark:bg-surface-700 dark:text-surface-100 dark:hover:bg-surface-600 w-full sm:w-auto"
-          >
-            Export All Data
-          </button>
-          
-          <button
-            onClick={() => {
-              if (confirm('Are you sure you want to delete ALL data? This cannot be undone.')) {
-                chrome.storage.local.clear();
-                window.location.reload();
-              }
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 w-full sm:w-auto"
-          >
-            Clear All Data
-          </button>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

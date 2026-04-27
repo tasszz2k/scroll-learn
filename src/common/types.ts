@@ -77,6 +77,8 @@ export interface Settings {
   noteMinLength: number;
   noteRetentionDays: number;
   noteTranslateDirection: TranslateDirection;
+  noteAutoTranslate: boolean;
+  noteToastDurationSeconds: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -112,7 +114,11 @@ export const DEFAULT_SETTINGS: Settings = {
   noteMinLength: 2,
   noteRetentionDays: 0,
   noteTranslateDirection: 'auto',
+  noteAutoTranslate: false,
+  noteToastDurationSeconds: 5,
 };
+
+export type TranslateLang = 'en' | 'vi';
 
 // Notes feature
 export interface Note {
@@ -122,6 +128,8 @@ export interface Note {
   pageTitle: string;
   domain: string;
   createdAt: number;
+  translation?: string;
+  translationLang?: TranslateLang;
 }
 
 export type NewNote = Omit<Note, 'id' | 'createdAt'>;

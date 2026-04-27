@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Note, Settings as SettingsType } from '../../common/types';
 import { detectVietnamese, translateMany, type TranslateLang } from '../../common/translate';
+import EditorialHeader from './EditorialHeader';
 
 interface NotesPanelProps {
   notes: Note[];
@@ -30,22 +31,31 @@ function toISODate(ts: number): string {
 export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelProps) {
   const [search, setSearch] = useState('');
   const [domainFilter, setDomainFilter] = useState<string>('');
-  const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
+  // null = "use derived default from notes"; '' = "user explicitly cleared"
+  const [fromDate, setFromDate] = useState<string | null>(null);
+  const [toDate, setToDate] = useState<string | null>(null);
   const [plainCopy, setPlainCopy] = useState<CopyState>({ kind: 'idle' });
   const [pairsCopy, setPairsCopy] = useState<CopyState>({ kind: 'idle' });
-  const datesPrefilled = useRef(false);
 
-  // Pre-fill the date range to span all existing notes the first time we see any.
-  // The user can still edit/clear the inputs after.
-  useEffect(() => {
-    if (datesPrefilled.current) return;
-    if (notes.length === 0) return;
-    const earliest = notes.reduce((min, n) => Math.min(min, n.createdAt), Date.now());
-    setFromDate(toISODate(earliest));
-    setToDate(toISODate(Date.now()));
-    datesPrefilled.current = true;
-  }, [notes]);
+  // Anchor "now" once per mount; the panel session is short-lived.
+  const [now] = useState(() => Date.now());
+
+  // Derived defaults span all existing notes; the user can still edit/clear them.
+  const defaultDates = useMemo(() => {
+    if (notes.length === 0) return { from: '', to: '' };
+    const earliest = notes.reduce((min, n) => Math.min(min, n.createdAt), now);
+    return { from: toISODate(earliest), to: toISODate(now) };
+  }, [notes, now]);
+
+  const effectiveFromDate = fromDate ?? defaultDates.from;
+  const effectiveToDate = toDate ?? defaultDates.to;
+
+  // Reset copy state at the source of any filter change so it doesn't drift to
+  // a stale "Copied!" label after the user narrows the result set.
+  function resetCopyState() {
+    setPlainCopy(prev => (prev.kind === 'idle' ? prev : { kind: 'idle' }));
+    setPairsCopy(prev => (prev.kind === 'idle' ? prev : { kind: 'idle' }));
+  }
 
   const domains = useMemo(() => {
     const set = new Set<string>();
@@ -55,8 +65,8 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    const fromTs = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
-    const toTs = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null;
+    const fromTs = effectiveFromDate ? new Date(`${effectiveFromDate}T00:00:00`).getTime() : null;
+    const toTs = effectiveToDate ? new Date(`${effectiveToDate}T23:59:59.999`).getTime() : null;
     return notes
       .filter(n => {
         if (domainFilter && n.domain !== domainFilter) return false;
@@ -66,13 +76,7 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
         return true;
       })
       .sort((a, b) => b.createdAt - a.createdAt);
-  }, [notes, search, domainFilter, fromDate, toDate]);
-
-  // Reset copy states when filtered list changes substantially
-  useEffect(() => {
-    setPlainCopy({ kind: 'idle' });
-    setPairsCopy({ kind: 'idle' });
-  }, [filtered.length]);
+  }, [notes, search, domainFilter, effectiveFromDate, effectiveToDate]);
 
   async function handleDelete(id: string) {
     const response = await chrome.runtime.sendMessage({ type: 'delete_note', noteId: id });
@@ -118,20 +122,44 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
 
   async function handleCopyPairs() {
     if (filtered.length === 0) return;
-    const items = filtered.map(n => ({ id: n.id, text: n.text.trim() })).filter(i => i.text);
-    if (items.length === 0) return;
-    setPairsCopy({ kind: 'translating', done: 0, total: items.length });
+    // Notes that already carry a stored translation (from auto-translate on capture)
+    // skip the re-translation pass to save time and quota.
+    const cached = new Map<string, string>();
+    const itemsNeedingTranslation: { id: string; text: string }[] = [];
+    const orderedTexts: { id: string; text: string }[] = [];
+    for (const n of filtered) {
+      const text = n.text.trim();
+      if (!text) continue;
+      orderedTexts.push({ id: n.id, text });
+      if (n.translation && n.translation.trim()) {
+        cached.set(n.id, n.translation.trim());
+      } else {
+        itemsNeedingTranslation.push({ id: n.id, text });
+      }
+    }
+    if (orderedTexts.length === 0) return;
+
+    setPairsCopy({ kind: 'translating', done: cached.size, total: orderedTexts.length });
     try {
-      const map = await translateMany(
-        items,
-        resolveDirection,
-        done => setPairsCopy({ kind: 'translating', done, total: items.length }),
-        5,
-      );
-      const lines = items.map(i => {
-        const t = map.get(i.id);
-        const translated = t && t.length > 0 ? t : i.text;
-        return `${i.text}|${translated}`;
+      let translated = cached;
+      if (itemsNeedingTranslation.length > 0) {
+        const fresh = await translateMany(
+          itemsNeedingTranslation,
+          resolveDirection,
+          done => setPairsCopy({
+            kind: 'translating',
+            done: cached.size + done,
+            total: orderedTexts.length,
+          }),
+          5,
+        );
+        translated = new Map(cached);
+        for (const [k, v] of fresh) translated.set(k, v);
+      }
+      const lines = orderedTexts.map(i => {
+        const t = translated.get(i.id);
+        const value = t && t.length > 0 ? t : i.text;
+        return `${i.text}|${value}`;
       });
       await navigator.clipboard.writeText(lines.join('\n'));
       setPairsCopy({ kind: 'copied', label: 'Copied!' });
@@ -147,33 +175,48 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-50">Notes</h2>
-          <p className="text-surface-500 mt-1">
-            Selections captured from allowlisted sites. Copy them out to build flashcards in the Import tab.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onRefresh}
-            className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-surface-200 text-surface-900 hover:bg-surface-300 focus:ring-surface-400 dark:bg-surface-700 dark:text-surface-100 dark:hover:bg-surface-600"
-          >
-            Refresh
-          </button>
-          <button
-            onClick={handleClearAll}
-            disabled={notes.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
-          >
-            Clear all
-          </button>
-        </div>
-      </div>
+      <EditorialHeader
+        kicker="03 · Notes"
+        title={
+          <>
+            Selections, <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>captured</span> from the wild.
+          </>
+        }
+        sub="Highlights from allowlisted sites. Copy them out to build flashcards in the Import tab."
+        action={
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <button onClick={onRefresh} className="btn btn-ghost" type="button">
+              Refresh
+            </button>
+            <button
+              onClick={handleClearAll}
+              disabled={notes.length === 0}
+              className="btn"
+              type="button"
+              style={{
+                background: 'transparent',
+                color: 'var(--rose)',
+                border: '1px solid var(--rose)',
+              }}
+            >
+              Clear all
+            </button>
+          </div>
+        }
+      />
 
       {allowlistEmpty && notes.length === 0 && (
-        <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-800 dark:text-amber-200">
-          No domains in your capture allowlist yet. Open <strong>Settings → Note Capture</strong> and add a domain (for example <code>en.wikipedia.org</code>) to start saving selections.
+        <div
+          className="card-flat"
+          style={{
+            padding: '14px 18px',
+            background: 'rgba(184,146,58,.08)',
+            borderColor: 'rgba(184,146,58,.30)',
+            color: '#6E5A20',
+            fontSize: 13,
+          }}
+        >
+          No domains in your capture allowlist yet. Open <strong>Settings → Note Capture</strong> and add a domain (for example <code className="mono" style={{ background: 'var(--paper-2)', padding: '1px 4px', borderRadius: 3 }}>en.wikipedia.org</code>) to start saving selections.
         </div>
       )}
 
@@ -186,7 +229,7 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
               type="text"
               className="w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); resetCopyState(); }}
               placeholder="Search note text..."
             />
           </div>
@@ -195,7 +238,7 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
             <select
               className="w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
               value={domainFilter}
-              onChange={e => setDomainFilter(e.target.value)}
+              onChange={e => { setDomainFilter(e.target.value); resetCopyState(); }}
             >
               <option value="">All domains</option>
               {domains.map(d => (
@@ -208,8 +251,8 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
             <input
               type="date"
               className="w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-              value={fromDate}
-              onChange={e => setFromDate(e.target.value)}
+              value={effectiveFromDate}
+              onChange={e => { setFromDate(e.target.value); resetCopyState(); }}
             />
           </div>
           <div>
@@ -217,8 +260,8 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
             <input
               type="date"
               className="w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-              value={toDate}
-              onChange={e => setToDate(e.target.value)}
+              value={effectiveToDate}
+              onChange={e => { setToDate(e.target.value); resetCopyState(); }}
             />
           </div>
         </div>
@@ -231,7 +274,9 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
             <button
               onClick={handleCopyPlain}
               disabled={filtered.length === 0 || plainCopy.kind === 'translating'}
-              className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500"
+              type="button"
+              className="btn btn-clay"
+              style={{ padding: '8px 14px', fontSize: 13 }}
             >
               {plainCopy.kind === 'copied'
                 ? plainCopy.label
@@ -242,7 +287,9 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
             <button
               onClick={handleCopyPairs}
               disabled={filtered.length === 0 || pairsCopy.kind === 'translating'}
-              className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-violet-600 text-white hover:bg-violet-700 focus:ring-violet-500"
+              type="button"
+              className="btn btn-dark"
+              style={{ padding: '8px 14px', fontSize: 13 }}
             >
               {pairsCopy.kind === 'translating'
                 ? `Translating... ${pairsCopy.done}/${pairsCopy.total}`
@@ -271,6 +318,15 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
                 <div className="text-sm text-surface-900 dark:text-surface-100 whitespace-pre-wrap break-words">
                   {note.text}
                 </div>
+                {note.translation && (
+                  <div
+                    className="mt-1 text-sm whitespace-pre-wrap break-words"
+                    style={{ color: 'var(--clay-deep)', fontStyle: 'italic' }}
+                    title={note.translationLang ? `Translated to ${note.translationLang.toUpperCase()}` : 'Translation'}
+                  >
+                    {note.translation}
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-surface-500">
                   <a
                     href={note.url}
@@ -289,10 +345,19 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
               </div>
               <button
                 onClick={() => handleDelete(note.id)}
-                className="text-xs text-surface-500 hover:text-red-600 dark:hover:text-red-400 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                type="button"
+                className="ulink"
                 aria-label="Delete note"
+                style={{
+                  background: 'none',
+                  padding: 0,
+                  fontSize: 12,
+                  color: 'var(--rose)',
+                  borderBottomColor: 'var(--rose)',
+                  cursor: 'pointer',
+                }}
               >
-                Delete
+                delete
               </button>
             </div>
           ))}

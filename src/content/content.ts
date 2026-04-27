@@ -492,41 +492,30 @@ function updateStatsDisplay(grade: 0 | 1 | 2 | 3) {
 }
 
 /**
- * Build stats bar HTML for the quiz
+ * Build session stats bar (under the quiz header) — editorial pills.
  */
-function buildStatsHTML(deckName?: string): string {
+function buildStatsHTML(_deckName?: string): string {
   const { todayTotal, todayCorrect, sessionCorrect, sessionIncorrect, currentStreak } = sessionStats;
-  
-  // Calculate accuracy percentage
+
   const accuracy = todayTotal > 0 ? Math.round((todayCorrect / todayTotal) * 100) : 0;
-  
-  // Session score display
   const sessionScore = sessionCorrect - sessionIncorrect;
   const sessionScoreDisplay = sessionScore >= 0 ? `+${sessionScore}` : `${sessionScore}`;
-  
-  // Inline styles to override Facebook CSS
-  const rowStyle = `display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 0 16px 0; margin-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.1);`;
-  const pillBase = `display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 100px; cursor: help;`;
-  
-  const purpleStyle = `${pillBase} background: #f3e8ff; color: #7c3aed;`;
-  const blueStyle = `${pillBase} background: #e0f2fe; color: #0369a1;`;
-  const greenStyle = `${pillBase} background: #dcfce7; color: #15803d;`;
-  const tealStyle = `${pillBase} background: #ccfbf1; color: #0f766e;`;
-  const redStyle = `${pillBase} background: #fee2e2; color: #b91c1c;`;
-  const orangeStyle = `${pillBase} background: #ffedd5; color: #c2410c;`;
-  
-  const sessionStyle = sessionScore >= 0 ? tealStyle : redStyle;
-  
-  // Truncate deck name if too long
-  const displayDeck = deckName ? (deckName.length > 20 ? deckName.substring(0, 18) + '...' : deckName) : null;
-  
+
+  // Editorial pill base — paper/ink/clay tokens, no jewel-tone colors.
+  const rowStyle = `display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 0 0 14px 0; margin-bottom: 14px; border-bottom: 1px solid var(--ss-rule);`;
+  const base = `display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; font: 500 11px 'JetBrains Mono', ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; border: 1px solid var(--ss-rule-2); color: var(--ss-ink-3); background: var(--ss-card); cursor: help;`;
+  const moss = `${base} background: #EAEEDF; border-color: #D6DEC0; color: #4F5B40;`;
+  const clay = `${base} background: var(--ss-clay-wash); border-color: var(--ss-clay-tint); color: var(--ss-clay-deep);`;
+  const rose = `${base} background: rgba(196,115,107,.10); border-color: rgba(196,115,107,.30); color: #8A4A42;`;
+
+  const sessionStyle = sessionScore >= 0 ? moss : rose;
+
   return `
     <div style="${rowStyle}">
-      ${displayDeck ? `<span style="${purpleStyle}" data-tooltip="Current deck: ${escapeHTML(deckName || '')}">${escapeHTML(displayDeck)}</span>` : ''}
-      <span style="${blueStyle}" data-tooltip="${todayTotal} questions answered (${todayCorrect} correct)">${todayTotal} today</span>
-      <span style="${greenStyle}" data-tooltip="${accuracy}% of answers correct">${accuracy}%</span>
+      <span style="${base}" data-tooltip="${todayTotal} answered (${todayCorrect} correct)">${todayTotal} today</span>
+      ${todayTotal > 0 ? `<span style="${moss}" data-tooltip="${accuracy}% correct">${accuracy}%</span>` : ''}
       <span style="${sessionStyle}" data-tooltip="Session: ${sessionCorrect} correct, ${sessionIncorrect} wrong">${sessionScoreDisplay}</span>
-      ${currentStreak > 0 ? `<span style="${orangeStyle}" data-tooltip="${currentStreak} day learning streak!">${currentStreak} streak</span>` : ''}
+      ${currentStreak > 0 ? `<span style="${clay}" data-tooltip="${currentStreak}-card streak">${currentStreak} streak</span>` : ''}
     </div>
   `;
 }
@@ -535,7 +524,26 @@ function buildStatsHTML(deckName?: string): string {
  * Build quiz HTML based on card type
  */
 function buildQuizHTML(card: Card): string {
-  const brandSVG = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>`;
+  // Editorial mark — feed lines + clay curl
+  const brandSVG = `<svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true">
+    <rect x="14" y="16" width="36" height="3" fill="currentColor"/>
+    <rect x="14" y="26" width="28" height="3" fill="currentColor"/>
+    <rect x="14" y="36" width="32" height="3" fill="currentColor"/>
+    <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="var(--ss-clay)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="50" cy="46" r="3" fill="var(--ss-clay)"/>
+  </svg>`;
+  const kindLabel: Record<Card['kind'], string> = {
+    'mcq-single': 'mcq',
+    'mcq-multi': 'mcq+',
+    'text': 'text',
+    'cloze': 'cloze',
+    'audio': 'audio',
+  };
+  const kindPill = `<span class="scrolllearn-quiz-deck">${kindLabel[card.kind]}</span>`;
+  const deckPill = card.deckName
+    ? `<span class="scrolllearn-quiz-deck">${escapeHTML(card.deckName)}</span>`
+    : '';
+  const duePill = `<span class="scrolllearn-quiz-deck clay">due now</span>`;
   
   let optionsHTML = '';
   let inputHTML = '';
@@ -597,13 +605,22 @@ function buildQuizHTML(card: Card): string {
   return `
     <div class="scrolllearn-quiz" role="dialog" aria-modal="true" aria-labelledby="ss-question">
       <div class="scrolllearn-quiz-header">
-        <div class="scrolllearn-quiz-brand">
-          ${brandSVG}
-          <span>ScrollLearn</span>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="scrolllearn-quiz-brand">
+            ${brandSVG}
+            <span>Scroll Learn · Injected</span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            ${kindPill}
+            ${deckPill}
+            ${duePill}
+          </div>
         </div>
-        <span class="scrolllearn-quiz-deck">${card.deckId ? 'Quiz Time' : 'Quick Quiz'}</span>
+        <span class="mono" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: var(--ss-ink-4); letter-spacing: .12em;">
+          ${sessionStats.todayTotal > 0 ? `${sessionStats.todayCorrect + sessionStats.todayIncorrect} / ${sessionStats.todayTotal}` : 'DUE NOW'}
+        </span>
       </div>
-      
+
       ${statsHTML}
       
       ${card.kind !== 'cloze' ? `

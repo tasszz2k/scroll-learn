@@ -1,6 +1,7 @@
-import type { Message, Response, Card, Deck, Note, NewNote, Settings, Stats, Grade } from '../common/types';
+import type { Message, Response, Card, Deck, Note, NewNote, Settings, Stats, Grade, TranslateLang } from '../common/types';
 import { createCard, createDeck, createNote } from '../common/types';
 import * as storage from '../common/storage';
+import { detectVietnamese, translate } from '../common/translate';
 import { sm2Update, sortCardsForReview } from './scheduler';
 
 // Alarm names
@@ -596,16 +597,50 @@ async function handleOpenDashboard(): Promise<Response<void>> {
 }
 
 /**
- * Save a captured selection as a note
+ * Save a captured selection as a note. When auto-translate is enabled,
+ * translate the captured text inline so the translation is persisted on
+ * the note and visible immediately in the dashboard.
  */
 async function handleSaveNote(noteData: NewNote): Promise<Response<Note>> {
   try {
-    const note = createNote(noteData);
+    const settings = await storage.getSettings();
+    let enriched = noteData;
+
+    if (settings.noteAutoTranslate) {
+      const text = noteData.text.trim();
+      if (text) {
+        const { from, to } = resolveTranslateDirection(text, settings.noteTranslateDirection);
+        if (from !== to) {
+          try {
+            const translated = (await translate(text, from, to)).trim();
+            // Skip if the endpoint returned the same string (means it could not translate)
+            if (translated && translated.toLowerCase() !== text.toLowerCase()) {
+              enriched = { ...noteData, translation: translated, translationLang: to };
+            }
+          } catch (err) {
+            console.warn('[ScrollLearn] auto-translate failed:', err);
+          }
+        }
+      }
+    }
+
+    const note = createNote(enriched);
     const saved = await storage.saveNote(note);
     return { ok: true, data: saved };
   } catch (error) {
     return { ok: false, error: String(error) };
   }
+}
+
+function resolveTranslateDirection(
+  text: string,
+  direction: Settings['noteTranslateDirection'],
+): { from: TranslateLang; to: TranslateLang } {
+  if (direction === 'en->vi') return { from: 'en', to: 'vi' };
+  if (direction === 'vi->en') return { from: 'vi', to: 'en' };
+  return detectVietnamese(text)
+    ? { from: 'vi', to: 'en' }
+    : { from: 'en', to: 'vi' };
 }
 
 async function handleGetNotes(): Promise<Response<Note[]>> {

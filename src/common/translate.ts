@@ -1,7 +1,9 @@
 // Lightweight EN<->VI translator using Google's public translate endpoint.
 // No API key, no extra dependencies.
 
-export type TranslateLang = 'en' | 'vi';
+import type { TranslateLang } from './types';
+
+export type { TranslateLang };
 
 // Vietnamese-only diacritics (letters and tone marks not present in plain English).
 const VI_DIACRITIC_RE = /[ăâđêôơưĂÂĐÊÔƠƯàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸ]/;
