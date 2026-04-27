@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ScrollLearn - Install</title>
+    <meta name="description" content="A Chrome extension that turns scrolling into spaced-repetition learning." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #f5f1eb;
+        --ink: #2a2620;
+        --ink-3: #6b655c;
+        --ink-4: #9a9388;
+        --rule: #d9d2c5;
+        --clay: #c96442;
+        --clay-soft: #fbf1e2;
+        --leaf: #5a7a4a;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--clay); text-decoration: underline; text-underline-offset: 3px; }
+      a:hover { color: var(--ink); }
+
+      .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+      .eyebrow {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .display {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-weight: 400;
+        line-height: 1.05;
+        margin: 12px 0 0;
+        font-size: 56px;
+      }
+      .display em { color: var(--clay); font-style: italic; }
+      .lead { color: var(--ink-3); font-size: 18px; margin: 18px 0 0; max-width: 56ch; }
+
+      .mark {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 46px; height: 46px;
+        background: var(--ink); border-radius: 8px;
+        margin-bottom: 8px;
+      }
+
+      .rule {
+        height: 1px; background: var(--rule); margin: 48px 0;
+        border: 0;
+      }
+
+      .step-num {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px; color: var(--clay); letter-spacing: 0;
+        display: inline-block; min-width: 28px;
+      }
+      .steps { counter-reset: s; padding: 0; margin: 0; list-style: none; }
+      .steps li {
+        position: relative; padding: 16px 0 16px 44px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .steps li:last-child { border-bottom: 0; }
+      .steps li::before {
+        counter-increment: s;
+        content: counter(s, decimal-leading-zero);
+        position: absolute; left: 0; top: 18px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px; color: var(--clay);
+      }
+      .steps strong { font-weight: 600; }
+
+      .cta-row {
+        display: flex; gap: 12px; flex-wrap: wrap;
+        margin-top: 28px;
+      }
+      .btn {
+        display: inline-flex; align-items: center; gap: 10px;
+        padding: 14px 22px;
+        border-radius: 999px; cursor: pointer;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-weight: 500; font-size: 14px;
+        text-decoration: none; border: 0;
+        transition: transform 80ms ease, background 120ms ease;
+      }
+      .btn:hover { transform: translateY(-1px); }
+      .btn:active { transform: translateY(0); }
+      .btn-clay { background: var(--clay); color: #fbf8f2; }
+      .btn-clay:hover { background: #b85838; color: #fbf8f2; }
+      .btn-ghost {
+        background: transparent; color: var(--ink);
+        border: 1px solid var(--rule);
+      }
+      .btn-ghost:hover { background: rgba(0,0,0,0.03); }
+      .btn .ico { font-size: 16px; line-height: 1; }
+
+      .cmd {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        background: #efe9dc;
+        border: 1px solid var(--rule);
+        border-radius: 8px;
+        padding: 14px 16px;
+        white-space: pre-wrap; word-break: break-all;
+        margin: 16px 0 0;
+        position: relative;
+      }
+      .cmd-copied {
+        position: absolute; right: 12px; top: 12px;
+        font-size: 11px; color: var(--leaf);
+        opacity: 0; transition: opacity 200ms ease;
+      }
+      .cmd-copied.show { opacity: 1; }
+
+      .panel {
+        background: #fbf8f2;
+        border: 1px solid var(--rule);
+        border-radius: 12px;
+        padding: 24px;
+        margin: 28px 0;
+      }
+      .panel h3 {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-weight: 400; margin: 0 0 4px;
+        font-size: 22px;
+      }
+      .panel p { margin: 0; color: var(--ink-3); font-size: 14px; }
+
+      .small {
+        font-size: 13px; color: var(--ink-3);
+      }
+      .small a { color: var(--ink-3); }
+
+      .footer {
+        margin-top: 64px;
+        padding-top: 24px;
+        border-top: 1px solid var(--rule);
+        font-size: 12px; color: var(--ink-4);
+      }
+      .footer a { color: var(--ink-4); }
+
+      @media (max-width: 560px) {
+        .display { font-size: 40px; }
+        .wrap { padding: 40px 20px 64px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="mark" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 64 64">
+          <rect x="14" y="16" width="36" height="3" fill="#FBF8F2" />
+          <rect x="14" y="26" width="28" height="3" fill="#FBF8F2" />
+          <rect x="14" y="36" width="32" height="3" fill="#FBF8F2" />
+          <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="#C96442" stroke-width="3" stroke-linecap="round" />
+          <circle cx="50" cy="46" r="3" fill="#C96442" />
+        </svg>
+      </div>
+      <div class="eyebrow">Scroll &middot; Learn</div>
+      <h1 class="display">Install the <em>quiet</em> feed.</h1>
+      <p class="lead">
+        ScrollLearn injects spaced-repetition flashcards into Facebook, YouTube,
+        and Instagram feeds. macOS + Chrome.
+      </p>
+
+      <div class="cta-row">
+        <a class="btn btn-clay" id="downloadBtn"
+           href="https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/docs/install.command"
+           download="install.command">
+          <span class="ico">&#x2193;</span>
+          Download installer
+        </a>
+        <button class="btn btn-ghost" id="copyBtn" type="button">
+          <span class="ico">&#x2398;</span>
+          Copy install command
+        </button>
+      </div>
+      <div class="cmd" id="cmdBox">
+curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.sh | bash
+        <span class="cmd-copied" id="copiedToast">copied</span>
+      </div>
+
+      <hr class="rule" />
+
+      <div class="eyebrow">After clicking download</div>
+      <ol class="steps">
+        <li>
+          <strong>Open Downloads</strong> in Finder, <strong>right-click <code>install.command</code> &rarr; Open</strong>
+          (the first time only; macOS warns about unsigned scripts).
+        </li>
+        <li>
+          A Terminal window opens and runs the installer.
+          It downloads the latest release into <code>~/.scroll-learn/</code>.
+        </li>
+        <li>
+          The installer will <strong>open Chrome</strong> at <code>chrome://extensions</code>.
+          Toggle <strong>Developer mode</strong>, click <strong>Load unpacked</strong>,
+          pick <code>~/.scroll-learn/extension</code>.
+        </li>
+        <li>
+          <strong>Copy the extension ID</strong> from the ScrollLearn card and paste it back into Terminal.
+        </li>
+        <li>
+          Reload the extension once. <strong>Done.</strong> Future updates appear as a one-click banner.
+        </li>
+      </ol>
+
+      <div class="panel">
+        <h3>Updates from now on</h3>
+        <p>
+          The dashboard shows a banner when a new release is out. Click
+          <em>Update now</em>, the new version installs in a few seconds, and the
+          extension reloads. No terminal, no downloads.
+        </p>
+      </div>
+
+      <p class="small">
+        Prefer to build from source?
+        <a href="https://github.com/tasszz2k/scroll-learn/blob/main/INSTALL.md#developer-install-build-from-source">
+          Developer install instructions
+        </a>.
+      </p>
+
+      <div class="footer">
+        <a href="https://github.com/tasszz2k/scroll-learn">GitHub</a> &middot;
+        <a href="https://github.com/tasszz2k/scroll-learn/releases">Releases</a> &middot;
+        <a href="https://github.com/tasszz2k/scroll-learn/blob/main/INSTALL.md">Full install guide</a>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var INSTALL_CMD =
+          'curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.sh | bash';
+        var btn = document.getElementById('copyBtn');
+        var toast = document.getElementById('copiedToast');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(INSTALL_CMD).then(function () {
+              toast.classList.add('show');
+              setTimeout(function () { toast.classList.remove('show'); }, 1400);
+            });
+          } else {
+            // Fallback
+            var ta = document.createElement('textarea');
+            ta.value = INSTALL_CMD;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            toast.classList.add('show');
+            setTimeout(function () { toast.classList.remove('show'); }, 1400);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
