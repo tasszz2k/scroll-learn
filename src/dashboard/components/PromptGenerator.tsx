@@ -92,20 +92,17 @@ function buildTranslationPrompt(
   direction: TranslationDirection,
   englishLevel: CEFRLevel,
 ): string {
-  const [src, tgt] = direction === 'en->vi'
-    ? ['English', 'Vietnamese']
-    : ['Vietnamese', 'English'];
+  const sourceLang = direction === 'en->vi' ? 'English' : 'Vietnamese';
   const cardTypeInstructions =
     cardType === 'text'
-      ? `Generate ONLY text translation cards: front = ${src}, back = ${tgt}. Keep each answer 1-5 words; use || on the back when several translations are equally acceptable (e.g. "meanwhile" -> "trong khi đó||cùng lúc đó").`
+      ? `Generate ONLY text translation cards. Keep each answer 1-5 words; use || on the back when several translations are equally acceptable (e.g. "meanwhile" -> "in the meantime||at the same time").`
       : cardType === 'mcq-single'
-        ? `Generate ONLY multiple-choice cards: question shows a ${src} word/phrase or short context, options are exactly 4 ${tgt} candidates, one correct.`
+        ? `Generate ONLY multiple-choice cards: a short cue plus exactly 4 candidate options, one correct.`
         : cardType === 'cloze'
-          ? `Generate ONLY cloze (fill-in-the-blank) cards. Front = a short ${src} sentence (preferably drawn from the source notes) with the target word in {{double-braces}}. Back = just that word.`
+          ? `Generate ONLY cloze (fill-in-the-blank) cards. Front = a short English sentence (preferably drawn from the source notes) with the target English word in {{double-braces}}. Back = just that word.`
           : `Mix card kinds in roughly these proportions: ~40% mcq-single, ~30% text translation, ~30% cloze. Vary the kind across the same cluster so the learner meets each concept in multiple shapes.`;
   const formatInstructions = formatInstructionsFor(outputFormat);
-  const isToVietnamese = direction === 'en->vi';
-  return `You are creating ${tgt}-learning flashcards from notes a learner highlighted while reading ${src} content on the web.
+  return `You are creating English-learning flashcards from notes a learner highlighted while reading ${sourceLang} content on the web. The goal is to improve their English.
 
 LEARNER PROFILE
 - CEFR English level: ${CEFR_DESCRIPTIONS[englishLevel]}
@@ -132,19 +129,26 @@ CONNECT THE DOTS (treat the whole list as ONE coherent reading session, not isol
 6. For the SAME high-value item, generate 2-3 reinforcement cards in different shapes (a translation card + a cloze using the source sentence + an MCQ contrasting it with cluster mates). The CSV deduper will keep only exact duplicates, so vary the question wording.
 7. Order the output by topic cluster, not by source line order. Cards in the same cluster should be adjacent.
 
+ANSWER LANGUAGE (IMPORTANT)
+- The learner is improving their English. Cards that force them to RECALL or PRODUCE English are more valuable than cards that only test recognition.
+- Bias the output so that ~70-80% of cards have ENGLISH on the back (or as the cloze blank, or as the correct MCQ option). The remaining ~20-30% may have Vietnamese on the back for recognition variety.
+- The Direction setting (currently: ${direction === 'en->vi' ? 'EN -> VI' : 'VI -> EN'}) describes what the SOURCE notes are mostly written in (${sourceLang}); it does NOT force every answer to be in the other language. Mix freely as described below.
+
 CARD KIND GUIDANCE
-- text translation: front = ${src} item exactly as the learner met it (favour source form over dictionary headword); back = concise, natural ${tgt} translation, 1-5 words, with || separating equally valid alternatives.
-- mcq-single: front asks for the meaning OR best-fitting word in a short ${src} context. Exactly 4 ${tgt} options, one correct, three plausible cluster-mate distractors. Avoid trivially wrong options.
-- cloze: front is a short ${src} sentence (lifted or lightly adapted from the source) with the target word in {{double-braces}}; back is just that word. Cloze is great for testing collocations and connectors in context.
-- Bidirectional vocab (mixed mode only): for each high-value vocab item, include at least one ${src}->${tgt} card AND one ${tgt}->${src} card so the learner can recall in both directions.
+- text translation (English-answer preferred):
+  * Preferred shape: front = a short Vietnamese cue / definition / synonym, back = the English word or phrase from the source. Keep back 1-5 words. Use || to list equally valid English alternatives.
+  * Variety shape (~20-30%): front = English item from the source, back = concise Vietnamese translation, 1-5 words.
+- mcq-single (English-answer preferred):
+  * Preferred shape: question shows a Vietnamese cue (or English context with a blank), the 4 options are English candidates, one correct. Distractors come from cluster mates whenever possible.
+  * Variety shape (~20-30%): question shows an English item, the 4 options are Vietnamese translations, one correct.
+- cloze (always English-answer):
+  * Front is a short ENGLISH sentence (lifted or lightly adapted from the source) with the target English word in {{double-braces}}; back is just that English word. Cloze always tests production of English in English context.
+- Bidirectional vocab (mixed mode only): for each high-value vocab item, include at least one card with English on the back AND, less often, one with Vietnamese on the back, so the learner gets both production and recognition practice on the same item.
 - ${cardTypeInstructions}
 
 LANGUAGE QUALITY
-${isToVietnamese
-  ? `- Vietnamese answers MUST use proper diacritics (tiếng Việt có dấu). Write "bỏ qua" not "bo qua", "tổng hợp" not "tong hop", "trong khi đó" not "trong khi do". This is non-negotiable on every Vietnamese field, including options, tags, and example sentences.
-- Pick the most natural register for each item; avoid stiff word-for-word translations when an idiomatic Vietnamese phrase exists.`
-  : `- English answers should be natural and idiomatic. Match the register of the source (academic, casual, technical) rather than defaulting to formal business English.
-- Preserve untranslatable domain terms (proper nouns, brand names, technical jargon) in their original form on the back as well; do not invent forced English equivalents.`}
+- English answers should be natural and idiomatic. Match the register of the source (academic, casual, technical) rather than defaulting to formal business English. Preserve untranslatable domain terms (proper nouns, brand names, technical jargon) in their original English form rather than inventing forced equivalents.
+- Vietnamese fields (cues, the minority of Vietnamese-answer backs, options, example glosses) MUST use proper diacritics (tiếng Việt có dấu). Write "bỏ qua" not "bo qua", "tổng hợp" not "tong hop", "trong khi đó" not "trong khi do". This is non-negotiable on every Vietnamese field, including options, tags, and example sentences. Pick the most natural register; avoid stiff word-for-word translations when an idiomatic Vietnamese phrase exists.
 
 DECK & TAGS
 - Deck name: reflect the dominant topic of the source (e.g. "Logical Connectors", "Enzyme Kinetics", "Wikipedia Vocab"). Use "Vocab" only if the source has no clear theme.
