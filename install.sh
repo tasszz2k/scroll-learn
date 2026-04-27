@@ -65,7 +65,10 @@ mkdir -p "$INSTALL_DIR"
 
 # Wipe previous extension dir so updates are clean.
 rm -rf "$EXT_DIR"
-unzip -q "$TMP/release.zip" -d "$INSTALL_DIR"
+# -o: overwrite top-level helper files (e.g. scrolllearn-updater.py) without
+#     prompting. When run via `curl ... | bash`, stdin is the script bytes,
+#     so any unzip prompt would read garbage from the piped script and fail.
+unzip -oq "$TMP/release.zip" -d "$INSTALL_DIR"
 
 if [[ ! -f "$EXT_DIR/manifest.json" ]]; then
   echo "Release zip layout looks wrong (no $EXT_DIR/manifest.json)." >&2
@@ -103,8 +106,9 @@ echo
 echo "  4. Copy the extension ID from the ScrollLearn card"
 echo
 
-if [[ -t 0 ]]; then
-  read -rp "Press Enter to open Chrome and reveal the extension folder..."
+if [[ -t 0 || -e /dev/tty ]]; then
+  # Read from /dev/tty in case stdin is the piped script (curl ... | bash).
+  read -rp "Press Enter to open Chrome and reveal the extension folder..." < /dev/tty || true
 else
   echo "(non-interactive shell — open chrome://extensions yourself)"
 fi
