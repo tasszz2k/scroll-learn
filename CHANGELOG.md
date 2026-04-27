@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0](https://github.com/tasszz2k/scroll-learn/compare/v1.1.7...v1.2.0) (2026-04-27)
+
+
+### Features
+
+* **notes:** AI prompt generator with translation mode ([a9d8909](https://github.com/tasszz2k/scroll-learn/commit/a9d89097df4f87feede134e3d8ece7fe15b643d9))
+
 ## [1.1.7](https://github.com/tasszz2k/scroll-learn/compare/v1.1.6...v1.1.7) (2026-04-27)
 
 
