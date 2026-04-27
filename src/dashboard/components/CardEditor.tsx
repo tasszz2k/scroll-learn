@@ -215,7 +215,10 @@ export default function CardEditor({ card, deckId, onSave, onCancel }: CardEdito
                   <button
                     type="button"
                     onClick={() => removeOption(index)}
-                    className="p-2 text-surface-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                    className="p-2 rounded"
+                    style={{ color: 'var(--ink-4)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--rose)'; e.currentTarget.style.background = 'rgba(196,115,107,.10)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ink-4)'; e.currentTarget.style.background = 'transparent'; }}
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18" />

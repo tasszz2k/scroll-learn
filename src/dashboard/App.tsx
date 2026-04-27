@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DeckList from './components/DeckList';
 import ImportPanel from './components/ImportPanel';
 import NotesPanel from './components/NotesPanel';
@@ -39,11 +39,24 @@ export default function App() {
     window.location.hash = `#${tab}`;
   }
 
+  const checkEditCardRequest = useCallback(async () => {
+    try {
+      const result = await chrome.storage.local.get(['editCardId', 'editDeckId']);
+      if (result.editCardId && result.editDeckId) {
+        setActiveTab('decks');
+        setEditCardId(result.editCardId);
+        setEditDeckId(result.editDeckId);
+        await chrome.storage.local.remove(['editCardId', 'editDeckId']);
+      }
+    } catch (error) {
+      console.error('Failed to check edit card request:', error);
+    }
+  }, []);
+
   // Load initial data
   useEffect(() => {
-    loadData();
+    void loadData();
 
-    // Check for dark mode preference
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setDarkMode(prefersDark);
 
@@ -51,31 +64,14 @@ export default function App() {
       document.documentElement.classList.add('dark');
     }
 
-    // Check for edit card request from quiz
-    checkEditCardRequest();
+    void checkEditCardRequest();
 
-    // Listen for hash changes
     function onHashChange() {
       setActiveTabState(getTabFromHash());
     }
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-
-  async function checkEditCardRequest() {
-    try {
-      const result = await chrome.storage.local.get(['editCardId', 'editDeckId']);
-      if (result.editCardId && result.editDeckId) {
-        setActiveTab('decks');
-        setEditCardId(result.editCardId);
-        setEditDeckId(result.editDeckId);
-        // Clear the storage
-        await chrome.storage.local.remove(['editCardId', 'editDeckId']);
-      }
-    } catch (error) {
-      console.error('Failed to check edit card request:', error);
-    }
-  }
+  }, [checkEditCardRequest]);
 
   async function loadData(showLoading = true) {
     if (showLoading) setLoading(true);
@@ -157,141 +153,133 @@ export default function App() {
     return response;
   }
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    {
-      id: 'study',
-      label: 'Study',
-      icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" />
-          <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'decks',
-      label: 'Decks',
-      icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-        </svg>
-      ),
-    },
-    {
-      id: 'notes',
-      label: 'Notes',
-      icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <polyline points="10 9 9 9 8 9" />
-        </svg>
-      ),
-    },
-    {
-      id: 'import',
-      label: 'Import',
-      icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-          <polyline points="17,8 12,3 7,8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-      ),
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'stats',
-      label: 'Statistics',
-      icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-        </svg>
-      ),
-    },
+  const tabs: { id: Tab; label: string; num: string }[] = [
+    { id: 'study',    label: 'Study',      num: '01' },
+    { id: 'decks',    label: 'Decks',      num: '02' },
+    { id: 'notes',    label: 'Notes',      num: '03' },
+    { id: 'import',   label: 'Import',     num: '04' },
+    { id: 'settings', label: 'Settings',   num: '05' },
+    { id: 'stats',    label: 'Statistics', num: '06' },
   ];
+
+  const totalDue = cards.filter(c => c.due <= Date.now()).length;
+  const streak = stats?.currentStreak ?? 0;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950">
-        <div className="animate-pulse text-surface-500">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--paper)' }}>
+        <div className="eyebrow animate-pulse">Loading…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface-50 dark:bg-surface-950">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-surface-200 dark:border-surface-800 bg-white/80 dark:bg-surface-900/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/icons/icon48.png" 
-              alt="ScrollLearn" 
-              className="w-10 h-10 rounded-xl"
-            />
-            <div>
-              <h1 className="text-xl font-semibold text-surface-900 dark:text-surface-50">ScrollLearn</h1>
-              <p className="text-sm text-surface-500">Learn while you scroll</p>
+    <div className="min-h-screen" style={{ background: 'var(--paper)' }}>
+      {/* Editorial header */}
+      <header
+        className="sticky top-0 z-50"
+        style={{
+          background: 'rgba(245, 241, 235, 0.92)',
+          backdropFilter: 'saturate(160%) blur(8px)',
+          WebkitBackdropFilter: 'saturate(160%) blur(8px)',
+          borderBottom: '1px solid var(--rule)',
+        }}
+      >
+        <div className="max-w-6xl mx-auto" style={{ padding: '24px 24px 0' }}>
+          <div className="flex items-start justify-between gap-6">
+            {/* Left: mark + display */}
+            <div className="flex items-center" style={{ gap: 14 }}>
+              <div
+                className="flex items-center justify-center"
+                style={{ width: 46, height: 46, background: 'var(--ink)', borderRadius: 8, flexShrink: 0 }}
+              >
+                <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
+                  <rect x="14" y="16" width="36" height="3" fill="#FBF8F2" />
+                  <rect x="14" y="26" width="28" height="3" fill="#FBF8F2" />
+                  <rect x="14" y="36" width="32" height="3" fill="#FBF8F2" />
+                  <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="#C96442" strokeWidth="3" strokeLinecap="round" />
+                  <circle cx="50" cy="46" r="3" fill="#C96442" />
+                </svg>
+              </div>
+              <div>
+                <div className="eyebrow" style={{ fontSize: 11 }}>Scroll · Learn</div>
+                <h1 className="display" style={{ fontSize: 30, marginTop: 2, lineHeight: 1 }}>
+                  The <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>quiet</span> feed.
+                </h1>
+              </div>
+            </div>
+
+            {/* Right: meta + actions */}
+            <div className="text-right" style={{ paddingTop: 4 }}>
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', letterSpacing: '.12em' }}>
+                {totalDue > 0 ? `${totalDue} DUE` : 'NOTHING DUE'} · STREAK {streak}
+              </div>
+              <div className="flex justify-end" style={{ gap: 8, marginTop: 10 }}>
+                <button
+                  type="button"
+                  onClick={toggleDarkMode}
+                  className="btn btn-ghost"
+                  style={{ padding: '6px 12px', fontSize: 12 }}
+                  aria-label="Toggle theme"
+                >
+                  {darkMode ? 'Light' : 'Dark'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-clay"
+                  style={{ padding: '6px 14px', fontSize: 12 }}
+                  onClick={() => setActiveTab('study')}
+                >
+                  Begin study →
+                </button>
+              </div>
             </div>
           </div>
-          
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-            aria-label="Toggle dark mode"
-          >
-            {darkMode ? (
-              <svg className="w-5 h-5 text-surface-600 dark:text-surface-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-surface-600" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-              </svg>
-            )}
-          </button>
+
+          {/* Tabs */}
+          <nav className="flex" style={{ gap: 28, marginTop: 24 }}>
+            {tabs.map(tab => {
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className="flex items-center"
+                  style={{
+                    gap: 8,
+                    padding: '14px 0',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: active ? '2px solid var(--clay)' : '2px solid transparent',
+                    color: active ? 'var(--ink)' : 'var(--ink-3)',
+                    fontFamily: "'Inter', system-ui, sans-serif",
+                    fontWeight: 500,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    marginBottom: -1,
+                  }}
+                >
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: 11,
+                      color: active ? 'var(--clay)' : 'var(--ink-4)',
+                      letterSpacing: 0,
+                    }}
+                  >
+                    {tab.num}
+                  </span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
-        
-        {/* Tabs */}
-        <nav className="max-w-6xl mx-auto px-4">
-          <div className="flex gap-1">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                  activeTab === tab.id
-                    ? 'text-primary-600 border-primary-600 dark:text-primary-400 dark:border-primary-400'
-                    : 'text-surface-500 border-transparent hover:text-surface-700 dark:hover:text-surface-300'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </nav>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto" style={{ padding: '40px 24px 56px' }}>
         {activeTab === 'study' && settings && (
           <StudySession
             decks={decks}
@@ -306,6 +294,7 @@ export default function App() {
           <DeckList
             decks={decks}
             cards={cards}
+            stats={stats}
             onSaveDeck={handleSaveDeck}
             onDeleteDeck={handleDeleteDeck}
             onSaveCard={handleSaveCard}
@@ -317,6 +306,7 @@ export default function App() {
             editCardId={editCardId}
             editDeckId={editDeckId}
             onEditCardHandled={() => { setEditCardId(null); setEditDeckId(null); }}
+            onBeginStudy={() => setActiveTab('study')}
           />
         )}
         

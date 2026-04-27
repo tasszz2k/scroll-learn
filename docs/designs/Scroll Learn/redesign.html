@@ -1,0 +1,1862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Scroll Learn — Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tiempos+Headline&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Claude-inspired warm editorial palette */
+    --paper:        #F5F1EB;   /* warm off-white background */
+    --paper-2:      #EFE9DF;   /* slightly deeper paper */
+    --card:         #FBF8F2;   /* card surface */
+    --ink:          #1F1B16;   /* near-black warm */
+    --ink-2:        #3C342B;
+    --ink-3:        #6B6157;   /* secondary text */
+    --ink-4:        #9A8E81;   /* tertiary */
+    --rule:         #E2D9CB;   /* hairline rules */
+    --rule-2:       #D2C7B4;
+    --clay:         #C96442;   /* signature terracotta */
+    --clay-deep:    #A84E30;
+    --clay-tint:    #EFD9CC;
+    --clay-wash:    #F6E6DC;
+    --moss:         #6E7B5C;   /* secondary accent */
+    --gold:         #B8923A;
+    --rose:         #C4736B;
+    --bg-block:     #2A2520;   /* dark editorial block */
+  }
+
+  html, body { background: var(--paper); }
+  body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+  .serif { font-family: 'Source Serif 4', 'Tiempos Headline', Georgia, serif; font-weight: 500; letter-spacing: -0.01em; }
+  .display { font-family: 'Source Serif 4', Georgia, serif; font-weight: 500; letter-spacing: -0.025em; line-height: 1.02; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+
+  /* Editorial helpers */
+  .eyebrow { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+  .rule { border: 0; border-top: 1px solid var(--rule); }
+  .rule-thick { border: 0; border-top: 2px solid var(--ink); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; font: 500 13.5px 'Inter', sans-serif; border-radius: 999px; border: 1px solid transparent; cursor: pointer; transition: all .15s; }
+  .btn-clay { background: var(--clay); color: #FFF8F2; border-color: var(--clay); }
+  .btn-clay:hover { background: var(--clay-deep); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule-2); }
+  .btn-ghost:hover { border-color: var(--ink-3); background: var(--paper-2); }
+  .btn-dark { background: var(--ink); color: var(--paper); }
+
+  /* Tag / pill */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font: 500 11px 'JetBrains Mono', monospace; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; border: 1px solid var(--rule-2); color: var(--ink-3); background: var(--card); }
+  .pill-clay { background: var(--clay-wash); border-color: var(--clay-tint); color: var(--clay-deep); }
+  .pill-moss { background: #EAEEDF; border-color: #D6DEC0; color: #4F5B40; }
+  .pill-ink { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  /* ASCII layer cake & diagrams */
+  .ascii { font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.45; white-space: pre; color: var(--ink-2); }
+
+  /* Diagram grids */
+  .grid-diagram { background-image:
+    linear-gradient(to right, var(--rule) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  /* Form inputs */
+  .input { width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--card); border: 1px solid var(--rule-2); border-radius: 10px; font: 400 14px 'Inter', sans-serif; color: var(--ink); }
+  .input:focus { outline: none; border-color: var(--clay); box-shadow: 0 0 0 3px var(--clay-tint); }
+
+  /* Toggle switch */
+  .switch { position: relative; width: 38px; height: 22px; background: var(--rule-2); border-radius: 999px; cursor: pointer; transition: background .15s; flex-shrink: 0; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: left .18s; }
+  .switch.on { background: var(--clay); }
+  .switch.on::after { left: 18px; }
+
+  /* Drop cap */
+  .dropcap::first-letter {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 600;
+    font-size: 3.4em;
+    float: left;
+    line-height: .85;
+    margin: 6px 8px 0 0;
+    color: var(--clay);
+  }
+
+  /* Number columns */
+  .stat-num { font-family: 'Source Serif 4', Georgia, serif; font-weight: 500; font-size: 56px; line-height: 1; letter-spacing: -0.04em; color: var(--ink); }
+
+  /* Card */
+  .card-soft { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; }
+  .card-flat { background: var(--card); border: 1px solid var(--rule); }
+
+  /* Browser frame chrome */
+  .chrome {
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--rule-2);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font: 500 12px 'JetBrains Mono', monospace;
+    color: var(--ink-3);
+  }
+  .chrome .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .chrome .url { flex: 1; background: var(--card); border: 1px solid var(--rule); border-radius: 999px; padding: 6px 14px; }
+
+  /* Tab bar */
+  .tab { padding: 14px 4px; font: 500 13px 'Inter'; color: var(--ink-3); border-bottom: 2px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .tab.active { color: var(--ink); border-bottom-color: var(--clay); }
+  .tab .glyph { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-4); letter-spacing: 0; }
+  .tab.active .glyph { color: var(--clay); }
+
+  /* Quiz card layered look */
+  .stack-shadow { box-shadow:
+    0 0 0 1px var(--rule),
+    8px 8px 0 -1px var(--paper-2),
+    8px 8px 0 0 var(--rule),
+    16px 16px 0 -1px var(--paper-2),
+    16px 16px 0 0 var(--rule);
+  }
+
+  /* Diagrammatic cell */
+  .cell {
+    border: 1px solid var(--rule-2);
+    background: var(--card);
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .cell.filled { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .cell.clay   { background: var(--clay); color: #FFF8F2; border-color: var(--clay); }
+  .cell.tint   { background: var(--clay-wash); border-color: var(--clay-tint); color: var(--clay-deep); }
+
+  /* Underline links */
+  .ulink { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--ink-3); padding-bottom: 1px; }
+  .ulink:hover { border-bottom-color: var(--clay); color: var(--clay-deep); }
+
+  /* Data table */
+  .dtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dtable th { text-align: left; font: 500 11px 'JetBrains Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+  .dtable td { padding: 12px 12px; border-bottom: 1px solid var(--rule); color: var(--ink-2); vertical-align: middle; }
+  .dtable tr:last-child td { border-bottom: none; }
+  .dtable tr:hover td { background: var(--paper-2); }
+
+  /* progress bar */
+  .bar { height: 4px; background: var(--rule); border-radius: 999px; overflow: hidden; }
+  .bar > i { display:block; height:100%; background: var(--clay); }
+
+  /* Scroll containers in artboards do NOT auto-scroll; sized to content */
+
+  /* Sparkline-ish bars */
+  .barchart { display: flex; align-items: flex-end; gap: 3px; height: 56px; }
+  .barchart > i { display: block; width: 8px; background: var(--ink); border-radius: 1px; }
+  .barchart > i.accent { background: var(--clay); }
+  .barchart > i.muted  { background: var(--rule-2); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+/* ---------- shared atoms ---------- */
+function Eyebrow({ children, num }) {
+  return <div style={{display:'flex', alignItems:'baseline', gap:10}}>
+    {num && <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>{num}</span>}
+    <span className="eyebrow">{children}</span>
+  </div>;
+}
+
+function Pill({ children, tone='default' }) {
+  const cls = tone==='clay' ? 'pill pill-clay' : tone==='moss' ? 'pill pill-moss' : tone==='ink' ? 'pill pill-ink' : 'pill';
+  return <span className={cls}>{children}</span>;
+}
+
+function Switch({ on }) {
+  return <div className={'switch' + (on ? ' on' : '')} />;
+}
+
+function SectionHeader({ kicker, title, sub, action }) {
+  return (
+    <div style={{display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24, paddingBottom:18, borderBottom:'1px solid var(--rule)'}}>
+      <div>
+        <Eyebrow>{kicker}</Eyebrow>
+        <h2 className="display" style={{fontSize:42, margin:'10px 0 6px', maxWidth:560}}>{title}</h2>
+        {sub && <p style={{margin:0, color:'var(--ink-3)', fontSize:14, maxWidth:520}}>{sub}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* THEME / TYPE SPECIMEN                                           */
+/* ============================================================== */
+function ThemeSpecimen() {
+  return (
+    <div style={{padding:'48px 56px', width:1320, background:'var(--paper)'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:28}}>
+        <div>
+          <Eyebrow num="01">Theme · Editorial Foundations</Eyebrow>
+          <h1 className="display" style={{fontSize:88, margin:'12px 0 0', lineHeight:.95}}>Scroll <span style={{fontStyle:'italic', color:'var(--clay)'}}>Learn</span>,<br/>after the redesign.</h1>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>VOL. 02 · ISSUE 04</div>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>APR 27, 2026</div>
+        </div>
+      </div>
+
+      <hr className="rule-thick" />
+
+      {/* Three column foundations */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:0, marginTop:32}}>
+        {/* Palette */}
+        <div style={{paddingRight:32, borderRight:'1px solid var(--rule)'}}>
+          <Eyebrow num="A">Palette</Eyebrow>
+          <h3 className="serif" style={{fontSize:22, margin:'10px 0 18px'}}>Warm paper, clay accent.</h3>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+            {[
+              ['#F5F1EB','Paper','--paper'],
+              ['#EFE9DF','Paper 02','--paper-2'],
+              ['#FBF8F2','Card','--card'],
+              ['#1F1B16','Ink','--ink'],
+              ['#6B6157','Ink 03','--ink-3'],
+              ['#C96442','Clay','--clay'],
+              ['#A84E30','Clay deep','--clay-deep'],
+              ['#F6E6DC','Clay wash','--clay-wash'],
+              ['#6E7B5C','Moss','--moss'],
+              ['#B8923A','Gold','--gold'],
+            ].map(([hex,name,tok])=>(
+              <div key={hex} style={{border:'1px solid var(--rule)', background:'var(--card)'}}>
+                <div style={{height:48, background:hex, borderBottom:'1px solid var(--rule)'}}/>
+                <div style={{padding:'8px 10px'}}>
+                  <div style={{fontSize:12, fontWeight:600}}>{name}</div>
+                  <div className="mono" style={{fontSize:10, color:'var(--ink-3)'}}>{hex}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Type */}
+        <div style={{padding:'0 32px', borderRight:'1px solid var(--rule)'}}>
+          <Eyebrow num="B">Type</Eyebrow>
+          <h3 className="serif" style={{fontSize:22, margin:'10px 0 18px'}}>Serif display, sans body.</h3>
+          <div style={{borderTop:'1px solid var(--rule)'}}>
+            <div style={{padding:'14px 0', borderBottom:'1px solid var(--rule)'}}>
+              <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginBottom:4}}>SOURCE SERIF 4 · 56 / 0.96</div>
+              <div className="display" style={{fontSize:48}}>Learn while you scroll.</div>
+            </div>
+            <div style={{padding:'14px 0', borderBottom:'1px solid var(--rule)'}}>
+              <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginBottom:4}}>SOURCE SERIF 4 · 24 / 1.3</div>
+              <div className="serif" style={{fontSize:22, color:'var(--ink-2)'}}>Spaced repetition for the doomscroll era.</div>
+            </div>
+            <div style={{padding:'14px 0', borderBottom:'1px solid var(--rule)'}}>
+              <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginBottom:4}}>INTER · 14 / 1.6</div>
+              <div style={{fontSize:14, color:'var(--ink-2)', lineHeight:1.6}}>Body copy uses Inter for clarity at small sizes. Dense settings, deck lists, and form fields stay legible without competing with display type.</div>
+            </div>
+            <div style={{padding:'14px 0'}}>
+              <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginBottom:4}}>JETBRAINS MONO · 11 / TRACKED</div>
+              <div className="mono" style={{fontSize:11, letterSpacing:'.14em', textTransform:'uppercase', color:'var(--ink-3)'}}>02 · DECKS · 14 DUE TODAY</div>
+            </div>
+          </div>
+        </div>
+
+        {/* System */}
+        <div style={{paddingLeft:32}}>
+          <Eyebrow num="C">System</Eyebrow>
+          <h3 className="serif" style={{fontSize:22, margin:'10px 0 18px'}}>Components &amp; rhythm.</h3>
+          <div style={{display:'flex', gap:8, flexWrap:'wrap', marginBottom:16}}>
+            <button className="btn btn-clay">Begin study</button>
+            <button className="btn btn-ghost">Manage decks</button>
+            <button className="btn btn-dark">Import →</button>
+          </div>
+          <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:18}}>
+            <Pill tone="clay">14 due</Pill>
+            <Pill tone="moss">retained</Pill>
+            <Pill tone="ink">ACTIVE</Pill>
+            <Pill>cloze</Pill>
+            <Pill>mcq</Pill>
+          </div>
+          <div className="ascii" style={{background:'var(--card)', border:'1px solid var(--rule)', padding:14, fontSize:11, lineHeight:1.55}}>
+{`┌─ LAYER CAKE ─────────────────────┐
+│  L4  CONTENT  · injected quiz    │
+│  L3  SCHEDULER · sm-2 algorithm  │
+│  L2  STORAGE  · chrome.storage   │
+│  L1  POPUP    · quick controls   │
+│  L0  PAPER    · the surface      │
+└──────────────────────────────────┘`}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* DASHBOARD — DECKS                                               */
+/* ============================================================== */
+function DashChrome({ activeTab='decks' }) {
+  const tabs = [
+    ['study','Study','01'],
+    ['decks','Decks','02'],
+    ['notes','Notes','03'],
+    ['import','Import','04'],
+    ['settings','Settings','05'],
+    ['stats','Statistics','06'],
+  ];
+  return (
+    <>
+      <div className="chrome">
+        <span className="dot" style={{background:'#E8B4A0'}}/>
+        <span className="dot" style={{background:'#E8D8A0'}}/>
+        <span className="dot" style={{background:'#A8C9A0'}}/>
+        <span className="url">chrome-extension://scrolllearn/dashboard#{activeTab}</span>
+        <span style={{color:'var(--ink-4)'}}>v 0.4.2</span>
+      </div>
+      <header style={{padding:'40px 56px 0', display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom:'1px solid var(--rule)'}}>
+        <div>
+          <div style={{display:'flex', alignItems:'center', gap:14, marginBottom:18}}>
+            <div style={{width:46, height:46, background:'var(--ink)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--paper)', fontFamily:'Source Serif 4', fontSize:24, fontWeight:600}}>S</div>
+            <div>
+              <div className="mono" style={{fontSize:11, color:'var(--ink-3)', letterSpacing:'.14em'}}>SCROLL · LEARN</div>
+              <div className="display" style={{fontSize:34, marginTop:2}}>The quiet feed.</div>
+            </div>
+          </div>
+        </div>
+        <div style={{textAlign:'right', paddingTop:8}}>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>SIGNED IN · TASS</div>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-4)', marginTop:2}}>14 DUE · STREAK 23</div>
+          <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:10}}>
+            <button className="btn btn-ghost" style={{padding:'6px 12px', fontSize:12}}>Sync</button>
+            <button className="btn btn-clay" style={{padding:'6px 14px', fontSize:12}}>Begin study →</button>
+          </div>
+        </div>
+      </header>
+
+      <nav style={{padding:'0 56px', display:'flex', gap:36, borderBottom:'1px solid var(--rule)'}}>
+        {tabs.map(([id,label,num])=>(
+          <div key={id} className={'tab' + (activeTab===id ? ' active':'')}>
+            <span className="glyph">{num}</span>
+            <span>{label}</span>
+          </div>
+        ))}
+      </nav>
+    </>
+  );
+}
+
+function DashboardDecks() {
+  const decks = [
+    { name:'Spanish, Volume I', desc:'Common words, B1 grammar, irregular verbs', cards:184, due:14, active:true, retention:.92, tag:'lang' },
+    { name:'JavaScript Fundamentals', desc:'Closures, prototypes, async, type coercion', cards:96, due:8, active:false, retention:.84, tag:'eng' },
+    { name:'World Capitals', desc:'Sovereign states &amp; territories', cards:212, due:0, active:false, retention:.78, tag:'geo' },
+    { name:'Grammar Police · Apr', desc:'Articles · prepositions · word choice', cards:112, due:23, active:false, retention:.71, tag:'lang' },
+  ];
+  return (
+    <div style={{width:1320, background:'var(--paper)'}}>
+      <DashChrome activeTab="decks"/>
+
+      <main style={{padding:'40px 56px 56px'}}>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 320px', gap:48}}>
+          <div>
+            <SectionHeader
+              kicker="02 · Decks"
+              title={<>Four decks. <span style={{fontStyle:'italic', color:'var(--clay)'}}>Forty&#8209;five</span> due across them.</>}
+              sub="Each deck is a small library. Pick one to make active, or let the scheduler choose what is most overdue."
+              action={<button className="btn btn-clay">＋ New deck</button>}
+            />
+
+            <table className="dtable" style={{marginTop:24}}>
+              <thead>
+                <tr>
+                  <th style={{width:36}}>№</th>
+                  <th>Deck</th>
+                  <th style={{width:110}}>Cards</th>
+                  <th style={{width:110}}>Due</th>
+                  <th style={{width:160}}>Retention</th>
+                  <th style={{width:120}}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {decks.map((d,i)=>(
+                  <tr key={d.name}>
+                    <td className="mono" style={{color:'var(--ink-4)'}}>{String(i+1).padStart(2,'0')}</td>
+                    <td>
+                      <div style={{display:'flex', alignItems:'baseline', gap:10}}>
+                        <span className="serif" style={{fontSize:18, fontWeight:600}}>{d.name}</span>
+                        {d.active && <Pill tone="ink">active</Pill>}
+                      </div>
+                      <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:3}} dangerouslySetInnerHTML={{__html:d.desc}}/>
+                    </td>
+                    <td className="mono" style={{fontSize:14}}>{d.cards}</td>
+                    <td>
+                      {d.due>0
+                        ? <span className="serif" style={{fontSize:18, color:'var(--clay-deep)', fontWeight:600}}>{d.due}</span>
+                        : <span className="mono" style={{color:'var(--ink-4)', fontSize:12}}>— none</span>}
+                    </td>
+                    <td>
+                      <div style={{display:'flex', alignItems:'center', gap:10}}>
+                        <div className="bar" style={{flex:1}}><i style={{width: (d.retention*100)+'%'}}/></div>
+                        <span className="mono" style={{fontSize:12, color:'var(--ink-3)'}}>{Math.round(d.retention*100)}%</span>
+                      </div>
+                    </td>
+                    <td style={{textAlign:'right'}}>
+                      <a className="ulink" style={{fontSize:12, marginRight:14}}>open</a>
+                      <a className="ulink" style={{fontSize:12, color:'var(--ink-3)'}}>···</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Expanded deck — diagrammatic */}
+            <div style={{marginTop:48}}>
+              <Eyebrow num="02·A">Spanish, Volume I — expanded</Eyebrow>
+              <div className="card-flat" style={{marginTop:14, padding:'28px 32px'}}>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', borderTop:'1px solid var(--rule)', borderBottom:'1px solid var(--rule)'}}>
+                  {[
+                    ['Cards','184'],
+                    ['Due now','14'],
+                    ['New','22'],
+                    ['Avg ease','2.4'],
+                  ].map(([k,v])=>(
+                    <div key={k} style={{padding:'18px 0', borderRight:'1px solid var(--rule)'}}>
+                      <div className="eyebrow">{k}</div>
+                      <div className="display" style={{fontSize:38, marginTop:6}}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Card composition — ASCII layer cake */}
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:32, marginTop:28}}>
+                  <div>
+                    <Eyebrow>Card mix</Eyebrow>
+                    <pre className="ascii" style={{margin:'10px 0 0', fontSize:12}}>
+{`┌──────────────────────────────────────┐
+│ TEXT      ████████████████░░░░░  62  │
+│ MCQ-ONE   █████████░░░░░░░░░░░░  48  │
+│ MCQ-MULTI ████░░░░░░░░░░░░░░░░░  22  │
+│ CLOZE     ████████░░░░░░░░░░░░░  40  │
+│ AUDIO     ██░░░░░░░░░░░░░░░░░░░  12  │
+└──────────────────────────────────────┘`}
+                    </pre>
+                  </div>
+                  <div>
+                    <Eyebrow>14-day forecast</Eyebrow>
+                    <div className="barchart" style={{marginTop:14}}>
+                      {[14,18,9,22,12,7,11,16,14,18,8,21,10,13].map((h,i)=>(
+                        <i key={i} style={{height:(h*2)+'px'}} className={i===0?'accent':''}/>
+                      ))}
+                    </div>
+                    <div style={{display:'flex', justifyContent:'space-between', marginTop:6}}>
+                      <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>TODAY</span>
+                      <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>+14d</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent cards table */}
+                <div style={{marginTop:30}}>
+                  <Eyebrow>Recent cards</Eyebrow>
+                  <table className="dtable" style={{marginTop:10}}>
+                    <thead>
+                      <tr>
+                        <th style={{width:90}}>Type</th>
+                        <th>Front</th>
+                        <th>Back</th>
+                        <th style={{width:90}}>Due</th>
+                        <th style={{width:60}}>Ease</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td><Pill>cloze</Pill></td><td>Yo ___ a la tienda ayer.</td><td>fui</td><td className="mono" style={{color:'var(--clay-deep)'}}>now</td><td className="mono">2.5</td></tr>
+                      <tr><td><Pill>text</Pill></td><td>"to remember" (verb)</td><td>recordar</td><td className="mono">2 hr</td><td className="mono">2.6</td></tr>
+                      <tr><td><Pill>mcq</Pill></td><td>The polite "you" form is —</td><td>usted</td><td className="mono">1 d</td><td className="mono">2.3</td></tr>
+                      <tr><td><Pill>cloze</Pill></td><td>Si yo ___ rico, viajaría.</td><td>fuera</td><td className="mono">3 d</td><td className="mono">1.9</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right rail */}
+          <aside>
+            <Eyebrow num="A">Today</Eyebrow>
+            <div className="card-flat" style={{padding:24, marginTop:12}}>
+              <div className="display" style={{fontSize:64, lineHeight:.95}}>14</div>
+              <div className="serif" style={{fontSize:16, color:'var(--ink-2)', marginTop:6}}>cards due across all decks</div>
+              <hr className="rule" style={{margin:'18px 0'}}/>
+              <div style={{display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:8}}>
+                <span style={{color:'var(--ink-3)'}}>Reviewed today</span>
+                <span className="mono">26 / 40</span>
+              </div>
+              <div className="bar"><i style={{width:'65%'}}/></div>
+              <button className="btn btn-clay" style={{width:'100%', justifyContent:'center', marginTop:18}}>Begin a session →</button>
+            </div>
+
+            <Eyebrow num="B" >Active deck</Eyebrow>
+            <div className="card-flat" style={{padding:18, marginTop:12}}>
+              <div className="serif" style={{fontSize:18, fontWeight:600}}>Spanish, Volume I</div>
+              <div style={{fontSize:12.5, color:'var(--ink-3)', marginTop:2}}>Auto-selected · most overdue</div>
+              <div style={{display:'flex', gap:6, marginTop:12, flexWrap:'wrap'}}>
+                <Pill tone="clay">14 due</Pill>
+                <Pill>184 cards</Pill>
+              </div>
+            </div>
+
+            <Eyebrow num="C">Streak</Eyebrow>
+            <div className="card-flat" style={{padding:18, marginTop:12}}>
+              <div style={{display:'flex', alignItems:'baseline', gap:10}}>
+                <div className="display" style={{fontSize:42}}>23</div>
+                <div className="serif" style={{fontSize:14, color:'var(--ink-3)'}}>days in a row</div>
+              </div>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(14, 1fr)', gap:3, marginTop:12}}>
+                {Array.from({length:28}).map((_,i)=>(
+                  <div key={i} style={{aspectRatio:'1', background: i<23 ? 'var(--clay)' : i<25 ? 'var(--clay-tint)' : 'var(--rule)', borderRadius:2}}/>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* DASHBOARD — STATS                                               */
+/* ============================================================== */
+function DashboardStats() {
+  return (
+    <div style={{width:1320, background:'var(--paper)'}}>
+      <DashChrome activeTab="stats"/>
+      <main style={{padding:'40px 56px 56px'}}>
+        <SectionHeader
+          kicker="06 · Statistics"
+          title={<>A reading of <span style={{fontStyle:'italic', color:'var(--clay)'}}>2,184</span> reviews across the season.</>}
+          sub="A monthly ledger of how knowledge accrues. No leaderboards, no streak shaming."
+          action={<div style={{display:'flex', gap:8}}><button className="btn btn-ghost">Apr</button><button className="btn btn-ghost">Quarter</button><button className="btn btn-dark">All-time</button></div>}
+        />
+
+        {/* Big numbers */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', borderTop:'1px solid var(--rule)', borderBottom:'1px solid var(--rule)', marginTop:24}}>
+          {[
+            ['Total cards','604','+18 this week'],
+            ['Reviews','2,184','89% accuracy'],
+            ['Streak','23 d','best · 41 d'],
+            ['Retention','82%','↑ 4 pts vs Mar'],
+          ].map(([k,v,s],i)=>(
+            <div key={k} style={{padding:'24px 24px 24px 0', borderRight: i<3?'1px solid var(--rule)':'none', paddingLeft: i>0 ? 24 : 0}}>
+              <Eyebrow>{k}</Eyebrow>
+              <div className="stat-num" style={{marginTop:8}}>{v}</div>
+              <div style={{fontSize:12, color:'var(--ink-3)', marginTop:6}}>{s}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Two-up: review history + retention by deck */}
+        <div style={{display:'grid', gridTemplateColumns:'1.3fr 1fr', gap:48, marginTop:40}}>
+          <div>
+            <Eyebrow num="A">Review history · 30 days</Eyebrow>
+            <div className="card-flat" style={{padding:24, marginTop:12}}>
+              <div style={{display:'flex', alignItems:'flex-end', gap:4, height:200}}>
+                {[18,22,14,28,32,12,40,36,28,44,30,22,18,26,38,42,30,48,36,28,52,40,30,44,38,32,46,40,28,52].map((h,i)=>(
+                  <div key={i} style={{flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', height:'100%'}}>
+                    <div style={{height:(h*3)+'px', background: i===29?'var(--clay)':'var(--ink)', borderRadius:'2px 2px 0 0'}}/>
+                  </div>
+                ))}
+              </div>
+              <hr className="rule" style={{margin:'10px 0'}}/>
+              <div style={{display:'flex', justifyContent:'space-between'}}>
+                <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>MAR 28</span>
+                <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>APR 12</span>
+                <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>APR 27</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Eyebrow num="B">Retention by deck</Eyebrow>
+            <div className="card-flat" style={{padding:'8px 24px', marginTop:12}}>
+              {[
+                ['Spanish, Volume I',92],
+                ['JS Fundamentals',84],
+                ['World Capitals',78],
+                ['Grammar Police · Apr',71],
+                ['React Concepts',88],
+              ].map(([n,p])=>(
+                <div key={n} style={{padding:'14px 0', borderBottom:'1px solid var(--rule)'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:6}}>
+                    <span className="serif" style={{fontSize:15}}>{n}</span>
+                    <span className="mono" style={{fontSize:13}}>{p}%</span>
+                  </div>
+                  <div className="bar"><i style={{width:p+'%', background: p>85 ? 'var(--moss)' : p>75 ? 'var(--clay)' : 'var(--gold)'}}/></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Heatmap */}
+        <div style={{marginTop:40}}>
+          <Eyebrow num="C">A year of reviewing — annual heat map</Eyebrow>
+          <div className="card-flat" style={{padding:24, marginTop:12, overflow:'hidden'}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(52, 1fr)', gap:3}}>
+              {Array.from({length: 52*7}).map((_,i)=>{
+                const intensities = [0,0,0,0,1,0,2,0,1,3,2,4,1,0,2,3,4,3,2,1,0,3,4,2,1,3,4];
+                const v = intensities[i % intensities.length];
+                const colors = ['var(--rule)','var(--clay-tint)','#E8B89A','#D88660','var(--clay)'];
+                return <div key={i} style={{aspectRatio:'1', background: colors[v], borderRadius:1}}/>;
+              })}
+            </div>
+            <div style={{display:'flex', justifyContent:'space-between', marginTop:14, alignItems:'center'}}>
+              <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>MAY ’25</span>
+              <div style={{display:'flex', alignItems:'center', gap:6}}>
+                <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>LESS</span>
+                {['var(--rule)','var(--clay-tint)','#E8B89A','#D88660','var(--clay)'].map(c=>(
+                  <div key={c} style={{width:10, height:10, background:c, borderRadius:1}}/>
+                ))}
+                <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>MORE</span>
+              </div>
+              <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>APR ’26</span>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* DASHBOARD — IMPORT                                              */
+/* ============================================================== */
+function DashboardImport() {
+  return (
+    <div style={{width:1320, background:'var(--paper)'}}>
+      <DashChrome activeTab="import"/>
+      <main style={{padding:'40px 56px 56px'}}>
+        <SectionHeader
+          kicker="04 · Import"
+          title={<>Bring in cards from <span style={{fontStyle:'italic', color:'var(--clay)'}}>plaintext</span>, CSV, or JSON.</>}
+          sub="Three formats, one preview. Paste below, choose a target deck, and inspect before committing."
+        />
+
+        <div style={{display:'grid', gridTemplateColumns:'1.1fr 1fr', gap:40, marginTop:32}}>
+          {/* Editor side */}
+          <div>
+            <Eyebrow num="A">Source</Eyebrow>
+            <div style={{display:'flex', gap:0, marginTop:10, borderBottom:'1px solid var(--rule)'}}>
+              {['Simple','CSV','JSON','Quizlet'].map((f,i)=>(
+                <div key={f} style={{padding:'10px 18px', fontSize:13, fontWeight:500, color:i===0?'var(--ink)':'var(--ink-3)', borderBottom: i===0?'2px solid var(--clay)':'2px solid transparent', marginBottom:-1, cursor:'pointer'}}>{f}</div>
+              ))}
+            </div>
+            <div className="card-flat" style={{borderTop:'none', borderTopLeftRadius:0, borderTopRightRadius:0}}>
+              <pre className="mono" style={{margin:0, padding:'20px 22px', fontSize:13, lineHeight:1.7, color:'var(--ink-2)'}}>
+{`[deck:Spanish, Volume I]
+Hola|Hello
+¿Cómo estás?|How are you?
+Capital of Spain?|Madrid|Barcelona|Lisbon|Paris
+Yo ___ a la tienda.|fui   {cloze}
+The polite "you" form|usted   {mcq}`}
+              </pre>
+              <div style={{padding:'12px 22px', borderTop:'1px solid var(--rule)', display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--paper-2)'}}>
+                <span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>6 LINES · 5 CARDS DETECTED</span>
+                <div style={{display:'flex', gap:8}}>
+                  <button className="btn btn-ghost" style={{padding:'6px 12px', fontSize:12}}>Paste</button>
+                  <button className="btn btn-ghost" style={{padding:'6px 12px', fontSize:12}}>Upload .txt</button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{marginTop:24}}>
+              <Eyebrow num="B">Target deck</Eyebrow>
+              <div style={{display:'flex', gap:10, marginTop:10, alignItems:'center'}}>
+                <select className="input" style={{flex:1}}>
+                  <option>Spanish, Volume I  ·  184 cards</option>
+                  <option>JavaScript Fundamentals · 96 cards</option>
+                </select>
+                <button className="btn btn-ghost">＋ New deck</button>
+              </div>
+            </div>
+
+            <div style={{marginTop:24, display:'flex', gap:10}}>
+              <button className="btn btn-clay">Import 5 cards →</button>
+              <button className="btn btn-ghost">Cancel</button>
+            </div>
+          </div>
+
+          {/* Preview side */}
+          <div>
+            <Eyebrow num="C">Preview · 5 cards</Eyebrow>
+            <table className="dtable" style={{marginTop:10}}>
+              <thead><tr><th>#</th><th>Type</th><th>Front</th><th>Back</th></tr></thead>
+              <tbody>
+                <tr><td className="mono" style={{color:'var(--ink-4)'}}>01</td><td><Pill>text</Pill></td><td>Hola</td><td className="serif">Hello</td></tr>
+                <tr><td className="mono" style={{color:'var(--ink-4)'}}>02</td><td><Pill>text</Pill></td><td>¿Cómo estás?</td><td className="serif">How are you?</td></tr>
+                <tr><td className="mono" style={{color:'var(--ink-4)'}}>03</td><td><Pill>mcq</Pill></td><td>Capital of Spain?</td><td className="serif">Madrid</td></tr>
+                <tr><td className="mono" style={{color:'var(--ink-4)'}}>04</td><td><Pill>cloze</Pill></td><td>Yo ___ a la tienda.</td><td className="serif">fui</td></tr>
+                <tr><td className="mono" style={{color:'var(--ink-4)'}}>05</td><td><Pill>mcq</Pill></td><td>Polite "you" form</td><td className="serif">usted</td></tr>
+              </tbody>
+            </table>
+
+            <div style={{marginTop:28}}>
+              <Eyebrow>Pipeline</Eyebrow>
+              <pre className="ascii" style={{marginTop:10, fontSize:11.5, lineHeight:1.55}}>
+{`  paste / upload
+        │
+        ▼
+  ┌───────────────┐    ┌───────────────┐
+  │   PARSER      │──▶ │  VALIDATOR    │
+  │   simple|csv  │    │  dedupe · fmt │
+  │   json|quzlt  │    │               │
+  └───────────────┘    └───────┬───────┘
+                               │
+                               ▼
+                       ┌───────────────┐
+                       │  TARGET DECK  │
+                       │  Spanish, Vol │
+                       └───────────────┘`}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* POPUP                                                           */
+/* ============================================================== */
+function ExtensionPopup() {
+  return (
+    <div style={{width:380, background:'var(--paper)', border:'1px solid var(--rule-2)', borderRadius:14, overflow:'hidden', boxShadow:'0 24px 60px -20px rgba(40,30,20,.25)'}}>
+      {/* Header */}
+      <div style={{padding:'20px 22px 16px', borderBottom:'1px solid var(--rule)', display:'flex', alignItems:'center', gap:12}}>
+        <div style={{width:36, height:36, background:'var(--ink)', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--paper)', fontFamily:'Source Serif 4', fontSize:18, fontWeight:600}}>S</div>
+        <div style={{flex:1}}>
+          <div className="serif" style={{fontSize:18, fontWeight:600, lineHeight:1}}>Scroll Learn</div>
+          <div style={{fontSize:11.5, color:'var(--ink-3)', marginTop:3}}>Learn while you scroll</div>
+        </div>
+        <div style={{width:8, height:8, background:'var(--moss)', borderRadius:'50%'}}/>
+      </div>
+
+      {/* Headline numbers */}
+      <div style={{padding:'18px 22px', display:'grid', gridTemplateColumns:'1fr 1fr', borderBottom:'1px solid var(--rule)'}}>
+        <div style={{borderRight:'1px solid var(--rule)', paddingRight:14}}>
+          <div className="display" style={{fontSize:46, lineHeight:.95}}>14</div>
+          <div className="eyebrow" style={{marginTop:4}}>Cards due</div>
+        </div>
+        <div style={{paddingLeft:14}}>
+          <div className="display" style={{fontSize:46, lineHeight:.95}}>23</div>
+          <div className="eyebrow" style={{marginTop:4}}>Day streak</div>
+        </div>
+      </div>
+
+      {/* Sub stats */}
+      <div style={{padding:'14px 22px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, borderBottom:'1px solid var(--rule)'}}>
+        <div>
+          <div className="eyebrow" style={{fontSize:10}}>Reviews</div>
+          <div className="serif" style={{fontSize:18, fontWeight:600}}>2,184</div>
+        </div>
+        <div>
+          <div className="eyebrow" style={{fontSize:10}}>Accuracy</div>
+          <div className="serif" style={{fontSize:18, fontWeight:600}}>89<span style={{color:'var(--ink-3)'}}>%</span></div>
+        </div>
+      </div>
+
+      {/* Site card */}
+      <div style={{padding:'18px 22px', borderBottom:'1px solid var(--rule)'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:12}}>
+          <Eyebrow>This site</Eyebrow>
+          <span className="mono" style={{fontSize:10.5, color:'var(--ink-4)'}}>youtube.com</span>
+        </div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <div className="serif" style={{fontSize:15, fontWeight:600}}>Quizzes enabled</div>
+            <div style={{fontSize:12, color:'var(--ink-3)'}}>Every 4 posts · pause 10 m</div>
+          </div>
+          <Switch on/>
+        </div>
+      </div>
+
+      {/* Active deck */}
+      <div style={{padding:'18px 22px', borderBottom:'1px solid var(--rule)'}}>
+        <Eyebrow>Active deck</Eyebrow>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:10, padding:'12px 14px', border:'1px solid var(--rule-2)', borderRadius:10, background:'var(--card)'}}>
+          <div>
+            <div className="serif" style={{fontSize:15, fontWeight:600}}>Spanish, Volume I</div>
+            <div style={{fontSize:11.5, color:'var(--ink-3)', marginTop:1}}>184 cards · 14 due</div>
+          </div>
+          <Pill tone="clay">14</Pill>
+        </div>
+      </div>
+
+      {/* Content blocking — diagrammatic */}
+      <div style={{padding:'18px 22px', borderBottom:'1px solid var(--rule)'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:10}}>
+          <Eyebrow>Hidden today</Eyebrow>
+          <span className="serif" style={{fontSize:15, fontWeight:600}}>27 <span className="mono" style={{fontSize:10, color:'var(--ink-3)', fontWeight:400}}>BLOCKED</span></span>
+        </div>
+        {/* mini grid breakdown */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:4, marginBottom:10}}>
+          {[
+            ['Reels',12, true],
+            ['Shorts',0, false],
+            ['Sponsored',8, true],
+            ['Suggested',4, true],
+            ['Strangers',3, true],
+          ].map(([l,n,on])=>(
+            <div key={l} style={{padding:'8px 6px', textAlign:'center', border:'1px solid var(--rule-2)', borderRadius:6, background: on?'var(--clay-wash)':'var(--card)'}}>
+              <div className="mono" style={{fontSize:9, color:'var(--ink-3)', textTransform:'uppercase', letterSpacing:'.06em'}}>{l}</div>
+              <div className="serif" style={{fontSize:16, fontWeight:600, color: on?'var(--clay-deep)':'var(--ink-4)', marginTop:2}}>{n}</div>
+            </div>
+          ))}
+        </div>
+        {[
+          ['Reels',true],
+          ['Sponsored',true],
+          ['Suggested',true],
+          ["Strangers' posts",false],
+        ].map(([l,on])=>(
+          <div key={l} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0'}}>
+            <span style={{fontSize:13, color:'var(--ink-2)'}}>{l}</span>
+            <Switch on={on}/>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div style={{padding:'14px 16px 16px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+        <button className="btn btn-clay" style={{justifyContent:'center'}}>Study now</button>
+        <button className="btn btn-ghost" style={{justifyContent:'center'}}>Dashboard →</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* QUIZ CARD (in-feed)                                             */
+/* ============================================================== */
+function QuizCard() {
+  return (
+    <div style={{width:520, position:'relative'}}>
+      {/* feed context above */}
+      <div style={{height:46, background:'var(--paper-2)', border:'1px solid var(--rule)', borderRadius:'10px 10px 0 0', display:'flex', alignItems:'center', padding:'0 16px', gap:10}}>
+        <div style={{width:24, height:24, background:'var(--rule-2)', borderRadius:'50%'}}/>
+        <div style={{flex:1, height:8, background:'var(--rule-2)', borderRadius:4}}/>
+        <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>POST 03</span>
+      </div>
+
+      {/* the card */}
+      <div className="stack-shadow" style={{background:'var(--card)', border:'1px solid var(--rule)', borderRadius:0, padding:'28px 32px 24px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:18}}>
+          <div>
+            <Eyebrow>Scroll Learn · injected</Eyebrow>
+            <div style={{display:'flex', gap:6, marginTop:8}}>
+              <Pill tone="ink">cloze</Pill>
+              <Pill>Spanish, Vol. I</Pill>
+              <Pill tone="clay">due now</Pill>
+            </div>
+          </div>
+          <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>14 / 14</span>
+        </div>
+
+        <div className="display" style={{fontSize:30, lineHeight:1.18, marginBottom:8}}>
+          Si yo <span style={{display:'inline-block', minWidth:120, borderBottom:'2px solid var(--clay)', color:'var(--clay)'}}>fuera</span> rico, viajaría por el mundo.
+        </div>
+        <div className="serif" style={{fontSize:14, color:'var(--ink-3)', fontStyle:'italic', marginBottom:24}}>
+          Imperfect subjunctive of <span className="mono" style={{fontStyle:'normal'}}>ser</span>, first person.
+        </div>
+
+        <input className="input" placeholder="Type the missing word…" defaultValue="fuera" style={{fontSize:18, padding:'14px 18px', fontFamily:'Source Serif 4', borderColor:'var(--clay)', boxShadow:'0 0 0 3px var(--clay-tint)'}}/>
+
+        {/* keyboard hints */}
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:20}}>
+          <div style={{display:'flex', gap:14, alignItems:'center'}}>
+            <span style={{display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--ink-3)'}}>
+              <kbd className="mono" style={{padding:'2px 7px', border:'1px solid var(--rule-2)', borderRadius:4, fontSize:10, background:'var(--paper-2)'}}>↵</kbd> submit
+            </span>
+            <span style={{display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--ink-3)'}}>
+              <kbd className="mono" style={{padding:'2px 7px', border:'1px solid var(--rule-2)', borderRadius:4, fontSize:10, background:'var(--paper-2)'}}>esc</kbd> skip
+            </span>
+          </div>
+          <div style={{display:'flex', gap:8}}>
+            <button className="btn btn-ghost" style={{padding:'6px 12px', fontSize:12}}>Pause 30 m</button>
+            <button className="btn btn-clay" style={{padding:'6px 14px', fontSize:12}}>Submit</button>
+          </div>
+        </div>
+
+        {/* SM-2 grading footer (after answer state hint) */}
+        <div style={{marginTop:18, paddingTop:14, borderTop:'1px solid var(--rule)'}}>
+          <div className="eyebrow" style={{marginBottom:10}}>After you submit · grade your recall</div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:6}}>
+            {[
+              ['Again','1 d','rose'],
+              ['Hard','3 d','gold'],
+              ['Good','7 d','clay'],
+              ['Easy','14 d','moss'],
+            ].map(([l,d,c])=>{
+              const colors = { rose:'var(--rose)', gold:'var(--gold)', clay:'var(--clay)', moss:'var(--moss)' };
+              return <div key={l} style={{padding:'10px 0', textAlign:'center', border:'1px solid var(--rule-2)', borderRadius:8, background:'var(--paper)'}}>
+                <div className="serif" style={{fontSize:14, fontWeight:600, color:colors[c]}}>{l}</div>
+                <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginTop:2}}>{d}</div>
+              </div>;
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* feed context below */}
+      <div style={{height:46, background:'var(--paper-2)', border:'1px solid var(--rule)', borderTop:'none', borderRadius:'0 0 10px 10px', display:'flex', alignItems:'center', padding:'0 16px', gap:10}}>
+        <div style={{width:24, height:24, background:'var(--rule-2)', borderRadius:'50%'}}/>
+        <div style={{flex:1, height:8, background:'var(--rule-2)', borderRadius:4}}/>
+        <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>POST 04</span>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* SETTINGS                                                        */
+/* ============================================================== */
+function DashboardSettings() {
+  // Unified row: label + hint stacked left, single consistent control on the right
+  const Row = ({label, hint, children, last}) => (
+    <div style={{display:'grid', gridTemplateColumns:'1fr 280px', gap:32, padding:'20px 0', borderBottom: last?'none':'1px solid var(--rule)', alignItems:'center'}}>
+      <div>
+        <div className="serif" style={{fontSize:16, fontWeight:600}}>{label}</div>
+        <div style={{fontSize:13, color:'var(--ink-3)', marginTop:3, lineHeight:1.45}}>{hint}</div>
+      </div>
+      <div style={{display:'flex', justifyContent:'flex-end'}}>{children}</div>
+    </div>
+  );
+
+  // Consistent stepper control for numbers
+  const Stepper = ({value, unit, min='—', max='—'}) => (
+    <div style={{display:'inline-flex', alignItems:'stretch', border:'1px solid var(--rule-2)', borderRadius:8, background:'var(--card)', overflow:'hidden'}}>
+      <button style={{width:36, border:'none', borderRight:'1px solid var(--rule-2)', background:'transparent', cursor:'pointer', color:'var(--ink-3)', fontSize:16}}>−</button>
+      <div style={{minWidth:80, padding:'8px 14px', display:'flex', alignItems:'baseline', justifyContent:'center', gap:4}}>
+        <span className="serif" style={{fontSize:18, fontWeight:600}}>{value}</span>
+        {unit && <span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>{unit}</span>}
+      </div>
+      <button style={{width:36, border:'none', borderLeft:'1px solid var(--rule-2)', background:'transparent', cursor:'pointer', color:'var(--ink-3)', fontSize:16}}>+</button>
+    </div>
+  );
+
+  // Consistent select control
+  const Select = ({value}) => (
+    <div style={{display:'inline-flex', alignItems:'center', gap:8, padding:'9px 14px', border:'1px solid var(--rule-2)', borderRadius:8, background:'var(--card)', minWidth:180, justifyContent:'space-between', cursor:'pointer'}}>
+      <span className="serif" style={{fontSize:14, fontWeight:500}}>{value}</span>
+      <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>▾</span>
+    </div>
+  );
+
+  // Consistent text-ish field
+  const Field = ({value, mono}) => (
+    <div style={{display:'inline-flex', alignItems:'center', padding:'9px 14px', border:'1px solid var(--rule-2)', borderRadius:8, background:'var(--card)', minWidth:200, justifyContent:'flex-end'}}>
+      <span className={mono?'mono':'serif'} style={{fontSize: mono?13:15, fontWeight:600, letterSpacing: mono?'.05em':'normal'}}>{value}</span>
+    </div>
+  );
+
+  // Consistent toggle row
+  const Toggle = ({on, label}) => (
+    <div style={{display:'inline-flex', alignItems:'center', gap:10, padding:'8px 14px 8px 16px', border:'1px solid var(--rule-2)', borderRadius:8, background:'var(--card)', minWidth:180, justifyContent:'space-between'}}>
+      <span className="mono" style={{fontSize:11, color: on?'var(--clay-deep)':'var(--ink-3)', letterSpacing:'.1em', textTransform:'uppercase'}}>{label || (on?'enabled':'disabled')}</span>
+      <Switch on={on}/>
+    </div>
+  );
+
+  // Slider (visual)
+  const Slider = ({pct, label}) => (
+    <div style={{display:'inline-flex', flexDirection:'column', gap:6, width:240, padding:'8px 14px', border:'1px solid var(--rule-2)', borderRadius:8, background:'var(--card)'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
+        <span className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.1em', textTransform:'uppercase'}}>{label}</span>
+        <span className="serif" style={{fontSize:15, fontWeight:600}}>{(pct/100).toFixed(2)}</span>
+      </div>
+      <div style={{position:'relative', height:4, background:'var(--rule)', borderRadius:999}}>
+        <div style={{position:'absolute', left:0, top:0, height:'100%', width:pct+'%', background:'var(--clay)', borderRadius:999}}/>
+        <div style={{position:'absolute', left:`calc(${pct}% - 7px)`, top:-5, width:14, height:14, borderRadius:'50%', background:'var(--card)', border:'2px solid var(--clay)'}}/>
+      </div>
+    </div>
+  );
+
+  // Per-site row with consistent toggle pills
+  const SiteToggle = ({on, dim}) => {
+    if (dim) return <span className="mono" style={{fontSize:11, color:'var(--ink-4)', letterSpacing:'.1em'}}>—</span>;
+    return <Switch on={on}/>;
+  };
+
+  return (
+    <div style={{width:1320, background:'var(--paper)'}}>
+      <DashChrome activeTab="settings"/>
+      <main style={{padding:'40px 56px 56px'}}>
+        <SectionHeader
+          kicker="05 · Settings"
+          title={<>Calibrate the <span style={{fontStyle:'italic', color:'var(--clay)'}}>quiet feed</span>.</>}
+          sub="What the feed hides, how often quizzes appear, how strict your grader is."
+          action={<div style={{display:'flex', gap:8}}><button className="btn btn-ghost">Reset to defaults</button><button className="btn btn-clay">Save changes</button></div>}
+        />
+
+        {/* === A · SITES & BLOCKING (now on top, full width) === */}
+        <div style={{marginTop:36}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:14}}>
+            <Eyebrow num="A">Sites &amp; blocking</Eyebrow>
+            <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>3 SITES · 27 BLOCKED TODAY</span>
+          </div>
+          <div className="card-flat" style={{borderRadius:0}}>
+            <table className="dtable">
+              <thead>
+                <tr>
+                  <th style={{paddingLeft:24}}>Site</th>
+                  <th style={{textAlign:'center'}}>Quizzes</th>
+                  <th style={{textAlign:'center'}}>Reels / Shorts</th>
+                  <th style={{textAlign:'center'}}>Sponsored</th>
+                  <th style={{textAlign:'center'}}>Suggested</th>
+                  <th style={{textAlign:'center', paddingRight:24}}>Strangers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['facebook.com',  'Reels · Sponsored · Suggested · Strangers',  [true,true,true,true,false]],
+                  ['instagram.com', 'Reels · Sponsored · Suggested · Strangers',  [true,true,false,true,true]],
+                  ['youtube.com',   'Shorts only',                                [true,true,'-','-','-']],
+                ].map(([site, sub, [q,a,b,c,d]])=>(
+                  <tr key={site}>
+                    <td style={{paddingLeft:24}}>
+                      <div className="serif" style={{fontWeight:600, fontSize:16}}>{site}</div>
+                      <div style={{fontSize:12, color:'var(--ink-3)', marginTop:2}}>{sub}</div>
+                    </td>
+                    <td style={{textAlign:'center'}}><div style={{display:'inline-block'}}><SiteToggle on={q}/></div></td>
+                    <td style={{textAlign:'center'}}><div style={{display:'inline-block'}}><SiteToggle on={a==='-'?false:a} dim={a==='-'}/></div></td>
+                    <td style={{textAlign:'center'}}><div style={{display:'inline-block'}}><SiteToggle on={b==='-'?false:b} dim={b==='-'}/></div></td>
+                    <td style={{textAlign:'center'}}><div style={{display:'inline-block'}}><SiteToggle on={c==='-'?false:c} dim={c==='-'}/></div></td>
+                    <td style={{textAlign:'center', paddingRight:24}}><div style={{display:'inline-block'}}><SiteToggle on={d==='-'?false:d} dim={d==='-'}/></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* === B · QUIZ BEHAVIOUR === */}
+        <div style={{marginTop:48}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:14}}>
+            <Eyebrow num="B">Quiz behaviour</Eyebrow>
+            <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>4 SETTINGS</span>
+          </div>
+          <div className="card-flat" style={{padding:'4px 28px'}}>
+            <Row label="Show after N posts" hint="Cards appear once you have scrolled past this many feed items.">
+              <Stepper value="4" unit="posts"/>
+            </Row>
+            <Row label="Pause after a card" hint="Cooldown before another quiz can appear on the same site.">
+              <Stepper value="10" unit="min"/>
+            </Row>
+            <Row label="Skip behaviour" hint="What happens when you press escape on a card.">
+              <Select value="Snooze 10 minutes"/>
+            </Row>
+            <Row label="Audio cards" hint="Use text-to-speech to play prompts for listening practice." last>
+              <Toggle on/>
+            </Row>
+          </div>
+        </div>
+
+        {/* === C · ANSWER MATCHING === */}
+        <div style={{marginTop:48}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:14}}>
+            <Eyebrow num="C">Answer matching</Eyebrow>
+            <span className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>3 SETTINGS</span>
+          </div>
+          <div className="card-flat" style={{padding:'4px 28px'}}>
+            <Row label="Case sensitive" hint={'"Madrid" vs "madrid" — do they count the same?'}>
+              <Toggle on={false}/>
+            </Row>
+            <Row label="Ignore characters" hint="Punctuation and accents stripped before comparison.">
+              <Field value=". , ¿ ? ¡ !" mono/>
+            </Row>
+            <Row label="Fuzzy threshold" hint="Higher means stricter — fewer typos forgiven." last>
+              <Slider pct={85} label="Levenshtein"/>
+            </Row>
+          </div>
+        </div>
+
+        {/* === D · PIPELINE diagram === */}
+        <div style={{marginTop:48}}>
+          <Eyebrow num="D">The pipeline</Eyebrow>
+          <div className="card-flat" style={{marginTop:14, padding:'24px 32px'}}>
+            <pre className="ascii" style={{margin:0, fontSize:12, lineHeight:1.55}}>
+{`scroll                  scroll
+  │                        │
+  ▼                        ▼
+┌──────┐  every 4    ┌──────────┐
+│ POST │ ───────────▶│  QUIZ    │
+└──────┘  posts      │  (cloze) │
+  │                  └────┬─────┘
+  ▼                       │
+ next                  graded ─▶ SM-2`}
+            </pre>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* LOGO EXPLORATIONS                                               */
+/* ============================================================== */
+
+/* Each "scroll" is a horizontal rule + curl — feed line as scroll bar */
+
+function LogoMark({ size=64, variant='A', tone='ink' }) {
+  // Variants: A=stacked-bars-curl, B=ess-scroll, C=open-book-S, D=ascii-S, E=monogram
+  const fg = tone==='paper' ? 'var(--paper)' : tone==='clay' ? 'var(--clay)' : 'var(--ink)';
+  const accent = tone==='paper' ? 'var(--clay)' : tone==='clay' ? 'var(--paper)' : 'var(--clay)';
+
+  if (variant==='A') {
+    // Three feed posts being rolled into a scroll
+    const s = size;
+    return (
+      <svg viewBox="0 0 64 64" width={s} height={s}>
+        {/* three "post" rules */}
+        <rect x="14" y="16" width="36" height="3" fill={fg}/>
+        <rect x="14" y="26" width="28" height="3" fill={fg}/>
+        <rect x="14" y="36" width="32" height="3" fill={fg}/>
+        {/* rolled curl on the right */}
+        <path d="M 50 12 Q 60 32 50 52" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round"/>
+        <circle cx="50" cy="46" r="3" fill={accent}/>
+      </svg>
+    );
+  }
+  if (variant==='B') {
+    // S as scroll — two curls
+    return (
+      <svg viewBox="0 0 64 64" width={size} height={size}>
+        <path d="M 46 18 Q 46 12 38 12 L 22 12 Q 14 12 14 20 Q 14 28 22 28 L 42 28 Q 50 28 50 36 Q 50 44 42 44 L 26 44 Q 18 44 18 50"
+              fill="none" stroke={fg} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="14" cy="20" r="2.5" fill={accent}/>
+        <circle cx="50" cy="36" r="2.5" fill={accent}/>
+      </svg>
+    );
+  }
+  if (variant==='C') {
+    // Open book / spread, with crease and clay underline
+    return (
+      <svg viewBox="0 0 64 64" width={size} height={size}>
+        <rect x="10" y="14" width="44" height="36" fill="none" stroke={fg} strokeWidth="2.5"/>
+        <line x1="32" y1="14" x2="32" y2="50" stroke={fg} strokeWidth="2"/>
+        <line x1="14" y1="22" x2="28" y2="22" stroke={fg} strokeWidth="1.5"/>
+        <line x1="14" y1="28" x2="28" y2="28" stroke={fg} strokeWidth="1.5"/>
+        <line x1="14" y1="34" x2="24" y2="34" stroke={fg} strokeWidth="1.5"/>
+        <line x1="36" y1="22" x2="50" y2="22" stroke={fg} strokeWidth="1.5"/>
+        <line x1="36" y1="28" x2="46" y2="28" stroke={fg} strokeWidth="1.5"/>
+        <line x1="36" y1="34" x2="50" y2="34" stroke={accent} strokeWidth="2.5"/>
+        <line x1="36" y1="40" x2="42" y2="40" stroke={fg} strokeWidth="1.5"/>
+      </svg>
+    );
+  }
+  if (variant==='D') {
+    // Stamp / monogram in a circle
+    return (
+      <svg viewBox="0 0 64 64" width={size} height={size}>
+        <circle cx="32" cy="32" r="26" fill="none" stroke={fg} strokeWidth="2"/>
+        <text x="32" y="40" textAnchor="middle" fontFamily="Source Serif 4, Georgia, serif" fontSize="30" fontWeight="600" fontStyle="italic" fill={fg}>S</text>
+        <circle cx="49" cy="20" r="3.2" fill={accent}/>
+      </svg>
+    );
+  }
+  // E — square block monogram (current dashboard chip)
+  return (
+    <svg viewBox="0 0 64 64" width={size} height={size}>
+      <rect x="6" y="6" width="52" height="52" rx="6" fill={fg}/>
+      <text x="32" y="44" textAnchor="middle" fontFamily="Source Serif 4, Georgia, serif" fontSize="34" fontWeight="600" fill={accent}>S</text>
+    </svg>
+  );
+}
+
+function Wordmark({ variant='A' }) {
+  if (variant==='A') {
+    return (
+      <div style={{display:'flex', alignItems:'baseline', gap:14}}>
+        <LogoMark size={56} variant="A"/>
+        <div style={{lineHeight:.95}}>
+          <div className="display" style={{fontSize:42, letterSpacing:'-0.03em'}}>Scroll<span style={{fontStyle:'italic', color:'var(--clay)'}}>Learn</span></div>
+          <div className="mono" style={{fontSize:10, letterSpacing:'.16em', color:'var(--ink-3)', marginTop:6}}>READ · RECALL · REPEAT</div>
+        </div>
+      </div>
+    );
+  }
+  if (variant==='B') {
+    return (
+      <div style={{textAlign:'center'}}>
+        <div className="display" style={{fontSize:60, letterSpacing:'-0.04em', lineHeight:.9}}>
+          Scroll
+          <span style={{display:'inline-block', width:14}}/>
+          <span style={{fontStyle:'italic', color:'var(--clay)'}}>Learn</span>
+        </div>
+        <div style={{marginTop:10, display:'flex', alignItems:'center', justifyContent:'center', gap:10}}>
+          <div style={{height:1, width:60, background:'var(--ink-3)'}}/>
+          <div className="mono" style={{fontSize:10, letterSpacing:'.18em', color:'var(--ink-3)'}}>EST · 2026</div>
+          <div style={{height:1, width:60, background:'var(--ink-3)'}}/>
+        </div>
+      </div>
+    );
+  }
+  // C — single-line lockup
+  return (
+    <div style={{display:'flex', alignItems:'center', gap:12}}>
+      <LogoMark size={36} variant="B"/>
+      <div className="serif" style={{fontSize:22, fontWeight:600}}>Scroll Learn</div>
+    </div>
+  );
+}
+
+function LogoExploration() {
+  return (
+    <div style={{padding:'48px 56px', width:1320, background:'var(--paper)'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:24}}>
+        <div>
+          <Eyebrow num="07">Identity · Logo Explorations</Eyebrow>
+          <h1 className="display" style={{fontSize:64, margin:'10px 0 0', lineHeight:.95}}>A mark for the <span style={{fontStyle:'italic', color:'var(--clay)'}}>quiet feed</span>.</h1>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>SHEET 07 OF 07</div>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-4)', marginTop:2}}>SCALE 1:1</div>
+        </div>
+      </div>
+      <hr className="rule-thick"/>
+
+      {/* PRIMARY LOCKUP */}
+      <div style={{marginTop:32}}>
+        <Eyebrow num="A">Primary lockup</Eyebrow>
+        <div style={{marginTop:14, padding:'56px 48px', background:'var(--card)', border:'1px solid var(--rule)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+          <Wordmark variant="A"/>
+          <div style={{textAlign:'right'}}>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.14em'}}>FEED LINES + CURL</div>
+            <div className="serif" style={{fontSize:14, color:'var(--ink-3)', marginTop:6, fontStyle:'italic', maxWidth:300}}>
+              Three posts pulled from the feed and rolled into a scroll. Clay terminus, ink rules.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* MARK GRID */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="B">Mark studies — five variants</Eyebrow>
+        <div style={{marginTop:14, display:'grid', gridTemplateColumns:'repeat(5, 1fr)', borderTop:'1px solid var(--rule)', borderBottom:'1px solid var(--rule)'}}>
+          {[
+            ['A','Feed scroll','Three rules + clay curl. The chosen primary mark.'],
+            ['B','Ribbon S','S as continuous scroll. Single weight, two clay terminals.'],
+            ['C','Open book','Editorial spread with a clay underline on the page.'],
+            ['D','Stamp','Italic S inside a thin rule. Letterhead-grade.'],
+            ['E','Block','Square block with serif S. The favicon / app icon.'],
+          ].map(([v,name,desc],i)=>(
+            <div key={v} style={{padding:'32px 18px', borderRight: i<4?'1px solid var(--rule)':'none', textAlign:'center'}}>
+              <div style={{height:96, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                <LogoMark size={72} variant={v}/>
+              </div>
+              <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginTop:14, letterSpacing:'.14em'}}>VARIANT · {v}</div>
+              <div className="serif" style={{fontSize:15, fontWeight:600, marginTop:4}}>{name}</div>
+              <div style={{fontSize:11.5, color:'var(--ink-3)', marginTop:4, lineHeight:1.4}}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* COLORWAYS */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="C">Colorways &amp; scale</Eyebrow>
+        <div style={{marginTop:14, display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12}}>
+          <div style={{padding:'40px 24px', background:'var(--paper)', border:'1px solid var(--rule)', textAlign:'center'}}>
+            <LogoMark size={64} variant="A" tone="ink"/>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-3)', marginTop:18, letterSpacing:'.14em'}}>INK ON PAPER</div>
+          </div>
+          <div style={{padding:'40px 24px', background:'var(--card)', border:'1px solid var(--rule)', textAlign:'center'}}>
+            <LogoMark size={64} variant="A" tone="clay"/>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-3)', marginTop:18, letterSpacing:'.14em'}}>CLAY ON CARD</div>
+          </div>
+          <div style={{padding:'40px 24px', background:'var(--ink)', border:'1px solid var(--ink)', textAlign:'center'}}>
+            <LogoMark size={64} variant="A" tone="paper"/>
+            <div className="mono" style={{fontSize:10, color:'var(--paper)', opacity:.7, marginTop:18, letterSpacing:'.14em'}}>PAPER ON INK</div>
+          </div>
+          <div style={{padding:'40px 24px', background:'var(--clay)', border:'1px solid var(--clay)', textAlign:'center'}}>
+            <LogoMark size={64} variant="A" tone="paper"/>
+            <div className="mono" style={{fontSize:10, color:'#FFF8F2', opacity:.85, marginTop:18, letterSpacing:'.14em'}}>PAPER ON CLAY</div>
+          </div>
+        </div>
+
+        {/* Scale ladder */}
+        <div style={{marginTop:24, padding:'28px 32px', background:'var(--card)', border:'1px solid var(--rule)', display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:24}}>
+          {[16,24,32,48,64,96,128].map(s=>(
+            <div key={s} style={{textAlign:'center'}}>
+              <div style={{height:128, display:'flex', alignItems:'flex-end', justifyContent:'center'}}>
+                <LogoMark size={s} variant="A"/>
+              </div>
+              <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginTop:8}}>{s}px</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* WORDMARK STUDIES */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="D">Wordmark studies</Eyebrow>
+        <div style={{marginTop:14, display:'grid', gridTemplateColumns:'1fr 1fr', gap:14}}>
+          <div style={{padding:'48px 36px', background:'var(--card)', border:'1px solid var(--rule)', minHeight:160, display:'flex', alignItems:'center', justifyContent:'center'}}>
+            <Wordmark variant="B"/>
+          </div>
+          <div style={{padding:'48px 36px', background:'var(--paper-2)', border:'1px solid var(--rule)', minHeight:160, display:'flex', alignItems:'center', justifyContent:'center'}}>
+            <Wordmark variant="C"/>
+          </div>
+        </div>
+      </div>
+
+      {/* CONSTRUCTION */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="E">Construction · primary mark</Eyebrow>
+        <div style={{marginTop:14, padding:'32px', background:'var(--card)', border:'1px solid var(--rule)', display:'grid', gridTemplateColumns:'auto 1fr', gap:48, alignItems:'center'}}>
+          <div style={{position:'relative', width:240, height:240, border:'1px solid var(--rule-2)', background:'var(--paper)'}} className="grid-diagram">
+            <svg viewBox="0 0 64 64" width="240" height="240" style={{position:'absolute', inset:0}}>
+              <rect x="14" y="16" width="36" height="3" fill="var(--ink)"/>
+              <rect x="14" y="26" width="28" height="3" fill="var(--ink)"/>
+              <rect x="14" y="36" width="32" height="3" fill="var(--ink)"/>
+              <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="var(--clay)" strokeWidth="3" strokeLinecap="round"/>
+              <circle cx="50" cy="46" r="3" fill="var(--clay)"/>
+              {/* construction guides */}
+              <line x1="14" y1="0" x2="14" y2="64" stroke="var(--clay)" strokeWidth=".3" strokeDasharray="1 1"/>
+              <line x1="50" y1="0" x2="50" y2="64" stroke="var(--clay)" strokeWidth=".3" strokeDasharray="1 1"/>
+              <line x1="0" y1="32" x2="64" y2="32" stroke="var(--clay)" strokeWidth=".3" strokeDasharray="1 1"/>
+            </svg>
+          </div>
+          <div>
+            <pre className="ascii" style={{margin:0, fontSize:12, lineHeight:1.55}}>
+{`GRID         · 64 × 64 unit canvas
+SAFE AREA    · 8 unit margin all sides
+RULE WEIGHT  · 3 units (3px @ 16px scale)
+RULE LENGTHS · 36 / 28 / 32 — feed asymmetry
+CURL RADIUS  · 22 units (Q control)
+TERMINAL     · 3-unit clay disc
+COLOR        · Ink #1F1B16  ·  Clay #C96442
+
+USE          · App icon, dashboard chip,
+               browser action, favicon, OG image.
+DON'T        · Recolor accent, rotate, distort,
+               place on saturated backgrounds.`}
+            </pre>
+          </div>
+        </div>
+      </div>
+
+      {/* APPLICATIONS */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="F">Applied</Eyebrow>
+        <div style={{marginTop:14, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14}}>
+          {/* Browser tab */}
+          <div style={{background:'var(--card)', border:'1px solid var(--rule)', padding:16}}>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.14em', marginBottom:12}}>BROWSER TAB</div>
+            <div style={{display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background:'var(--paper-2)', border:'1px solid var(--rule)', borderRadius:'6px 6px 0 0', maxWidth:240}}>
+              <LogoMark size={14} variant="A"/>
+              <span style={{fontSize:12, color:'var(--ink-2)'}}>Scroll Learn — Decks</span>
+              <span style={{marginLeft:'auto', color:'var(--ink-4)'}}>×</span>
+            </div>
+          </div>
+          {/* App icon */}
+          <div style={{background:'var(--card)', border:'1px solid var(--rule)', padding:24, textAlign:'center'}}>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.14em', marginBottom:14}}>APP ICON · 128</div>
+            <div style={{width:96, height:96, background:'var(--ink)', borderRadius:18, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'center'}}>
+              <svg viewBox="0 0 64 64" width="64" height="64">
+                <rect x="14" y="16" width="36" height="3" fill="var(--paper)"/>
+                <rect x="14" y="26" width="28" height="3" fill="var(--paper)"/>
+                <rect x="14" y="36" width="32" height="3" fill="var(--paper)"/>
+                <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="var(--clay)" strokeWidth="3" strokeLinecap="round"/>
+                <circle cx="50" cy="46" r="3" fill="var(--clay)"/>
+              </svg>
+            </div>
+          </div>
+          {/* Letterhead */}
+          <div style={{background:'var(--card)', border:'1px solid var(--rule)', padding:16}}>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.14em', marginBottom:12}}>LETTERHEAD</div>
+            <div style={{padding:'14px 16px', background:'var(--paper)', border:'1px solid var(--rule)'}}>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'2px solid var(--ink)', paddingBottom:8}}>
+                <Wordmark variant="C"/>
+                <span className="mono" style={{fontSize:9, color:'var(--ink-3)'}}>VOL.02 · APR ’26</span>
+              </div>
+              <div style={{height:6, background:'var(--rule)', marginTop:14, borderRadius:2}}/>
+              <div style={{height:6, background:'var(--rule)', marginTop:6, borderRadius:2, width:'80%'}}/>
+              <div style={{height:6, background:'var(--rule)', marginTop:6, borderRadius:2, width:'60%'}}/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* BILINGUAL — EN / VI                                             */
+/* ============================================================== */
+function BilingualSheet() {
+  return (
+    <div style={{padding:'48px 56px', width:1320, background:'var(--paper)'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:24}}>
+        <div>
+          <Eyebrow num="08">Bilingual · EN / VI</Eyebrow>
+          <h1 className="display" style={{fontSize:56, margin:'10px 0 0', lineHeight:1.05}}>One mark, <span style={{fontStyle:'italic', color:'var(--clay)'}}>two tongues</span>.</h1>
+          <p className="serif" style={{fontSize:16, color:'var(--ink-3)', maxWidth:560, marginTop:10}}>
+            The editorial system holds in Vietnamese — diacritics breathe at display sizes, the clay accent stays the same.
+          </p>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>SHEET 08 OF 08</div>
+          <div className="mono" style={{fontSize:11, color:'var(--ink-4)', marginTop:2}}>EN-US · VI-VN</div>
+        </div>
+      </div>
+      <hr className="rule-thick"/>
+
+      {/* SIDE-BY-SIDE LOCKUP */}
+      <div style={{marginTop:32, display:'grid', gridTemplateColumns:'1fr 1fr', gap:0, borderTop:'1px solid var(--rule)', borderBottom:'1px solid var(--rule)'}}>
+        <div style={{padding:'40px 36px', borderRight:'1px solid var(--rule)'}}>
+          <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.16em', marginBottom:14}}>EN · ENGLISH</div>
+          <div className="display" style={{fontSize:54, lineHeight:1.05}}>Learn while<br/>you <span style={{fontStyle:'italic', color:'var(--clay)'}}>scroll</span>.</div>
+          <div className="serif" style={{fontSize:15, color:'var(--ink-3)', marginTop:14, fontStyle:'italic', maxWidth:380}}>
+            Spaced repetition for the doomscroll era. Quizzes appear inside your feed, every fourth post.
+          </div>
+        </div>
+        <div style={{padding:'40px 36px'}}>
+          <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.16em', marginBottom:14}}>VI · TIẾNG VIỆT</div>
+          <div className="display" style={{fontSize:54, lineHeight:1.1}}>Học ngay khi<br/>bạn <span style={{fontStyle:'italic', color:'var(--clay)'}}>lướt</span>.</div>
+          <div className="serif" style={{fontSize:15, color:'var(--ink-3)', marginTop:14, fontStyle:'italic', maxWidth:380}}>
+            Ôn tập theo lịch khoa học, ngay giữa dòng tin của bạn. Mỗi bốn bài đăng, một thẻ học hiện ra.
+          </div>
+        </div>
+      </div>
+
+      {/* QUIZ CARDS */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="A">In-feed quiz · paired</Eyebrow>
+        <div style={{marginTop:14, display:'grid', gridTemplateColumns:'1fr 1fr', gap:24}}>
+
+          {/* EN: VI -> EN */}
+          <div style={{background:'var(--card)', border:'1px solid var(--rule)', padding:'28px 30px'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16}}>
+              <div>
+                <Eyebrow>VI → EN · translate</Eyebrow>
+                <div style={{display:'flex', gap:6, marginTop:8}}>
+                  <Pill tone="ink">text</Pill>
+                  <Pill>Vocabulary · Apr</Pill>
+                  <Pill tone="clay">due now</Pill>
+                </div>
+              </div>
+              <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>07 / 23</span>
+            </div>
+            <div style={{fontSize:13, color:'var(--ink-3)', marginBottom:8}}>Translate to English —</div>
+            <div className="display" style={{fontSize:32, lineHeight:1.2, marginBottom:8}}>
+              "Tôi sẽ <span style={{color:'var(--clay)'}}>triển khai</span> bản vá lên môi trường thật."
+            </div>
+            <div className="serif" style={{fontSize:13, color:'var(--ink-3)', fontStyle:'italic', marginBottom:20}}>
+              context · DevOps · CI/CD release
+            </div>
+            <input className="input" placeholder="Type your translation…" defaultValue="I will deploy the patch to production." style={{fontSize:16, padding:'12px 16px', fontFamily:'Source Serif 4', borderColor:'var(--clay)', boxShadow:'0 0 0 3px var(--clay-tint)'}}/>
+            <div style={{marginTop:14, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>↵ submit · esc skip</span>
+              <button className="btn btn-clay" style={{padding:'6px 14px', fontSize:12}}>Submit</button>
+            </div>
+          </div>
+
+          {/* VI: EN -> VI */}
+          <div style={{background:'var(--card)', border:'1px solid var(--rule)', padding:'28px 30px'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16}}>
+              <div>
+                <Eyebrow>EN → VI · dịch</Eyebrow>
+                <div style={{display:'flex', gap:6, marginTop:8}}>
+                  <Pill tone="ink">cloze</Pill>
+                  <Pill>Từ vựng · Tháng 4</Pill>
+                  <Pill tone="clay">đến hạn</Pill>
+                </div>
+              </div>
+              <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>08 / 23</span>
+            </div>
+            <div style={{fontSize:13, color:'var(--ink-3)', marginBottom:8}}>Điền từ còn thiếu —</div>
+            <div className="display" style={{fontSize:32, lineHeight:1.2, marginBottom:8}}>
+              "Hãy <span style={{display:'inline-block', minWidth:120, borderBottom:'2px solid var(--clay)', color:'var(--clay)'}}>xem xét</span> kỹ pull request trước khi duyệt."
+            </div>
+            <div className="serif" style={{fontSize:13, color:'var(--ink-3)', fontStyle:'italic', marginBottom:20}}>
+              EN · "review carefully before approving"
+            </div>
+            <input className="input" placeholder="Nhập từ còn thiếu…" defaultValue="xem xét" style={{fontSize:16, padding:'12px 16px', fontFamily:'Source Serif 4'}}/>
+            <div style={{marginTop:14, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>↵ gửi · esc bỏ qua</span>
+              <button className="btn btn-clay" style={{padding:'6px 14px', fontSize:12}}>Gửi</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DECK — VI vocabulary table */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="B">Deck · EN ↔ VI vocabulary (April, from Grammar Police)</Eyebrow>
+        <div style={{marginTop:14, background:'var(--card)', border:'1px solid var(--rule)'}}>
+          <div style={{padding:'20px 24px', borderBottom:'1px solid var(--rule)', display:'flex', justifyContent:'space-between', alignItems:'flex-end'}}>
+            <div>
+              <div className="serif" style={{fontSize:22, fontWeight:600}}>Từ vựng · Vocabulary, Apr ’26</div>
+              <div style={{fontSize:13, color:'var(--ink-3)', marginTop:2}}>Bidirectional EN ↔ VI · 112 cards · 23 due</div>
+            </div>
+            <div style={{display:'flex', gap:8}}>
+              <Pill>EN → VI</Pill>
+              <Pill>VI → EN</Pill>
+              <Pill tone="clay">23 đến hạn</Pill>
+            </div>
+          </div>
+          <table className="dtable">
+            <thead>
+              <tr>
+                <th style={{width:36}}>№</th>
+                <th>English</th>
+                <th>Tiếng Việt</th>
+                <th>Example · context</th>
+                <th style={{width:80}}>Type</th>
+                <th style={{width:80}}>Due</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="mono" style={{color:'var(--ink-4)'}}>01</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600}}>deploy</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600, color:'var(--clay-deep)'}}>triển khai</td>
+                <td style={{fontStyle:'italic', color:'var(--ink-3)'}}>"Triển khai bản vá lên môi trường thật."</td>
+                <td><Pill>text</Pill></td>
+                <td className="mono" style={{color:'var(--clay-deep)'}}>now</td>
+              </tr>
+              <tr>
+                <td className="mono" style={{color:'var(--ink-4)'}}>02</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600}}>review (v.)</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600, color:'var(--clay-deep)'}}>xem xét</td>
+                <td style={{fontStyle:'italic', color:'var(--ink-3)'}}>"Xem xét kỹ pull request trước khi duyệt."</td>
+                <td><Pill>cloze</Pill></td>
+                <td className="mono" style={{color:'var(--clay-deep)'}}>now</td>
+              </tr>
+              <tr>
+                <td className="mono" style={{color:'var(--ink-4)'}}>03</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600}}>rollback</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600, color:'var(--clay-deep)'}}>quay lui</td>
+                <td style={{fontStyle:'italic', color:'var(--ink-3)'}}>"Nếu lỗi nặng, hãy quay lui phiên bản trước."</td>
+                <td><Pill>text</Pill></td>
+                <td className="mono">2 hr</td>
+              </tr>
+              <tr>
+                <td className="mono" style={{color:'var(--ink-4)'}}>04</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600}}>merge conflict</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600, color:'var(--clay-deep)'}}>xung đột hợp nhất</td>
+                <td style={{fontStyle:'italic', color:'var(--ink-3)'}}>"Tôi đang giải quyết xung đột hợp nhất."</td>
+                <td><Pill>mcq</Pill></td>
+                <td className="mono">1 d</td>
+              </tr>
+              <tr>
+                <td className="mono" style={{color:'var(--ink-4)'}}>05</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600}}>staging</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600, color:'var(--clay-deep)'}}>môi trường thử nghiệm</td>
+                <td style={{fontStyle:'italic', color:'var(--ink-3)'}}>"Kiểm thử trên môi trường thử nghiệm trước."</td>
+                <td><Pill>text</Pill></td>
+                <td className="mono">3 d</td>
+              </tr>
+              <tr>
+                <td className="mono" style={{color:'var(--ink-4)'}}>06</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600}}>throughout</td>
+                <td className="serif" style={{fontSize:16, fontWeight:600, color:'var(--clay-deep)'}}>xuyên suốt</td>
+                <td style={{fontStyle:'italic', color:'var(--ink-3)'}}>"Vấn đề xuyên suốt cả pipeline CI/CD."</td>
+                <td><Pill>cloze</Pill></td>
+                <td className="mono">5 d</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* TYPE BEHAVIOUR WITH DIACRITICS */}
+      <div style={{marginTop:40}}>
+        <Eyebrow num="C">Diacritics · how the serif breathes</Eyebrow>
+        <div style={{marginTop:14, display:'grid', gridTemplateColumns:'1fr 1fr', gap:14}}>
+          <div style={{padding:'32px 36px', background:'var(--card)', border:'1px solid var(--rule)'}}>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.14em', marginBottom:18}}>DISPLAY · 64 / 1.15</div>
+            <div className="display" style={{fontSize:64, lineHeight:1.15, paddingTop:6}}>Đường dài.</div>
+            <div className="display" style={{fontSize:64, lineHeight:1.15, color:'var(--clay)', fontStyle:'italic'}}>Học mãi.</div>
+          </div>
+          <div style={{padding:'32px 36px', background:'var(--paper-2)', border:'1px solid var(--rule)'}}>
+            <div className="mono" style={{fontSize:10, color:'var(--ink-4)', letterSpacing:'.14em', marginBottom:10}}>BODY · 18 / 1.55</div>
+            <p className="serif" style={{fontSize:18, lineHeight:1.55, margin:0, color:'var(--ink-2)'}}>
+              Mỗi ngày một chút — vài thẻ giữa dòng tin, vài phút trước khi cuộn tiếp. Lâu dần, từ vựng lập trình, ngữ pháp tiếng Anh, và cả tên thủ đô đều ở lại trong trí nhớ.
+            </p>
+            <p className="serif" style={{fontSize:18, lineHeight:1.55, marginTop:14, marginBottom:0, color:'var(--ink-2)'}}>
+              A little every day — a few cards between posts, a few minutes before scrolling on. Over time, vocabulary, grammar, and capitals settle in.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* DASHBOARD — STUDY                                               */
+/* ============================================================== */
+function DashboardStudy() {
+  return (
+    <div style={{width:1320, background:'var(--paper)'}}>
+      <DashChrome activeTab="study"/>
+      <main style={{padding:'40px 56px 56px'}}>
+        <SectionHeader
+          kicker="01 · Study"
+          title={<>Twenty&#8209;three cards for <span style={{fontStyle:'italic', color:'var(--clay)'}}>this sitting</span>.</>}
+          sub="One card at a time. The scheduler picks the most overdue. Press enter to commit."
+          action={<div style={{display:'flex', gap:8}}><button className="btn btn-ghost">Pause</button><button className="btn btn-dark">End session</button></div>}
+        />
+
+        {/* Session header strip */}
+        <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr 1fr', borderTop:'1px solid var(--rule)', borderBottom:'1px solid var(--rule)', marginTop:24}}>
+          <div style={{padding:'18px 24px 18px 0', borderRight:'1px solid var(--rule)'}}>
+            <Eyebrow>Active deck</Eyebrow>
+            <div className="serif" style={{fontSize:20, fontWeight:600, marginTop:4}}>Từ vựng · Vocabulary, Apr ’26</div>
+            <div style={{fontSize:12.5, color:'var(--ink-3)'}}>Bidirectional EN ↔ VI · 112 cards</div>
+          </div>
+          <div style={{padding:'18px 24px', borderRight:'1px solid var(--rule)'}}>
+            <Eyebrow>Position</Eyebrow>
+            <div className="display" style={{fontSize:32, marginTop:4}}>08 <span style={{color:'var(--ink-3)', fontSize:18}}>/ 23</span></div>
+          </div>
+          <div style={{padding:'18px 24px', borderRight:'1px solid var(--rule)'}}>
+            <Eyebrow>Correct</Eyebrow>
+            <div className="display" style={{fontSize:32, marginTop:4, color:'var(--moss)'}}>06</div>
+          </div>
+          <div style={{padding:'18px 0 18px 24px'}}>
+            <Eyebrow>Elapsed</Eyebrow>
+            <div className="display" style={{fontSize:32, marginTop:4}}>04:12</div>
+          </div>
+        </div>
+
+        {/* Progress rail */}
+        <div style={{marginTop:18, display:'grid', gridTemplateColumns:'repeat(23, 1fr)', gap:3}}>
+          {Array.from({length:23}).map((_,i)=>{
+            const state = i<6 ? 'right' : i===6 ? 'wrong' : i===7 ? 'current' : 'pending';
+            const bg = state==='right' ? 'var(--moss)' : state==='wrong' ? 'var(--rose)' : state==='current' ? 'var(--clay)' : 'var(--rule)';
+            return <div key={i} style={{height:6, background:bg, borderRadius:1}}/>;
+          })}
+        </div>
+
+        {/* Two-up: card + side rail */}
+        <div style={{display:'grid', gridTemplateColumns:'1.4fr 1fr', gap:48, marginTop:36}}>
+          {/* THE CARD */}
+          <div>
+            <Eyebrow num="A">Card 08 · cloze</Eyebrow>
+            <div className="card-flat" style={{marginTop:12, padding:'40px 44px'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:18}}>
+                <div style={{display:'flex', gap:6}}>
+                  <Pill tone="ink">cloze</Pill>
+                  <Pill>EN → VI</Pill>
+                  <Pill tone="clay">due 2 d ago</Pill>
+                </div>
+                <div className="mono" style={{fontSize:11, color:'var(--ink-4)'}}>EASE 2.4 · REPS 3</div>
+              </div>
+
+              <div className="eyebrow" style={{marginBottom:10}}>Translate to Vietnamese — fill the blank</div>
+              <div className="display" style={{fontSize:38, lineHeight:1.22, marginBottom:14}}>
+                "Hãy <span style={{display:'inline-block', minWidth:160, borderBottom:'2px solid var(--clay)', color:'var(--clay)'}}>xem xét</span> kỹ pull request trước khi duyệt."
+              </div>
+              <div className="serif" style={{fontSize:15, color:'var(--ink-3)', fontStyle:'italic', marginBottom:24, paddingBottom:18, borderBottom:'1px solid var(--rule)'}}>
+                EN · "Please <strong style={{fontStyle:'normal', color:'var(--ink-2)'}}>review</strong> the pull request carefully before approving."
+              </div>
+
+              <input className="input" placeholder="Nhập từ còn thiếu…" defaultValue="xem xét"
+                style={{fontSize:20, padding:'16px 20px', fontFamily:'Source Serif 4', borderColor:'var(--clay)', boxShadow:'0 0 0 3px var(--clay-tint)'}}/>
+
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:22}}>
+                <div style={{display:'flex', gap:14, alignItems:'center'}}>
+                  <span style={{display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--ink-3)'}}>
+                    <kbd className="mono" style={{padding:'2px 7px', border:'1px solid var(--rule-2)', borderRadius:4, fontSize:10, background:'var(--paper-2)'}}>↵</kbd> submit
+                  </span>
+                  <span style={{display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--ink-3)'}}>
+                    <kbd className="mono" style={{padding:'2px 7px', border:'1px solid var(--rule-2)', borderRadius:4, fontSize:10, background:'var(--paper-2)'}}>esc</kbd> skip
+                  </span>
+                  <span style={{display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--ink-3)'}}>
+                    <kbd className="mono" style={{padding:'2px 7px', border:'1px solid var(--rule-2)', borderRadius:4, fontSize:10, background:'var(--paper-2)'}}>?</kbd> reveal
+                  </span>
+                </div>
+                <button className="btn btn-clay">Submit answer</button>
+              </div>
+
+              {/* Inline edit / delete */}
+              <div style={{display:'flex', gap:12, marginTop:22, paddingTop:18, borderTop:'1px solid var(--rule)'}}>
+                <a className="ulink" style={{fontSize:12, color:'var(--ink-3)'}}>Edit card</a>
+                <a className="ulink" style={{fontSize:12, color:'var(--ink-3)'}}>Delete</a>
+                <a className="ulink" style={{fontSize:12, color:'var(--ink-3)'}}>Bury until tomorrow</a>
+              </div>
+            </div>
+
+            {/* Reveal preview — what the answered state looks like */}
+            <div style={{marginTop:36}}>
+              <Eyebrow num="A·2">After reveal · grade your recall</Eyebrow>
+              <div className="card-flat" style={{marginTop:12, padding:'28px 32px', background:'var(--clay-wash)', border:'1px solid var(--clay-tint)'}}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
+                  <div className="serif" style={{fontSize:22, fontWeight:600, color:'var(--clay-deep)'}}>xem xét</div>
+                  <Pill tone="clay">your answer matched</Pill>
+                </div>
+                <div className="serif" style={{fontSize:14, color:'var(--ink-3)', marginTop:8, fontStyle:'italic'}}>
+                  Also: cân nhắc · duyệt qua. Used in formal workplace contexts.
+                </div>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8, marginTop:18}}>
+                  {[
+                    ['Again','+ 1 d','rose'],
+                    ['Hard','+ 3 d','gold'],
+                    ['Good','+ 7 d','clay'],
+                    ['Easy','+ 14 d','moss'],
+                  ].map(([l,d,c])=>{
+                    const colors = { rose:'var(--rose)', gold:'var(--gold)', clay:'var(--clay)', moss:'var(--moss)' };
+                    return <div key={l} style={{padding:'12px 0', textAlign:'center', border:'1px solid var(--rule-2)', borderRadius:8, background:'var(--paper)'}}>
+                      <div className="serif" style={{fontSize:15, fontWeight:600, color:colors[c]}}>{l}</div>
+                      <div className="mono" style={{fontSize:10, color:'var(--ink-4)', marginTop:2}}>{d}</div>
+                    </div>;
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SIDE RAIL */}
+          <aside>
+            <Eyebrow num="B">Queue</Eyebrow>
+            <div className="card-flat" style={{marginTop:12}}>
+              {[
+                ['07','review','xem xét','done · good'],
+                ['08','rollback','quay lui','current'],
+                ['09','staging','môi trường thử nghiệm','queued'],
+                ['10','throughout','xuyên suốt','queued'],
+                ['11','merge conflict','xung đột hợp nhất','queued'],
+                ['12','pipeline','chu trình','queued'],
+              ].map(([n,en,vi,state],i)=>{
+                const isCurrent = state==='current';
+                const isDone = state.startsWith('done');
+                return (
+                  <div key={n} style={{padding:'12px 18px', borderBottom:'1px solid var(--rule)', display:'flex', alignItems:'center', gap:12,
+                    background: isCurrent ? 'var(--clay-wash)' : 'transparent',
+                    borderLeft: isCurrent ? '3px solid var(--clay)' : '3px solid transparent'}}>
+                    <span className="mono" style={{fontSize:11, color: isCurrent ? 'var(--clay-deep)' : 'var(--ink-4)', width:20}}>{n}</span>
+                    <div style={{flex:1, minWidth:0}}>
+                      <div className="serif" style={{fontSize:14, fontWeight: isCurrent?700:500, color: isDone ? 'var(--ink-3)' : 'var(--ink)'}}>
+                        {en} <span style={{color:'var(--ink-4)'}}>·</span> <span style={{color: isCurrent ? 'var(--clay-deep)' : 'var(--ink-2)', fontStyle:'italic'}}>{vi}</span>
+                      </div>
+                    </div>
+                    <span className="mono" style={{fontSize:10, color: isDone ? 'var(--moss)' : isCurrent ? 'var(--clay-deep)' : 'var(--ink-4)', textTransform:'uppercase', letterSpacing:'.08em'}}>{state}</span>
+                  </div>
+                );
+              })}
+              <div style={{padding:'10px 18px', textAlign:'center'}}>
+                <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>+ 17 MORE</span>
+              </div>
+            </div>
+
+            <Eyebrow num="C">This session</Eyebrow>
+            <div className="card-flat" style={{padding:18, marginTop:12}}>
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:14}}>
+                <div>
+                  <div className="eyebrow" style={{fontSize:10}}>Accuracy</div>
+                  <div className="display" style={{fontSize:30, marginTop:2}}>86%</div>
+                </div>
+                <div>
+                  <div className="eyebrow" style={{fontSize:10}}>Avg time</div>
+                  <div className="display" style={{fontSize:30, marginTop:2}}>4.1<span style={{fontSize:14, color:'var(--ink-3)'}}>s</span></div>
+                </div>
+              </div>
+              <hr className="rule" style={{margin:'14px 0'}}/>
+              <div className="ascii" style={{fontSize:11, lineHeight:1.5}}>
+{`right ████████████░░░░░░░ 06
+wrong █░░░░░░░░░░░░░░░░░░ 01
+left  ████████████████░░░ 16`}
+              </div>
+            </div>
+
+            <Eyebrow num="D">Hint</Eyebrow>
+            <div className="card-flat" style={{padding:'14px 16px', marginTop:12, background:'var(--paper-2)'}}>
+              <div className="serif" style={{fontSize:13, color:'var(--ink-2)', fontStyle:'italic'}}>
+                Verb · two syllables. Often paired with <span className="mono" style={{fontStyle:'normal', fontSize:11, background:'var(--card)', padding:'1px 5px', border:'1px solid var(--rule)'}}>kỹ</span> ("carefully").
+              </div>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ============================================================== */
+/* APP                                                             */
+/* ============================================================== */
+function App() {
+  return (
+    <DesignCanvas title="Scroll Learn — editorial redesign" subtitle="Warm paper · clay accent · serif display · diagrammatic imagery">
+      <DCSection id="theme" title="Theme · Foundations">
+        <DCArtboard id="specimen" label="01 · Theme specimen" width={1320} height={780}>
+          <ThemeSpecimen/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="dashboard" title="Dashboard · Decks · Stats · Import · Settings">
+        <DCArtboard id="study" label="01 · Dashboard / Study" width={1320} height={1380}>
+          <DashboardStudy/>
+        </DCArtboard>
+        <DCArtboard id="decks" label="02 · Dashboard / Decks" width={1320} height={1640}>
+          <DashboardDecks/>
+        </DCArtboard>
+        <DCArtboard id="stats" label="06 · Dashboard / Statistics" width={1320} height={1280}>
+          <DashboardStats/>
+        </DCArtboard>
+        <DCArtboard id="import" label="04 · Dashboard / Import" width={1320} height={1080}>
+          <DashboardImport/>
+        </DCArtboard>
+        <DCArtboard id="settings" label="05 · Dashboard / Settings" width={1320} height={1500}>
+          <DashboardSettings/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="bilingual" title="Bilingual · English / Vietnamese">
+        <DCArtboard id="bilingual-sheet" label="08 · EN / VI" width={1320} height={1820}>
+          <BilingualSheet/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="logo" title="Identity · Logo">
+        <DCArtboard id="logo-explorations" label="07 · Logo system" width={1320} height={1900}>
+          <LogoExploration/>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="surface" title="Surfaces · Popup &amp; in-feed quiz">
+        <DCArtboard id="popup" label="Browser action popup" width={420} height={1100}>
+          <div style={{padding:20, background:'var(--paper-2)', height:'100%', boxSizing:'border-box'}}>
+            <ExtensionPopup/>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="quiz" label="In-feed quiz card" width={620} height={760}>
+          <div style={{padding:20, background:'var(--paper-2)', height:'100%', boxSizing:'border-box'}}>
+            <QuizCard/>
+          </div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

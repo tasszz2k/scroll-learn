@@ -1,18 +1,44 @@
+/* eslint-disable react-refresh/only-export-components -- popup.tsx is the entry point, not a Vite-HMR module */
 import { createRoot } from 'react-dom/client';
-import { useState, useEffect } from 'react';
-import type { Deck, Stats, Settings } from '../common/types';
+import { useState, useEffect, useCallback } from 'react';
+import type { Card, Deck, Stats, Settings } from '../common/types';
 import type { BlockedCounts } from '../content/blocker';
+import { isHostAllowed, parseRegexEntry } from '../common/allowlist';
 import './popup.css';
 
 interface PopupState {
   stats: Stats | null;
   settings: Settings | null;
   decks: Deck[];
+  cardCounts: Record<string, number>;
+  dueCounts: Record<string, number>;
+  totalDue: number;
   currentSite: string;
   loading: boolean;
   blockedCount: number;
   blockedCounts: BlockedCounts | null;
-  notesCount: number;
+}
+
+function ArrowRight({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M3 9h12M10 4l5 5-5 5" />
+    </svg>
+  );
+}
+
+function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+  return (
+    <div className="toggle-row">
+      <span className="label-text">{label}</span>
+      <button
+        type="button"
+        className={'switch' + (checked ? ' on' : '')}
+        aria-pressed={checked}
+        onClick={onChange}
+      />
+    </div>
+  );
 }
 
 function Popup() {
@@ -20,31 +46,41 @@ function Popup() {
     stats: null,
     settings: null,
     decks: [],
+    cardCounts: {},
+    dueCounts: {},
+    totalDue: 0,
     currentSite: '',
     loading: true,
     blockedCount: 0,
     blockedCounts: null,
-    notesCount: 0,
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
-      // Get current tab info
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const url = tab?.url ? new URL(tab.url) : null;
       const currentSite = url?.hostname?.replace(/^(www\.|m\.)/, '') || '';
 
-      // Get stats and settings from background
-      const [statsResponse, settingsResponse, decksResponse, notesResponse] = await Promise.all([
+      const [statsResponse, settingsResponse, decksResponse, cardsResponse] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_stats' }),
         chrome.runtime.sendMessage({ type: 'get_settings' }),
         chrome.runtime.sendMessage({ type: 'get_decks' }),
-        chrome.runtime.sendMessage({ type: 'get_notes' }),
+        chrome.runtime.sendMessage({ type: 'get_cards' }),
       ]);
+
+      const cardCounts: Record<string, number> = {};
+      const dueCounts: Record<string, number> = {};
+      let totalDue = 0;
+      const now = Date.now();
+      if (cardsResponse?.ok && Array.isArray(cardsResponse.data)) {
+        for (const card of cardsResponse.data as Card[]) {
+          cardCounts[card.deckId] = (cardCounts[card.deckId] ?? 0) + 1;
+          if (card.due <= now) {
+            dueCounts[card.deckId] = (dueCounts[card.deckId] ?? 0) + 1;
+            totalDue += 1;
+          }
+        }
+      }
 
       let blockedCount = 0;
       let blockedCounts: BlockedCounts | null = null;
@@ -62,21 +98,27 @@ function Popup() {
         stats: statsResponse.ok ? statsResponse.data : null,
         settings: settingsResponse.ok ? settingsResponse.data : null,
         decks: decksResponse.ok ? decksResponse.data : [],
+        cardCounts,
+        dueCounts,
+        totalDue,
         currentSite,
         loading: false,
         blockedCount,
         blockedCounts,
-        notesCount: notesResponse?.ok && Array.isArray(notesResponse.data) ? notesResponse.data.length : 0,
       });
     } catch (error) {
       console.error('Failed to load popup data:', error);
       setState(prev => ({ ...prev, loading: false }));
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot async load via chrome.runtime; no Suspense bridge available
+    void loadData();
+  }, [loadData]);
 
   async function toggleSite() {
     if (!state.settings || !state.currentSite) return;
-
     const isEnabled = isSiteEnabled();
     const newSettings = {
       ...state.settings,
@@ -88,12 +130,7 @@ function Popup() {
         },
       },
     };
-
-    await chrome.runtime.sendMessage({
-      type: 'set_settings',
-      settings: newSettings,
-    });
-
+    await chrome.runtime.sendMessage({ type: 'set_settings', settings: newSettings });
     setState(prev => ({ ...prev, settings: newSettings }));
   }
 
@@ -103,45 +140,49 @@ function Popup() {
     return domainSettings?.enabled !== false;
   }
 
-  function openDashboard() {
-    chrome.runtime.openOptionsPage();
+  function isNoteCaptureEnabled(): boolean {
+    if (!state.settings || !state.currentSite) return false;
+    return isHostAllowed(state.settings.noteCaptureAllowlist, state.currentSite);
   }
 
-  function openImport() {
-    chrome.tabs.create({ url: chrome.runtime.getURL('index.html#import') });
+  // Whether the current site is allowlisted via a regex entry rather than a
+  // plain hostname. The popup toggle only flips plain entries — toggling off a
+  // regex match would silently remove a user's pattern, so we surface a hint
+  // and disable the toggle in that case.
+  function isAllowlistedByRegex(): boolean {
+    if (!state.settings || !state.currentSite) return false;
+    for (const entry of state.settings.noteCaptureAllowlist) {
+      const re = parseRegexEntry(entry.trim());
+      if (!re) continue;
+      try {
+        if (new RegExp(re.source, re.flags).test(state.currentSite)) return true;
+      } catch {
+        // ignore bad regex
+      }
+    }
+    return false;
   }
 
-  function openNotes() {
-    chrome.tabs.create({ url: chrome.runtime.getURL('index.html#notes') });
+  async function toggleNoteCapture() {
+    if (!state.settings || !state.currentSite) return;
+    if (isAllowlistedByRegex()) return;
+
+    const host = state.currentSite;
+    const current = state.settings.noteCaptureAllowlist;
+    const enabled = current.some(e => e.trim().toLowerCase() === host);
+    const next = enabled
+      ? current.filter(e => e.trim().toLowerCase() !== host)
+      : [...current, host];
+
+    const response = await chrome.runtime.sendMessage({
+      type: 'set_settings',
+      settings: { noteCaptureAllowlist: next },
+    });
+    if (response?.ok) setState(prev => ({ ...prev, settings: response.data }));
   }
 
-  function openSettings() {
-    chrome.tabs.create({ url: chrome.runtime.getURL('index.html#settings') });
-  }
-
-  function openStudy() {
-    chrome.tabs.create({ url: chrome.runtime.getURL('index.html#study') });
-  }
-
-  function renderPopupToggle(label: string, checked: boolean, key: keyof Settings) {
-    return (
-      <div className="toggle-row">
-        <div className="toggle-label">
-          <div>
-            <div className="toggle-text">{label}</div>
-          </div>
-        </div>
-        <label className="toggle-switch">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={() => toggleBlockingSetting(key)}
-          />
-          <span className="toggle-slider"></span>
-        </label>
-      </div>
-    );
-  }
+  function openDashboard() { chrome.runtime.openOptionsPage(); }
+  function openStudy()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#study') }); }
 
   async function toggleBlockingSetting(key: keyof Settings) {
     if (!state.settings) return;
@@ -150,9 +191,7 @@ function Popup() {
       type: 'set_settings',
       settings: { [key]: newSettings[key] },
     });
-    if (response.ok) {
-      setState(prev => ({ ...prev, settings: response.data }));
-    }
+    if (response.ok) setState(prev => ({ ...prev, settings: response.data }));
   }
 
   async function setActiveDeck(deckId: string | null) {
@@ -160,241 +199,241 @@ function Popup() {
       type: 'set_settings',
       settings: { activeDeckId: deckId },
     });
-    if (response.ok) {
-      setState(prev => ({ ...prev, settings: response.data }));
-    }
-  }
-
-  function renderBlockedBreakdown(counts: BlockedCounts) {
-    const labels: Record<string, string> = {
-      reels: 'Reels',
-      shorts: 'Shorts',
-      sponsored: 'Sponsored',
-      suggested: 'Suggested',
-      strangers: 'Strangers',
-    };
-    const entries = Object.entries(labels)
-      .filter(([key]) => counts[key as keyof BlockedCounts] > 0)
-      .map(([key, label]) => (
-        <div key={key} className="tooltip-row">
-          <span className="tooltip-label">{label}</span>
-          <span className="tooltip-value">{counts[key as keyof BlockedCounts]}</span>
-        </div>
-      ));
-    return entries.length > 0 ? entries : null;
+    if (response.ok) setState(prev => ({ ...prev, settings: response.data }));
   }
 
   if (state.loading) {
     return (
       <div className="popup-container">
         <div className="loading">
-          <div className="spinner"></div>
+          <div className="spinner" />
         </div>
       </div>
     );
   }
 
-  const { stats, settings, currentSite, decks } = state;
+  const { stats, settings, currentSite, decks, cardCounts, dueCounts, totalDue, blockedCount, blockedCounts } = state;
   const siteEnabled = isSiteEnabled();
+  const noteCaptureOn = isNoteCaptureEnabled();
+  const noteCaptureLockedByRegex = isAllowlistedByRegex();
   const isFacebook = currentSite.includes('facebook');
   const isYouTube = currentSite.includes('youtube');
   const isInstagram = currentSite.includes('instagram');
   const isSocialSite = isFacebook || isYouTube || isInstagram;
 
+  // Active deck lookup
+  const activeDeck = decks.find(d => d.id === settings?.activeDeckId) || null;
+  const activeDeckCount = activeDeck ? (cardCounts[activeDeck.id] ?? 0) : 0;
+  const activeDeckDue = activeDeck ? (dueCounts[activeDeck.id] ?? 0) : 0;
+
+  // Blocked breakdown ordered for grid (Reels, Shorts, Sponsored, Suggested, Strangers)
+  const blockKeys: Array<{ key: keyof BlockedCounts; label: string }> = [
+    { key: 'reels', label: 'Reels' },
+    { key: 'shorts', label: 'Shorts' },
+    { key: 'sponsored', label: 'Sponsored' },
+    { key: 'suggested', label: 'Suggested' },
+    { key: 'strangers', label: 'Strangers' },
+  ];
+
   return (
     <div className="popup-container">
-      {/* Header */}
-      <div className="popup-header">
-        <img src="/icons/icon48.png" alt="ScrollLearn" className="popup-logo-img" />
+      {/* Header — block-S monogram + serif title + status dot */}
+      <header className="popup-header">
+        <div className="popup-mark">S</div>
         <div className="popup-title">
-          <h1>ScrollLearn</h1>
+          <h1>Scroll Learn</h1>
           <p>Learn while you scroll</p>
         </div>
-        <div className={`status-dot ${!siteEnabled ? 'disabled' : ''}`}></div>
+        <div className={'status-dot' + (!siteEnabled ? ' disabled' : '')} title={siteEnabled ? 'Active' : 'Paused on this site'} />
+      </header>
+
+      {/* Quick actions — moved to the top */}
+      <div className="actions-grid actions-grid-top">
+        <button className="btn btn-clay" type="button" onClick={openStudy}>Study now</button>
+        <button className="btn btn-ghost" type="button" onClick={openDashboard}>
+          Dashboard <ArrowRight />
+        </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{stats?.totalCards || 0}</div>
-          <div className="stat-label">Total Cards</div>
+      {/* Headline numbers — cards due / day streak */}
+      <div className="numbers-row">
+        <div className="number-cell">
+          <div className={'num' + (totalDue === 0 ? ' muted' : '')}>{totalDue}</div>
+          <div className="eyebrow label">Cards due</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{stats?.totalReviews || 0}</div>
-          <div className="stat-label">Reviews</div>
+        <div className="number-cell">
+          <div className={'num' + ((stats?.currentStreak ?? 0) === 0 ? ' muted' : '')}>{stats?.currentStreak ?? 0}</div>
+          <div className="eyebrow label">Day streak</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{stats?.currentStreak || 0}</div>
-          <div className="stat-label">Day Streak</div>
+      </div>
+
+      {/* Sub stats */}
+      <div className="sub-stats">
+        <div>
+          <div className="eyebrow label">Reviews</div>
+          <div className="value">{stats?.totalReviews ?? 0}</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {stats?.averageAccuracy ? Math.round(stats.averageAccuracy * 100) : 0}%
+        <div>
+          <div className="eyebrow label">Accuracy</div>
+          <div className="value">
+            {stats?.averageAccuracy ? Math.round(stats.averageAccuracy * 100) : 0}
+            <span className="pct">%</span>
           </div>
-          <div className="stat-label">Accuracy</div>
         </div>
       </div>
 
-      {/* Site Toggle */}
-      {isSocialSite && (
-        <div className="site-toggle">
-          <div className="toggle-row">
-            <div className="toggle-label">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-              </svg>
-              <div>
-                <div className="toggle-text">Enable on this site</div>
-                <div className="toggle-site">{currentSite}</div>
+      {/* This site — always rendered to match the design */}
+      <section className="section">
+        <div className="section-head">
+          <span className="eyebrow">This site</span>
+          <span className="url">{currentSite || '—'}</span>
+        </div>
+        {isSocialSite ? (
+          <div className="site-row">
+            <div>
+              <div className="head">{siteEnabled ? 'Quizzes enabled' : 'Quizzes paused'}</div>
+              <div className="sub">
+                Every {settings?.showAfterNPosts ?? 5} posts
+                {settings?.pauseMinutesAfterQuiz ? ` · pause ${settings.pauseMinutesAfterQuiz} m` : ''}
               </div>
             </div>
-            <label className="toggle-switch">
-              <input
-                type="checkbox"
-                checked={siteEnabled}
-                onChange={toggleSite}
-              />
-              <span className="toggle-slider"></span>
-            </label>
+            <button
+              type="button"
+              className={'switch' + (siteEnabled ? ' on' : '')}
+              aria-pressed={siteEnabled}
+              onClick={toggleSite}
+            />
           </div>
+        ) : (
+          <div className="site-row">
+            <div>
+              <div className="head" style={{ color: 'var(--ink-3)' }}>Not a feed site</div>
+              <div className="sub">Quizzes inject on Facebook, YouTube, and Instagram.</div>
+            </div>
+            <button type="button" className="switch" aria-pressed="false" disabled />
+          </div>
+        )}
+        <div className="site-row">
+          <div>
+            <div className="head">{noteCaptureOn ? 'Capturing notes' : 'Note capture off'}</div>
+            <div className="sub">
+              {noteCaptureLockedByRegex
+                ? 'Allowlisted by a regex pattern — manage in Settings.'
+                : currentSite
+                  ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Ctrl/Cmd</span> and hover to pluck text.</>
+                  : 'Open a tab to enable.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            className={'switch' + (noteCaptureOn ? ' on' : '')}
+            aria-pressed={noteCaptureOn}
+            onClick={toggleNoteCapture}
+            disabled={!currentSite || noteCaptureLockedByRegex}
+            title={noteCaptureLockedByRegex
+              ? 'Manage regex allowlist in the dashboard Settings'
+              : noteCaptureOn
+                ? `Stop capturing notes on ${currentSite}`
+                : `Capture notes on ${currentSite}`}
+          />
         </div>
-      )}
+      </section>
 
-      {/* Active Deck */}
-      <div className="deck-selector">
-        <div className="section-title">Active Deck</div>
-        <select
-          className="deck-select"
-          value={state.settings?.activeDeckId || ''}
-          onChange={e => setActiveDeck(e.target.value || null)}
-          disabled={decks.length === 0}
-        >
-          <option value="">Auto-select next due deck</option>
-          {decks.map(deck => (
-            <option key={deck.id} value={deck.id}>
-              {deck.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Active deck */}
+      <section className="section">
+        <div className="section-head">
+          <span className="eyebrow">Active deck</span>
+        </div>
+        {activeDeck ? (
+          <button
+            type="button"
+            className="deck-card deck-card-button"
+            onClick={() => setActiveDeck(null)}
+            title="Clear active deck"
+          >
+            <div>
+              <div className="name">{activeDeck.name}</div>
+              <div className="meta">
+                {activeDeckCount} {activeDeckCount === 1 ? 'card' : 'cards'}
+                {activeDeckDue > 0 && ` · ${activeDeckDue} due`}
+              </div>
+            </div>
+            {activeDeckDue > 0
+              ? <span className="pill pill-clay">{activeDeckDue}</span>
+              : <span className="pill">none due</span>}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="deck-card deck-card-button"
+            onClick={() => decks[0] && setActiveDeck(decks[0].id)}
+            title={decks.length === 0 ? 'No decks yet' : 'Pick a deck'}
+            disabled={decks.length === 0}
+          >
+            <div>
+              <div className="name" style={{ color: 'var(--ink-3)' }}>Auto-select</div>
+              <div className="meta">Most overdue deck is chosen for you</div>
+            </div>
+            {totalDue > 0 && <span className="pill pill-clay">{totalDue}</span>}
+          </button>
+        )}
+      </section>
 
-      {/* Content Blocking Toggles */}
-      {isSocialSite && settings && (
-        <div className="site-toggle">
-          <div className="blocking-header">
-            <div className="section-title" style={{ padding: '0', fontSize: '11px', marginBottom: '0' }}>Content Blocking</div>
-            {state.blockedCount > 0 && (
-              <span className="blocked-count-badge">
-                {state.blockedCount} blocked
-                {state.blockedCounts && (
-                  <span className="blocked-tooltip">
-                    {renderBlockedBreakdown(state.blockedCounts)}
-                  </span>
-                )}
-              </span>
-            )}
+      {/* Hidden today / Content blocking — always rendered */}
+      {settings && (
+        <section className="section">
+          <div className="block-head">
+            <span className="eyebrow">Hidden today</span>
+            <span className="block-total">
+              {blockedCount}
+              <span className="unit">blocked</span>
+            </span>
           </div>
+
+          <div className="block-grid">
+            {blockKeys.map(({ key, label }) => {
+              const n = (blockedCounts?.[key] as number | undefined) ?? 0;
+              return (
+                <div key={key} className={'block-cell' + (n > 0 ? ' on' : '')}>
+                  <div className="k">{label}</div>
+                  <div className="n">{n}</div>
+                </div>
+              );
+            })}
+          </div>
+
           {isFacebook && (
             <>
-              {renderPopupToggle('Hide Reels', settings.hideFacebookReels, 'hideFacebookReels')}
-              {renderPopupToggle('Hide Sponsored', settings.hideFacebookSponsored, 'hideFacebookSponsored')}
-              {renderPopupToggle('Hide Suggested', settings.hideFacebookSuggested, 'hideFacebookSuggested')}
-              {renderPopupToggle("Hide Strangers' Posts", settings.hideFacebookStrangers, 'hideFacebookStrangers')}
+              <ToggleRow label="Reels"            checked={settings.hideFacebookReels}     onChange={() => toggleBlockingSetting('hideFacebookReels')} />
+              <ToggleRow label="Sponsored"        checked={settings.hideFacebookSponsored} onChange={() => toggleBlockingSetting('hideFacebookSponsored')} />
+              <ToggleRow label="Suggested"        checked={settings.hideFacebookSuggested} onChange={() => toggleBlockingSetting('hideFacebookSuggested')} />
+              <ToggleRow label="Strangers' posts" checked={settings.hideFacebookStrangers} onChange={() => toggleBlockingSetting('hideFacebookStrangers')} />
             </>
           )}
           {isInstagram && (
             <>
-              {renderPopupToggle('Hide Reels', settings.hideInstagramReels, 'hideInstagramReels')}
-              {renderPopupToggle('Hide Sponsored', settings.hideInstagramSponsored, 'hideInstagramSponsored')}
-              {renderPopupToggle('Hide Suggested', settings.hideInstagramSuggested, 'hideInstagramSuggested')}
-              {renderPopupToggle("Hide Strangers' Posts", settings.hideInstagramStrangers, 'hideInstagramStrangers')}
+              <ToggleRow label="Reels"            checked={settings.hideInstagramReels}     onChange={() => toggleBlockingSetting('hideInstagramReels')} />
+              <ToggleRow label="Sponsored"        checked={settings.hideInstagramSponsored} onChange={() => toggleBlockingSetting('hideInstagramSponsored')} />
+              <ToggleRow label="Suggested"        checked={settings.hideInstagramSuggested} onChange={() => toggleBlockingSetting('hideInstagramSuggested')} />
+              <ToggleRow label="Strangers' posts" checked={settings.hideInstagramStrangers} onChange={() => toggleBlockingSetting('hideInstagramStrangers')} />
             </>
           )}
           {isYouTube && (
-            <>
-              {renderPopupToggle('Hide Shorts', settings.hideYouTubeShorts, 'hideYouTubeShorts')}
-            </>
+            <ToggleRow label="Shorts" checked={settings.hideYouTubeShorts} onChange={() => toggleBlockingSetting('hideYouTubeShorts')} />
           )}
-        </div>
+          {!isSocialSite && (
+            <div className="mono" style={{ fontSize: 10.5, color: 'var(--ink-4)', letterSpacing: '.06em', marginTop: 4 }}>
+              Per-site toggles appear when this popup is open on a feed site.
+            </div>
+          )}
+        </section>
       )}
 
-      {/* Quick Actions */}
-      <div className="section-title">Quick Actions</div>
-      <div className="quick-actions">
-        <button className="action-btn" onClick={openStudy}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/>
-          </svg>
-          <span>Study Now</span>
-          <svg className="arrow" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-          </svg>
-        </button>
-
-        <button className="action-btn" onClick={openDashboard}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-          </svg>
-          <span>Manage Decks</span>
-          <svg className="arrow" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-          </svg>
-        </button>
-
-        <button className="action-btn" onClick={openNotes}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-          </svg>
-          <span>Notes</span>
-          {state.notesCount > 0 && (
-            <span className="action-btn-count">{state.notesCount}</span>
-          )}
-          <svg className="arrow" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-          </svg>
-        </button>
-
-        <button className="action-btn" onClick={openImport}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
-          </svg>
-          <span>Import Cards</span>
-          <svg className="arrow" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-          </svg>
-        </button>
-
-        <button className="action-btn" onClick={openSettings}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-          </svg>
-          <span>Settings</span>
-          <svg className="arrow" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-          </svg>
-        </button>
-      </div>
-
-      {/* Footer */}
-      <div className="popup-footer">
-        <a className="footer-link" onClick={openDashboard}>
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-          </svg>
-          Dashboard
-        </a>
-        <a className="footer-link" href="https://github.com/your-repo/scroll-learn" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-          </svg>
-          Help
-        </a>
-      </div>
+      {/* Quick actions — pair (the design's only bottom action) */}
     </div>
   );
 }
 
-// Mount the popup
 const container = document.getElementById('popup-root');
 if (container) {
   const root = createRoot(container);

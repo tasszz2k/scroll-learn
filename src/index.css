@@ -1,99 +1,343 @@
 @import "tailwindcss";
 
+/* ================================================================
+ * ScrollLearn — Editorial theme
+ * Warm paper, clay accent, serif display + sans body + mono eyebrow.
+ * Light theme is the canonical design; dark theme retains usable
+ * defaults but is not part of the editorial spec.
+ * ================================================================ */
+
 @theme {
-  --font-sans: 'Geist', system-ui, sans-serif;
-  --font-mono: 'Geist Mono', monospace;
-  
-  --color-primary-50: #f0f9ff;
-  --color-primary-100: #e0f2fe;
-  --color-primary-200: #bae6fd;
-  --color-primary-300: #7dd3fc;
-  --color-primary-400: #38bdf8;
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-primary-700: #0369a1;
-  --color-primary-800: #075985;
-  --color-primary-900: #0c4a6e;
-  --color-primary-950: #082f49;
-  
-  --color-accent-50: #fdf4ff;
-  --color-accent-100: #fae8ff;
-  --color-accent-200: #f5d0fe;
-  --color-accent-300: #f0abfc;
-  --color-accent-400: #e879f9;
-  --color-accent-500: #d946ef;
-  --color-accent-600: #c026d3;
-  --color-accent-700: #a21caf;
-  --color-accent-800: #86198f;
-  --color-accent-900: #701a75;
-  --color-accent-950: #4a044e;
-  
-  --color-surface-50: #f8fafc;
-  --color-surface-100: #f1f5f9;
-  --color-surface-200: #e2e8f0;
-  --color-surface-300: #cbd5e1;
-  --color-surface-400: #94a3b8;
-  --color-surface-500: #64748b;
-  --color-surface-600: #475569;
-  --color-surface-700: #334155;
-  --color-surface-800: #1e293b;
-  --color-surface-900: #0f172a;
-  --color-surface-950: #020617;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Source Serif 4', 'Tiempos Headline', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+  /* Surface scale -> paper / ink */
+  --color-surface-50:  #F5F1EB;
+  --color-surface-100: #EFE9DF;
+  --color-surface-200: #E2D9CB;
+  --color-surface-300: #D2C7B4;
+  --color-surface-400: #9A8E81;
+  --color-surface-500: #6B6157;
+  --color-surface-600: #3C342B;
+  --color-surface-700: #3C342B;
+  --color-surface-800: #2A2520;
+  --color-surface-900: #1F1B16;
+  --color-surface-950: #14110D;
+
+  /* Primary scale -> clay (terracotta) */
+  --color-primary-50:  #FBF1EA;
+  --color-primary-100: #F6E6DC;
+  --color-primary-200: #EFD9CC;
+  --color-primary-300: #E8B89A;
+  --color-primary-400: #D88660;
+  --color-primary-500: #C96442;
+  --color-primary-600: #C96442;
+  --color-primary-700: #A84E30;
+  --color-primary-800: #8A3F26;
+  --color-primary-900: #5D2A19;
+  --color-primary-950: #3A1A0F;
+
+  /* Accent scale -> moss (secondary, occasional) */
+  --color-accent-50:  #EDF1E2;
+  --color-accent-100: #D6DEC0;
+  --color-accent-200: #BAC79C;
+  --color-accent-300: #97A878;
+  --color-accent-400: #7D8C5E;
+  --color-accent-500: #6E7B5C;
+  --color-accent-600: #5C684C;
+  --color-accent-700: #4F5B40;
+  --color-accent-800: #3E4733;
+  --color-accent-900: #2A3023;
+  --color-accent-950: #1A1F17;
 }
 
 :root {
-  --background: var(--color-surface-50);
-  --foreground: var(--color-surface-900);
-  --muted: var(--color-surface-500);
-  --border: var(--color-surface-200);
-  --card: white;
-  --card-foreground: var(--color-surface-900);
+  /* Editorial palette tokens (referenced directly in component CSS) */
+  --paper: #F5F1EB;
+  --paper-2: #EFE9DF;
+  --card: #FBF8F2;
+  --ink: #1F1B16;
+  --ink-2: #3C342B;
+  --ink-3: #6B6157;
+  --ink-4: #9A8E81;
+  --rule: #E2D9CB;
+  --rule-2: #D2C7B4;
+  --clay: #C96442;
+  --clay-deep: #A84E30;
+  --clay-tint: #EFD9CC;
+  --clay-wash: #F6E6DC;
+  --moss: #6E7B5C;
+  --gold: #B8923A;
+  --rose: #C4736B;
+  --bg-block: #2A2520;
+
+  /* Generic semantic tokens for legacy `var(--background)` / `var(--card)` use */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --muted: var(--ink-3);
+  --border: var(--rule);
+  --card-foreground: var(--ink);
 }
 
 .dark {
-  --background: var(--color-surface-950);
-  --foreground: var(--color-surface-50);
-  --muted: var(--color-surface-400);
-  --border: var(--color-surface-800);
-  --card: var(--color-surface-900);
-  --card-foreground: var(--color-surface-50);
+  --paper: #14110D;
+  --paper-2: #1F1B16;
+  --card: #2A2520;
+  --ink: #F5F1EB;
+  --ink-2: #E2D9CB;
+  --ink-3: #B8B0A4;
+  --ink-4: #9A8E81;
+  --rule: #3C342B;
+  --rule-2: #4D4338;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --muted: var(--ink-3);
+  --border: var(--rule);
+  --card-foreground: var(--ink);
 }
 
 * {
   border-color: var(--border);
 }
 
+html, body {
+  background: var(--paper);
+}
+
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ----------------------------------------------------------------
+ * Typography helpers — used across dashboard, popup, and content
+ * ---------------------------------------------------------------- */
+
+.serif { font-family: var(--font-serif); font-weight: 500; letter-spacing: -0.01em; }
+.display { font-family: var(--font-serif); font-weight: 500; letter-spacing: -0.025em; line-height: 1.02; }
+.mono { font-family: var(--font-mono); }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Editorial rules */
+.rule-thin { border: 0; border-top: 1px solid var(--rule); }
+.rule-thick { border: 0; border-top: 2px solid var(--ink); }
+
+/* ----------------------------------------------------------------
+ * Buttons — clay (primary), ghost (outline), dark (ink)
+ * ---------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font: 500 13.5px var(--font-sans);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all .15s ease;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-clay  { background: var(--clay); color: #FFF8F2; border-color: var(--clay); }
+.btn-clay:hover:not(:disabled)  { background: var(--clay-deep); border-color: var(--clay-deep); }
+
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule-2); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--ink-3); background: var(--paper-2); }
+
+.btn-dark  { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn-dark:hover:not(:disabled)  { background: var(--ink-2); }
+
+/* ----------------------------------------------------------------
+ * Pill / tag
+ * ---------------------------------------------------------------- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font: 500 11px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1px solid var(--rule-2);
+  color: var(--ink-3);
+  background: var(--card);
+}
+.pill-clay { background: var(--clay-wash); border-color: var(--clay-tint); color: var(--clay-deep); }
+.pill-moss { background: #EAEEDF; border-color: #D6DEC0; color: #4F5B40; }
+.pill-ink  { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.pill-gold { background: #F4EBD2; border-color: #E5D5A8; color: #6E5A20; }
+
+/* ----------------------------------------------------------------
+ * Form inputs
+ * ---------------------------------------------------------------- */
+
+.input-editorial {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--rule-2);
+  border-radius: 10px;
+  font: 400 14px var(--font-sans);
+  color: var(--ink);
+}
+.input-editorial:focus {
+  outline: none;
+  border-color: var(--clay);
+  box-shadow: 0 0 0 3px var(--clay-tint);
+}
+.input-editorial::placeholder { color: var(--ink-4); }
+
+/* ----------------------------------------------------------------
+ * Switch (clay when on)
+ * ---------------------------------------------------------------- */
+
+.switch-editorial {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  background: var(--rule-2);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+}
+.switch-editorial::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  transition: left .18s;
+}
+.switch-editorial.on { background: var(--clay); }
+.switch-editorial.on::after { left: 18px; }
+
+/* ----------------------------------------------------------------
+ * Card surfaces
+ * ---------------------------------------------------------------- */
+
+.card-soft { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; }
+.card-flat { background: var(--card); border: 1px solid var(--rule); }
+
+/* ----------------------------------------------------------------
+ * Data table — editorial
+ * ---------------------------------------------------------------- */
+
+.dtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dtable th {
+  text-align: left;
+  font: 500 11px var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.dtable td {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-2);
+  vertical-align: middle;
+}
+.dtable tr:last-child td { border-bottom: none; }
+.dtable tr:hover td { background: var(--paper-2); }
+
+/* ----------------------------------------------------------------
+ * Misc — bar, links, stat numerals, ascii block
+ * ---------------------------------------------------------------- */
+
+.bar { height: 4px; background: var(--rule); border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--clay); }
+
+.ulink {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ink-3);
+  padding-bottom: 1px;
+  cursor: pointer;
+}
+.ulink:hover { border-bottom-color: var(--clay); color: var(--clay-deep); }
+
+.stat-num {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 56px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--ink);
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+.ascii {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  color: var(--ink-2);
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+/* Drop cap */
+.dropcap::first-letter {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 3.4em;
+  float: left;
+  line-height: .85;
+  margin: 6px 8px 0 0;
+  color: var(--clay);
 }
 
-.animate-slide-up {
-  animation: slideUp 0.3s ease-out forwards;
-}
+/* ----------------------------------------------------------------
+ * Bridge: legacy color names (Tailwind classes that ship with the app)
+ * The token retune above already remaps surface/primary/accent, so
+ * `bg-primary-600`, `text-surface-500`, etc. become editorial.
+ * Below are explicit fallbacks for common literal values some
+ * existing components may have used.
+ * ---------------------------------------------------------------- */
 
-.animate-slide-down {
-  animation: slideDown 0.3s ease-out forwards;
-}
+.bg-paper { background: var(--paper); }
+.bg-paper-2 { background: var(--paper-2); }
+.bg-card { background: var(--card); }
+.bg-ink { background: var(--ink); }
+.bg-clay { background: var(--clay); }
+.text-clay { color: var(--clay); }
+.text-clay-deep { color: var(--clay-deep); }
+.text-ink { color: var(--ink); }
+.text-ink-2 { color: var(--ink-2); }
+.text-ink-3 { color: var(--ink-3); }
+.text-ink-4 { color: var(--ink-4); }
+.border-rule { border-color: var(--rule); }
+
+/* ----------------------------------------------------------------
+ * Animations
+ * ---------------------------------------------------------------- */
+
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-fade-in   { animation: fadeIn 0.3s ease-out forwards; }
+.animate-slide-up  { animation: slideUp 0.3s ease-out forwards; }
+.animate-slide-down{ animation: slideDown 0.3s ease-out forwards; }

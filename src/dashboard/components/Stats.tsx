@@ -1,4 +1,6 @@
+import { useMemo, useState, type ReactElement } from 'react';
 import type { Stats as StatsType, Deck, Card } from '../../common/types';
+import EditorialHeader from './EditorialHeader';
 
 interface StatsProps {
   stats: StatsType;
@@ -6,332 +8,343 @@ interface StatsProps {
   cards: Card[];
 }
 
+const DAY_MS = 86_400_000;
+
+const numberFmt = new Intl.NumberFormat('en-US').format;
+
+type Range = '30d' | 'quarter' | 'all';
+
+function rangeDays(range: Range): number {
+  if (range === '30d') return 30;
+  if (range === 'quarter') return 90;
+  return 365;
+}
+
+function monthLabel(date: Date) {
+  return date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+}
+
 export default function Stats({ stats, decks, cards }: StatsProps) {
-  const now = Date.now();
-  const DAY_MS = 86400 * 1000;
+  const [range, setRange] = useState<Range>('30d');
+  // Anchor "now" once per mount; the stats view is short-lived.
+  const [now] = useState(() => Date.now());
 
-  // Calculate due cards
-  const dueNow = cards.filter(c => c.due <= now).length;
-  const dueTomorrow = cards.filter(c => c.due > now && c.due <= now + DAY_MS).length;
-  const dueThisWeek = cards.filter(c => c.due > now && c.due <= now + 7 * DAY_MS).length;
+  // Big numbers ----------------------------------------------------------
+  const totalCards = cards.length;
+  const totalReviews = stats.totalReviews;
+  const accuracyPct = Math.round(stats.averageAccuracy * 100);
+  const currentStreak = stats.currentStreak;
+  const bestStreak = stats.longestStreak;
 
-  // Get last 14 days of stats
-  const last14Days = getLast14Days(stats.dailyStats);
+  // Cards added this week (best-effort: createdAt within 7 days)
+  const cardsThisWeek = useMemo(
+    () => cards.filter(c => (c.createdAt ?? 0) > now - 7 * DAY_MS).length,
+    [cards, now],
+  );
 
-  // Calculate deck-wise breakdown
-  const deckStats = decks.map(deck => {
-    const deckCards = cards.filter(c => c.deckId === deck.id);
-    const due = deckCards.filter(c => c.due <= now).length;
-    const learned = deckCards.filter(c => c.repetitions > 0).length;
-    const avgEase = deckCards.length > 0 
-      ? deckCards.reduce((sum, c) => sum + c.ease, 0) / deckCards.length 
-      : 2.5;
-    
-    return {
-      deck,
-      total: deckCards.length,
-      due,
-      learned,
-      new: deckCards.length - learned,
-      avgEase,
-    };
-  });
+  // Retention: 1 - lapses / max(reviews, 1)
+  const totalReps = cards.reduce((s, c) => s + (c.repetitions ?? 0), 0);
+  const totalLapses = cards.reduce((s, c) => s + (c.lapses ?? 0), 0);
+  const retentionPct = totalReps > 0
+    ? Math.round((1 - totalLapses / totalReps) * 100)
+    : 0;
 
-  // Get max value for chart scaling
-  const maxReviews = Math.max(...last14Days.map(d => d.reviews), 1);
+  // Retention delta vs prior 30 days — synthetic from streak trend; if no
+  // history, leave the delta line empty.
+  // (We don't have monthly retention history, so this stays heuristic.)
+
+  // Review history bars --------------------------------------------------
+  const days = useMemo(() => {
+    const out: { date: string; reviews: number; isToday: boolean }[] = [];
+    const map = new Map<string, number>();
+    for (const d of stats.dailyStats) map.set(d.date, d.reviews);
+    const today = new Date();
+    const n = rangeDays(range);
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      out.push({ date: key, reviews: map.get(key) ?? 0, isToday: i === 0 });
+    }
+    return out;
+  }, [stats.dailyStats, range]);
+
+  const maxReviews = Math.max(...days.map(d => d.reviews), 1);
+  const startLabel = useMemo(() => {
+    if (days.length === 0) return '';
+    const d = new Date(days[0].date);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  }, [days]);
+  const midLabel = useMemo(() => {
+    if (days.length < 2) return '';
+    const d = new Date(days[Math.floor(days.length / 2)].date);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  }, [days]);
+  const endLabel = useMemo(() => {
+    if (days.length === 0) return '';
+    const d = new Date(days[days.length - 1].date);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  }, [days]);
+
+  // Retention by deck ----------------------------------------------------
+  const deckRetention = useMemo(() => {
+    return decks.map(deck => {
+      const list = cards.filter(c => c.deckId === deck.id);
+      const reps = list.reduce((s, c) => s + (c.repetitions ?? 0), 0);
+      const lapses = list.reduce((s, c) => s + (c.lapses ?? 0), 0);
+      const r = reps > 0 ? Math.max(0, Math.min(1, 1 - lapses / reps)) : 0;
+      return { deck, retention: r, hasReviews: reps > 0 };
+    });
+  }, [decks, cards]);
+
+  // Annual heatmap (52 weeks × 7 days) -----------------------------------
+  // Buckets: 0 / 1-3 / 4-9 / 10-19 / 20+
+  const heatmap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of stats.dailyStats) map.set(d.date, d.reviews);
+    const cells: { reviews: number; key: string; level: 0 | 1 | 2 | 3 | 4; date: Date }[] = [];
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    // Start 52 weeks ago, aligned to Sunday
+    const start = new Date(today);
+    start.setDate(today.getDate() - 52 * 7 + 1);
+    // Walk the Sundays
+    for (let w = 0; w < 52; w++) {
+      for (let dow = 0; dow < 7; dow++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + w * 7 + dow);
+        if (d.getTime() > today.getTime()) {
+          cells.push({ reviews: -1, key: '', level: 0, date: d });
+          continue;
+        }
+        const key = d.toISOString().slice(0, 10);
+        const r = map.get(key) ?? 0;
+        const level: 0 | 1 | 2 | 3 | 4 =
+          r === 0 ? 0
+          : r < 4 ? 1
+          : r < 10 ? 2
+          : r < 20 ? 3
+          : 4;
+        cells.push({ reviews: r, key, level, date: d });
+      }
+    }
+    return cells;
+  }, [stats.dailyStats]);
+
+  const heatmapStartLabel = monthLabel(heatmap[0]?.date ?? new Date());
+  const heatmapEndLabel = monthLabel(new Date());
+
+  // Render ---------------------------------------------------------------
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-50">Statistics</h2>
-        <p className="text-surface-500 mt-1">Track your learning progress</p>
+    <div>
+      <EditorialHeader
+        kicker="06 · Statistics"
+        title={
+          <>
+            A reading of{' '}
+            <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>
+              {numberFmt(totalReviews)}
+            </span>{' '}
+            reviews across the season.
+          </>
+        }
+        sub="A monthly ledger of how knowledge accrues. No leaderboards, no streak shaming."
+        action={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setRange('30d')}
+              className={range === '30d' ? 'btn btn-dark' : 'btn btn-ghost'}
+              style={{ padding: '6px 14px', fontSize: 12 }}
+            >
+              30d
+            </button>
+            <button
+              type="button"
+              onClick={() => setRange('quarter')}
+              className={range === 'quarter' ? 'btn btn-dark' : 'btn btn-ghost'}
+              style={{ padding: '6px 14px', fontSize: 12 }}
+            >
+              Quarter
+            </button>
+            <button
+              type="button"
+              onClick={() => setRange('all')}
+              className={range === 'all' ? 'btn btn-dark' : 'btn btn-ghost'}
+              style={{ padding: '6px 14px', fontSize: 12 }}
+            >
+              All-time
+            </button>
+          </div>
+        }
+      />
+
+      {/* 4-cell big numbers strip */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          borderTop: '1px solid var(--rule)',
+          borderBottom: '1px solid var(--rule)',
+        }}
+      >
+        {([
+          ['Total cards', numberFmt(totalCards), cardsThisWeek > 0 ? `+${cardsThisWeek} this week` : `${decks.length} decks`],
+          ['Reviews',     numberFmt(totalReviews), totalReviews > 0 ? `${accuracyPct}% accuracy` : 'no reviews yet'],
+          ['Streak',      `${currentStreak} d`, bestStreak > currentStreak ? `best · ${bestStreak} d` : 'best · today'],
+          ['Retention',   totalReps > 0 ? `${retentionPct}%` : '—', totalReps > 0 ? `${numberFmt(totalReps)} reviews counted` : 'awaiting reviews'],
+        ] as const).map(([k, v, sub], i) => (
+          <div
+            key={k}
+            style={{
+              padding: i === 0 ? '24px 24px 24px 0' : '24px',
+              borderRight: i < 3 ? '1px solid var(--rule)' : 'none',
+            }}
+          >
+            <div className="eyebrow">{k}</div>
+            <div className="stat-num" style={{ marginTop: 8 }}>{v}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>{sub}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-          <div className="text-3xl font-bold text-primary-600 dark:text-primary-400">
-            {stats.currentStreak}
-          </div>
-          <div className="text-sm text-surface-500 mt-1">Day Streak</div>
-          {stats.longestStreak > stats.currentStreak && (
-            <div className="text-xs text-surface-400 mt-2">
-              Best: {stats.longestStreak} days
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-          <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-            {Math.round(stats.averageAccuracy * 100)}%
-          </div>
-          <div className="text-sm text-surface-500 mt-1">Accuracy</div>
-          <div className="text-xs text-surface-400 mt-2">
-            {stats.totalReviews} total reviews
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-          <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
-            {dueNow}
-          </div>
-          <div className="text-sm text-surface-500 mt-1">Due Now</div>
-          <div className="text-xs text-surface-400 mt-2">
-            +{dueTomorrow} tomorrow
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-          <div className="text-3xl font-bold text-surface-900 dark:text-surface-50">
-            {cards.length}
-          </div>
-          <div className="text-sm text-surface-500 mt-1">Total Cards</div>
-          <div className="text-xs text-surface-400 mt-2">
-            {decks.length} decks
-          </div>
-        </div>
-      </div>
-
-      {/* Review Chart */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Reviews (Last 14 Days)</h3>
-        
-        {stats.totalReviews === 0 ? (
-          <div className="text-center py-8 text-surface-500">
-            No reviews yet. Start studying to see your progress!
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Chart */}
-            <div className="flex items-end gap-1 h-40">
-              {last14Days.map((day, index) => {
-                const height = (day.reviews / maxReviews) * 100;
-                const correctPercent = day.reviews > 0 ? day.correct / day.reviews : 0;
-                
-                return (
-                  <div 
-                    key={index} 
-                    className="flex-1 flex flex-col items-center group relative"
-                  >
-                    <div 
-                      className="w-full rounded-t-sm transition-all duration-300 relative overflow-hidden"
-                      style={{ height: `${Math.max(height, 2)}%` }}
-                    >
-                      {/* Correct portion */}
-                      <div 
-                        className="absolute bottom-0 w-full bg-green-500 dark:bg-green-400"
-                        style={{ height: `${correctPercent * 100}%` }}
-                      />
-                      {/* Incorrect portion */}
-                      <div 
-                        className="absolute top-0 w-full bg-red-400 dark:bg-red-500"
-                        style={{ height: `${(1 - correctPercent) * 100}%` }}
-                      />
-                    </div>
-                    
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                      <div className="bg-surface-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
-                        {day.date}: {day.reviews} reviews
-                        <br />
-                        {day.correct} correct, {day.incorrect} wrong
+      {/* Two-up: review history + retention by deck */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 48, marginTop: 40 }}>
+        <div>
+          <div className="eyebrow">A · Review history · {range === '30d' ? '30 days' : range === 'quarter' ? '90 days' : 'all time'}</div>
+          <div className="card-flat" style={{ padding: 24, marginTop: 12 }}>
+            {totalReviews === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '32px 0' }}>
+                No reviews yet. Begin a session to start the ledger.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 200 }}>
+                  {days.map((day, idx) => {
+                    const h = (day.reviews / maxReviews) * 100;
+                    return (
+                      <div
+                        key={idx}
+                        title={`${day.date}: ${day.reviews} reviews`}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'flex-end',
+                          height: '100%',
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: `${Math.max(day.reviews > 0 ? 2 : 0, h)}%`,
+                            background: day.isToday ? 'var(--clay)' : 'var(--ink)',
+                            borderRadius: '2px 2px 0 0',
+                          }}
+                        />
                       </div>
+                    );
+                  })}
+                </div>
+                <hr className="rule-thin" style={{ margin: '10px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{startLabel}</span>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{midLabel}</span>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{endLabel}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="eyebrow">B · Retention by deck</div>
+          <div className="card-flat" style={{ padding: '8px 24px', marginTop: 12 }}>
+            {deckRetention.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '32px 0' }}>
+                No decks yet.
+              </div>
+            ) : (
+              deckRetention.map(({ deck, retention, hasReviews }) => {
+                const pct = Math.round(retention * 100);
+                return (
+                  <div key={deck.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--rule)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                      <span className="serif" style={{ fontSize: 15, color: 'var(--ink)' }}>{deck.name}</span>
+                      <span className="mono" style={{ fontSize: 13, color: hasReviews ? 'var(--ink-2)' : 'var(--ink-4)' }}>
+                        {hasReviews ? `${pct}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="bar">
+                      <i style={{
+                        width: `${pct}%`,
+                        background: pct > 85 ? 'var(--moss)' : pct > 75 ? 'var(--clay)' : 'var(--gold)',
+                      }} />
                     </div>
                   </div>
                 );
-              })}
-            </div>
-            
-            {/* X-axis labels */}
-            <div className="flex gap-1 text-xs text-surface-400">
-              {last14Days.map((_day, index) => (
-                <div key={index} className="flex-1 text-center truncate">
-                  {index === 0 ? '14d ago' : index === 13 ? 'Today' : ''}
-                </div>
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Annual heatmap */}
+      <div style={{ marginTop: 40 }}>
+        <div className="eyebrow">C · A year of reviewing — annual heat map</div>
+        <div className="card-flat" style={{ padding: 24, marginTop: 12, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(52, 1fr)', gap: 3 }}>
+            {(() => {
+              // Cells are stored row-major by week; heatmap[w*7+dow]. Reshape to
+              // grid by displaying day rows instead of weekday rows.
+              // But we want a 7-row × 52-col layout. Build by dow.
+              const byDow: typeof heatmap[number][][] = [[], [], [], [], [], [], []];
+              for (let i = 0; i < heatmap.length; i++) {
+                const dow = i % 7;
+                byDow[dow].push(heatmap[i]);
+              }
+              const colors = [
+                'var(--rule)',     // 0 — none
+                'var(--clay-tint)',// 1 — light
+                '#E8B89A',         // 2
+                '#D88660',         // 3
+                'var(--clay)',     // 4 — heavy
+              ];
+              // Render column-major: 52 columns of 7 cells
+              const out: ReactElement[] = [];
+              for (let w = 0; w < 52; w++) {
+                for (let dow = 0; dow < 7; dow++) {
+                  const cell = byDow[dow][w];
+                  if (!cell) continue;
+                  if (cell.reviews < 0) {
+                    out.push(<div key={`${w}-${dow}`} style={{ aspectRatio: '1' }} />);
+                    continue;
+                  }
+                  out.push(
+                    <div
+                      key={`${w}-${dow}`}
+                      title={`${cell.key}: ${cell.reviews} reviews`}
+                      style={{ aspectRatio: '1', background: colors[cell.level], borderRadius: 1 }}
+                    />
+                  );
+                }
+              }
+              return out;
+            })()}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{heatmapStartLabel}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>LESS</span>
+              {['var(--rule)', 'var(--clay-tint)', '#E8B89A', '#D88660', 'var(--clay)'].map(c => (
+                <div key={c} style={{ width: 10, height: 10, background: c, borderRadius: 1 }} />
               ))}
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>MORE</span>
             </div>
-            
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-green-500 dark:bg-green-400" />
-                <span className="text-surface-600 dark:text-surface-400">Correct</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-red-400 dark:bg-red-500" />
-                <span className="text-surface-600 dark:text-surface-400">Incorrect</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Upcoming Reviews */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Upcoming Reviews</h3>
-        
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-lg">
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-              {dueNow}
-            </div>
-            <div className="text-sm text-surface-500">Today</div>
-          </div>
-          <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-lg">
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-              {dueTomorrow}
-            </div>
-            <div className="text-sm text-surface-500">Tomorrow</div>
-          </div>
-          <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-lg">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {dueThisWeek}
-            </div>
-            <div className="text-sm text-surface-500">This Week</div>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>{heatmapEndLabel}</span>
           </div>
         </div>
-      </div>
-
-      {/* Deck Breakdown */}
-      {deckStats.length > 0 && (
-        <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-          <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Deck Breakdown</h3>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-surface-200 dark:border-surface-700">
-                  <th className="text-left py-2 px-3 font-medium text-surface-500">Deck</th>
-                  <th className="text-right py-2 px-3 font-medium text-surface-500">Cards</th>
-                  <th className="text-right py-2 px-3 font-medium text-surface-500">Due</th>
-                  <th className="text-right py-2 px-3 font-medium text-surface-500">New</th>
-                  <th className="text-right py-2 px-3 font-medium text-surface-500">Learned</th>
-                  <th className="text-right py-2 px-3 font-medium text-surface-500">Ease</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deckStats.map(stat => (
-                  <tr key={stat.deck.id} className="border-b border-surface-100 dark:border-surface-800">
-                    <td className="py-3 px-3 font-medium text-surface-900 dark:text-surface-100">
-                      {stat.deck.name}
-                    </td>
-                    <td className="py-3 px-3 text-right text-surface-600 dark:text-surface-400">
-                      {stat.total}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      {stat.due > 0 ? (
-                        <span className="text-orange-600 dark:text-orange-400 font-medium">{stat.due}</span>
-                      ) : (
-                        <span className="text-surface-400">0</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 text-right text-blue-600 dark:text-blue-400">
-                      {stat.new}
-                    </td>
-                    <td className="py-3 px-3 text-right text-green-600 dark:text-green-400">
-                      {stat.learned}
-                    </td>
-                    <td className="py-3 px-3 text-right text-surface-600 dark:text-surface-400">
-                      {Math.round(stat.avgEase * 100)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Card States */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-        <h3 className="font-semibold text-surface-900 dark:text-surface-50 mb-4">Card States</h3>
-        
-        {cards.length === 0 ? (
-          <div className="text-center py-8 text-surface-500">
-            No cards yet. Import or create some cards to see the breakdown.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Progress bar */}
-            <div className="h-8 flex rounded-lg overflow-hidden">
-              {(() => {
-                const newCards = cards.filter(c => c.repetitions === 0).length;
-                const learning = cards.filter(c => c.repetitions > 0 && c.intervalDays < 7).length;
-                const mature = cards.filter(c => c.intervalDays >= 7).length;
-                const total = cards.length;
-                
-                return (
-                  <>
-                    <div 
-                      className="bg-blue-500 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(newCards / total) * 100}%` }}
-                    >
-                      {newCards > 0 && newCards}
-                    </div>
-                    <div 
-                      className="bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(learning / total) * 100}%` }}
-                    >
-                      {learning > 0 && learning}
-                    </div>
-                    <div 
-                      className="bg-green-500 flex items-center justify-center text-white text-xs font-medium"
-                      style={{ width: `${(mature / total) * 100}%` }}
-                    >
-                      {mature > 0 && mature}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-            
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-blue-500" />
-                <span className="text-surface-600 dark:text-surface-400">
-                  New ({cards.filter(c => c.repetitions === 0).length})
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-orange-500" />
-                <span className="text-surface-600 dark:text-surface-400">
-                  Learning ({cards.filter(c => c.repetitions > 0 && c.intervalDays < 7).length})
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-green-500" />
-                <span className="text-surface-600 dark:text-surface-400">
-                  Mature ({cards.filter(c => c.intervalDays >= 7).length})
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 }
-
-// Helper to get last 14 days of stats
-function getLast14Days(dailyStats: StatsType['dailyStats']) {
-  const days: Array<{ date: string; reviews: number; correct: number; incorrect: number }> = [];
-  
-  for (let i = 13; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    
-    const dayStats = dailyStats.find(d => d.date === dateStr);
-    
-    days.push({
-      date: dateStr,
-      reviews: dayStats?.reviews || 0,
-      correct: dayStats?.correct || 0,
-      incorrect: dayStats?.incorrect || 0,
-    });
-  }
-  
-  return days;
-}
-

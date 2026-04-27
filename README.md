@@ -47,26 +47,50 @@
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/images/extension.png" alt="Extension Popup" width="320"><br>
-      <b>Extension Popup</b><br>
-      <sub>Quick stats, site controls, content blocking with per-category breakdown</sub>
+      <img src="docs/images/study.png" alt="Study Session" width="420"><br>
+      <b>Study Session</b><br>
+      <sub>Stand-alone review with bilingual cards, queue, and per-session stats</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/images/deck.png" alt="Deck Management" width="320"><br>
+      <img src="docs/images/deck.png" alt="Deck Management" width="420"><br>
       <b>Deck Management</b><br>
-      <sub>Create, import, and manage flashcard decks with due card tracking</sub>
+      <sub>Create, import, and manage flashcard decks with due-card tracking</sub>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/images/settings.png" alt="Settings Dashboard" width="320"><br>
+      <img src="docs/images/settings.png" alt="Settings Dashboard" width="420"><br>
       <b>Settings Dashboard</b><br>
       <sub>Per-site quiz toggles and granular content blocking options</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/images/quiz.png" alt="Quiz Card" width="320"><br>
-      <b>Quiz Card</b><br>
-      <sub>Flashcard quiz injected directly into your social media feed</sub>
+      <img src="docs/images/stats.png" alt="Statistics" width="420"><br>
+      <b>Statistics</b><br>
+      <sub>Review history, retention by deck, and a year-long heatmap</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/import.png" alt="Import" width="420"><br>
+      <b>Import</b><br>
+      <sub>Plaintext, CSV, JSON, and Quizlet formats with live preview</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/theme.png" alt="Theme Foundations" width="420"><br>
+      <b>Theme Foundations</b><br>
+      <sub>Warm paper, clay accent, serif display, sans body</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/extension.png" alt="Extension Popup" width="280"><br>
+      <b>Extension Popup</b><br>
+      <sub>Quick stats, site controls, per-category blocked counts</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/quiz.png" alt="In-feed Quiz Card" width="420"><br>
+      <b>In-feed Quiz Card</b><br>
+      <sub>Cloze, MCQ, and text cards injected directly into your feed</sub>
     </td>
   </tr>
 </table>
