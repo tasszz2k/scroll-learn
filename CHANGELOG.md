@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.1](https://github.com/tasszz2k/scroll-learn/compare/v1.1.0...v1.1.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* **ci:** bump build job to node 22 ([f916387](https://github.com/tasszz2k/scroll-learn/commit/f916387934cc254d42b980435c8aab5cb1a3645b))
+
 ## [1.1.0](https://github.com/tasszz2k/scroll-learn/compare/v1.0.0...v1.1.0) (2026-04-27)
 
 
