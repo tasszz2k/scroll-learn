@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Deck, Card, Stats, Response } from '../../common/types';
 import CardEditor from './CardEditor';
+import CardPreview from './CardPreview';
 import EditorialHeader from './EditorialHeader';
 
 interface DeckListProps {
@@ -73,6 +74,7 @@ export default function DeckList({
   const [newDeckName, setNewDeckName] = useState('');
   const [newDeckDescription, setNewDeckDescription] = useState('');
   const [cardFilter, setCardFilter] = useState('');
+  const [previewState, setPreviewState] = useState<{ deckId: string; index: number } | null>(null);
   const pendingScrollCardIdRef = useRef<string | null>(null);
 
   // Honor the "edit card from quiz" deep link. Effect-driven setState is
@@ -477,6 +479,15 @@ export default function DeckList({
                       </button>
                       <button
                         type="button"
+                        onClick={() => setPreviewState({ deckId: deck.id, index: 0 })}
+                        disabled={agg.cardList.length === 0}
+                        className="btn btn-ghost"
+                        style={{ padding: '6px 14px', fontSize: 12 }}
+                      >
+                        Preview cards
+                      </button>
+                      <button
+                        type="button"
                         onClick={async () => {
                           if (!onSetActiveDeck) return;
                           await onSetActiveDeck(activeDeckId === deck.id ? null : deck.id);
@@ -610,6 +621,17 @@ export default function DeckList({
                                     </td>
                                     <td className="mono">{(card.ease ?? 2.5).toFixed(1)}</td>
                                     <td style={{ textAlign: 'right' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const idx = agg.cardList.findIndex(c => c.id === card.id);
+                                          setPreviewState({ deckId: deck.id, index: Math.max(0, idx) });
+                                        }}
+                                        className="ulink"
+                                        style={{ background: 'none', padding: 0, fontSize: 12, marginRight: 12, cursor: 'pointer' }}
+                                      >
+                                        preview
+                                      </button>
                                       <button
                                         type="button"
                                         onClick={() => setEditingCard(card)}
@@ -747,6 +769,26 @@ export default function DeckList({
           </div>
         </div>
       </aside>
+
+      {/* Card preview modal */}
+      {previewState && (() => {
+        const deck = decks.find(d => d.id === previewState.deckId);
+        const agg = perDeck.get(previewState.deckId);
+        if (!deck || !agg || agg.cardList.length === 0) return null;
+        return (
+          <CardPreview
+            cards={agg.cardList}
+            deckName={deck.name}
+            initialIndex={previewState.index}
+            onClose={() => setPreviewState(null)}
+            onEdit={(card) => {
+              setExpandedDeck(deck.id);
+              setEditingCard(card);
+              setPreviewState(null);
+            }}
+          />
+        );
+      })()}
 
       {/* Edit deck modal */}
       {editingDeck && (
