@@ -182,7 +182,7 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
       return handleClearNotes();
 
     case 'check_for_update':
-      return handleCheckForUpdate(message.force);
+      return handleCheckForUpdate();
 
     case 'get_update_info':
       return handleGetUpdateInfo();
@@ -195,9 +195,9 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
   }
 }
 
-async function handleCheckForUpdate(force?: boolean): Promise<Response<UpdateInfo>> {
+async function handleCheckForUpdate(): Promise<Response<UpdateInfo>> {
   try {
-    const info = await checkForUpdate(force);
+    const info = await checkForUpdate();
     return { ok: true, data: info };
   } catch (error) {
     return { ok: false, error: String(error) };

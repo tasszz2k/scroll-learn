@@ -103,6 +103,57 @@ html, body {
   margin-top: 4px;
   font-family: var(--font-sans);
 }
+.popup-version {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--ink-4, var(--ink-3));
+  background: var(--card);
+  vertical-align: middle;
+}
+button.popup-version {
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 10px;
+}
+.popup-version-update {
+  color: var(--clay-deep, var(--clay));
+  background: var(--clay-wash, #FBF1E2);
+  border-color: var(--clay-tint, var(--clay));
+  font-weight: 600;
+  animation: popup-version-pulse 1.8s ease-in-out infinite;
+}
+.popup-version-update:hover,
+.popup-version-update:focus-visible {
+  background: var(--clay);
+  color: var(--paper, #FBF8F2);
+  border-color: var(--clay);
+  outline: none;
+  animation: none;
+}
+.popup-version-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--clay);
+  flex-shrink: 0;
+}
+.popup-version-update:hover .popup-version-dot,
+.popup-version-update:focus-visible .popup-version-dot {
+  background: var(--paper, #FBF8F2);
+}
+@keyframes popup-version-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 100, 66, 0.35); }
+  50%      { box-shadow: 0 0 0 4px rgba(201, 100, 66, 0); }
+}
 
 .status-dot {
   width: 8px;

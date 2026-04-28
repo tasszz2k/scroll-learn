@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- popup.tsx is the entry point, not a Vite-HMR module */
 import { createRoot } from 'react-dom/client';
 import { useState, useEffect, useCallback } from 'react';
-import type { Card, Deck, Stats, Settings } from '../common/types';
+import type { Card, Deck, Stats, Settings, UpdateInfo } from '../common/types';
 import type { BlockedCounts } from '../content/blocker';
 import { isHostAllowed, parseRegexEntry } from '../common/allowlist';
 import './popup.css';
@@ -17,6 +17,7 @@ interface PopupState {
   loading: boolean;
   blockedCount: number;
   blockedCounts: BlockedCounts | null;
+  updateInfo: UpdateInfo | null;
 }
 
 function ArrowRight({ size = 14 }: { size?: number }) {
@@ -53,6 +54,7 @@ function Popup() {
     loading: true,
     blockedCount: 0,
     blockedCounts: null,
+    updateInfo: null,
   });
 
   const loadData = useCallback(async () => {
@@ -61,11 +63,12 @@ function Popup() {
       const url = tab?.url ? new URL(tab.url) : null;
       const currentSite = url?.hostname?.replace(/^(www\.|m\.)/, '') || '';
 
-      const [statsResponse, settingsResponse, decksResponse, cardsResponse] = await Promise.all([
+      const [statsResponse, settingsResponse, decksResponse, cardsResponse, updateResponse] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_stats' }),
         chrome.runtime.sendMessage({ type: 'get_settings' }),
         chrome.runtime.sendMessage({ type: 'get_decks' }),
         chrome.runtime.sendMessage({ type: 'get_cards' }),
+        chrome.runtime.sendMessage({ type: 'get_update_info' }),
       ]);
 
       const cardCounts: Record<string, number> = {};
@@ -105,6 +108,7 @@ function Popup() {
         loading: false,
         blockedCount,
         blockedCounts,
+        updateInfo: updateResponse?.ok ? updateResponse.data : null,
       });
     } catch (error) {
       console.error('Failed to load popup data:', error);
@@ -116,6 +120,22 @@ function Popup() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot async load via chrome.runtime; no Suspense bridge available
     void loadData();
   }, [loadData]);
+
+  // Trigger a fresh GitHub check on every popup open so the highlight reacts
+  // to brand-new releases without waiting for the 6-hour alarm.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await chrome.runtime.sendMessage({ type: 'check_for_update' });
+        if (cancelled || !res?.ok) return;
+        setState(prev => ({ ...prev, updateInfo: res.data }));
+      } catch {
+        // popup is short-lived; swallow transient errors
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function toggleSite() {
     if (!state.settings || !state.currentSite) return;
@@ -212,7 +232,15 @@ function Popup() {
     );
   }
 
-  const { stats, settings, currentSite, decks, cardCounts, dueCounts, totalDue, blockedCount, blockedCounts } = state;
+  const { stats, settings, currentSite, decks, cardCounts, dueCounts, totalDue, blockedCount, blockedCounts, updateInfo } = state;
+  const updateAvailable = !!updateInfo?.updateAvailable;
+  const currentVersion = chrome.runtime.getManifest().version;
+  const versionLabel = updateAvailable && updateInfo?.latestVersion
+    ? `v${currentVersion} → v${updateInfo.latestVersion}`
+    : `v${currentVersion}`;
+  const versionTitle = updateAvailable
+    ? `Update available: v${updateInfo?.latestVersion}. Click to open the dashboard.`
+    : 'Extension version';
   const siteEnabled = isSiteEnabled();
   const noteCaptureOn = isNoteCaptureEnabled();
   const noteCaptureLockedByRegex = isAllowlistedByRegex();
@@ -250,7 +278,22 @@ function Popup() {
         </div>
         <div className="popup-title">
           <h1>Scroll Learn</h1>
-          <p>Learn while you scroll</p>
+          <p>
+            Learn while you scroll
+            {updateAvailable ? (
+              <button
+                type="button"
+                className="popup-version popup-version-update"
+                title={versionTitle}
+                onClick={openDashboard}
+              >
+                <span className="popup-version-dot" aria-hidden />
+                {versionLabel}
+              </button>
+            ) : (
+              <span className="popup-version" title={versionTitle}>{versionLabel}</span>
+            )}
+          </p>
         </div>
         <div className={'status-dot' + (!siteEnabled ? ' disabled' : '')} title={siteEnabled ? 'Active' : 'Paused on this site'} />
       </header>

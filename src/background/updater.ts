@@ -1,6 +1,6 @@
 import type { UpdateInfo, Response } from '../common/types';
 import { STORAGE_KEYS } from '../common/types';
-import { buildUpdateInfo, compareVersions, getCurrentVersion, NATIVE_HOST_NAME } from '../common/updater';
+import { buildUpdateInfo, NATIVE_HOST_NAME } from '../common/updater';
 
 export const ALARM_CHECK_UPDATE = 'check_for_update';
 
@@ -23,36 +23,9 @@ function setBadgeForUpdate(updateAvailable: boolean): void {
   }
 }
 
-export async function checkForUpdate(force = false): Promise<UpdateInfo> {
-  const existing = await getStoredUpdateInfo();
-  const sixHours = 6 * 60 * 60 * 1000;
-  const liveVersion = getCurrentVersion();
-  // Cached entries are still valid only if they were taken on the same
-  // installed version. After an in-place update or a manual reload, the
-  // cached `updateAvailable` flag becomes a lie, and a stale banner reappears.
-  if (
-    !force
-    && existing
-    && Date.now() - existing.checkedAt < sixHours
-    && existing.currentVersion === liveVersion
-  ) {
-    return existing;
-  }
-  // Reconcile the cache against the current manifest before going to the
-  // network: if the cache was for an older version and the latest release
-  // it knew about is now installed (or older), we can clear the banner
-  // immediately without waiting on the GitHub API.
-  if (existing && existing.currentVersion !== liveVersion && existing.latestVersion) {
-    if (compareVersions(existing.latestVersion, liveVersion) <= 0) {
-      const reconciled: UpdateInfo = {
-        ...existing,
-        currentVersion: liveVersion,
-        updateAvailable: false,
-      };
-      await saveUpdateInfo(reconciled);
-      setBadgeForUpdate(false);
-    }
-  }
+export async function checkForUpdate(): Promise<UpdateInfo> {
+  // Always hit GitHub: the stored info is only used to render an instant view
+  // while the next check is in flight, never as a substitute for it.
   const info = await buildUpdateInfo();
   await saveUpdateInfo(info);
   setBadgeForUpdate(info.updateAvailable);

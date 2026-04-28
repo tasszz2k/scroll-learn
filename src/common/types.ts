@@ -269,7 +269,6 @@ export interface ClearNotesMessage {
 
 export interface CheckForUpdateMessage {
   type: 'check_for_update';
-  force?: boolean;
 }
 
 export interface GetUpdateInfoMessage {

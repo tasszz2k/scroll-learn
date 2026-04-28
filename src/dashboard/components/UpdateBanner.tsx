@@ -3,8 +3,6 @@ import type { UpdateInfo } from '../../common/types';
 
 type State = 'idle' | 'checking' | 'installing' | 'success' | 'error';
 
-const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-
 export default function UpdateBanner() {
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [state, setState] = useState<State>('idle');
@@ -14,7 +12,7 @@ export default function UpdateBanner() {
   const check = useCallback(async () => {
     setState('checking');
     setErrorMsg(null);
-    const res = await chrome.runtime.sendMessage({ type: 'check_for_update', force: true });
+    const res = await chrome.runtime.sendMessage({ type: 'check_for_update' });
     if (res?.ok) {
       setInfo(res.data);
       setState('idle');
@@ -24,18 +22,10 @@ export default function UpdateBanner() {
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    const res = await chrome.runtime.sendMessage({ type: 'get_update_info' });
-    if (res?.ok) setInfo(res.data ?? null);
-    if (!res?.data || Date.now() - res.data.checkedAt > SIX_HOURS_MS) {
-      void check();
-    }
-  }, [check]);
-
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot async load via chrome.runtime; no Suspense bridge available
-    void refresh();
-  }, [refresh]);
+    void check();
+  }, [check]);
 
   async function install() {
     setState('installing');
