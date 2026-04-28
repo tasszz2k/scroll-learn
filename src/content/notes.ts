@@ -1,11 +1,12 @@
-// Notes content script: captures user selections on allowlisted domains and
-// forwards them to the background service worker for storage.
+// Notes content script: on allowlisted domains, captures the element under the
+// cursor while the user holds the Option (Alt) key ("pluck mode") and forwards
+// its text to the background service worker for storage. Plain text selection
+// alone never triggers a save; the user must opt in by holding the modifier.
 
 import type { Settings } from '../common/types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../common/types';
 import { isHostAllowed } from '../common/allowlist';
 
-const DEBOUNCE_MS = 350;
 const LOCAL_DEDUPE_MS = 3000;
 const TOAST_GAP_PX = 8;
 // Bounds enforced on the user-configurable toast duration.
@@ -28,19 +29,21 @@ function toastVisibleMs(): number {
   return Math.max(TOAST_MIN_MS, Math.min(TOAST_MAX_MS, Math.round(seconds * 1000)));
 }
 
-let debounceTimer: number | null = null;
 let lastSentText = '';
 let lastSentAt = 0;
 
-// Pluck mode state: while Ctrl/Cmd is held, hovering shows a green outline as a
-// preview — nothing is saved. Releasing the modifier captures whichever element
-// is currently outlined. Click / right-click during the hold also captures
-// immediately (useful for macOS where Ctrl+click is contextmenu).
+// Pluck mode state: while Option (Alt) is held, hovering shows a green outline
+// as a preview; nothing is saved. Releasing the modifier captures whichever
+// element is currently outlined. Clicking during the hold also captures
+// immediately. If the user drag-selects text during the hold, the selected
+// words are saved instead of the surrounding element's full text. Pressing Esc
+// cancels without saving.
 let pluckActive = false;
 let pluckHoverEl: HTMLElement | null = null;
 let pluckHoverPrev: { outline: string; outlineOffset: string; backgroundColor: string } | null = null;
 let pluckPrevBodyCursor = '';
 let pluckSessionCaptured = false;
+let pluckMouseDown = false;
 
 function normalizeHost(host: string): string {
   return host.toLowerCase().replace(/^(www\.|m\.)/, '');
@@ -266,6 +269,12 @@ function pluckExtractText(target: HTMLElement): string {
 
 function onPluckMove(e: MouseEvent) {
   if (!pluckActive) return;
+  // While the user is dragging to select text, suppress the hover outline so it
+  // doesn't compete visually with the native selection highlight.
+  if (pluckMouseDown) {
+    setPluckHover(null);
+    return;
+  }
   const target = pluckTargetFromPoint(e.clientX, e.clientY);
   setPluckHover(target);
 }
@@ -293,13 +302,72 @@ function pluckCaptureElement(target: HTMLElement) {
   trySendNote(text);
 }
 
+function pluckCaptureSelection(): boolean {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return false;
+  const raw = sel.toString();
+  if (!raw.trim()) return false;
+  if (isInsideEditable(sel.anchorNode)) {
+    console.log('[ScrollLearn:notes] pluck selection: inside editable, skip');
+    return false;
+  }
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (text.length < ctx.settings.noteMinLength) {
+    console.log('[ScrollLearn:notes] pluck selection: below minLength', text);
+    return false;
+  }
+
+  const now = Date.now();
+  if (text === lastSentText && now - lastSentAt < LOCAL_DEDUPE_MS) {
+    console.log('[ScrollLearn:notes] pluck selection: dedupe skip', text);
+    return false;
+  }
+  lastSentText = text;
+  lastSentAt = now;
+
+  trySendNote(text);
+  return true;
+}
+
+function onPluckMouseDown() {
+  if (!pluckActive) return;
+  pluckMouseDown = true;
+}
+
+// Selection wins over element capture: if the user has any non-empty text
+// selection at this trigger, save that text and skip element capture.
+function pluckCaptureSelectionOrElement(target: HTMLElement | null): boolean {
+  if (pluckCaptureSelection()) return true;
+  if (!target) return false;
+  if (target.closest('#scrolllearn-note-toast-stack')) return false;
+  pluckCaptureElement(target);
+  return true;
+}
+
+function onPluckMouseUpCapture() {
+  if (!pluckActive) return;
+  if (!pluckMouseDown) return;
+  pluckMouseDown = false;
+  if (pluckSessionCaptured) return;
+
+  // If the user drag-selected text during the modifier hold, save just those
+  // words. A bare click (no selection) is handled by the click listener below.
+  if (pluckCaptureSelection()) {
+    pluckSessionCaptured = true;
+  }
+}
+
 function onPluckClickCapture(e: MouseEvent) {
   if (!pluckActive) return;
 
-  // If the user happened to drag-select with the modifier held, let the
-  // selection-capture path handle it via the normal mouseup flow.
-  const sel = window.getSelection();
-  if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+  // mouseup may have already captured a drag-selected range during this hold.
+  // Consume the click so the page's link/button handler doesn't fire either.
+  if (pluckSessionCaptured) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+    return;
+  }
 
   const target = (e.target as HTMLElement | null) ?? pluckHoverEl;
   if (!target) return;
@@ -310,64 +378,59 @@ function onPluckClickCapture(e: MouseEvent) {
   e.stopPropagation();
   if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
 
-  pluckSessionCaptured = true;
-  pluckCaptureElement(target);
-}
-
-// macOS converts Ctrl+click into a contextmenu event, so the click listener never
-// fires there. Intercept contextmenu while pluck is active and use it as the
-// capture trigger.
-function onPluckContextMenu(e: MouseEvent) {
-  if (!pluckActive) return;
-  const target = (e.target as HTMLElement | null) ?? pluckHoverEl;
-  if (!target) return;
-  if (target.closest('#scrolllearn-note-toast-stack')) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
-
-  pluckSessionCaptured = true;
-  pluckCaptureElement(target);
+  if (pluckCaptureSelectionOrElement(target)) {
+    pluckSessionCaptured = true;
+  }
 }
 
 function startPluck() {
   if (pluckActive) return;
   pluckActive = true;
   pluckSessionCaptured = false;
+  pluckMouseDown = false;
   pluckPrevBodyCursor = document.body.style.cursor;
   document.body.style.cursor = 'crosshair';
   document.addEventListener('mousemove', onPluckMove, true);
+  document.addEventListener('mousedown', onPluckMouseDown, true);
+  document.addEventListener('mouseup', onPluckMouseUpCapture, true);
   document.addEventListener('click', onPluckClickCapture, true);
-  document.addEventListener('contextmenu', onPluckContextMenu, true);
   console.log('[ScrollLearn:notes] pluck mode ON');
 }
 
 function stopPluck(opts: { skipCapture?: boolean } = {}) {
   if (!pluckActive) return;
-  // Capture the currently-hovered element on release, unless click/contextmenu
-  // already handled the capture during this session, or the caller asked us to
-  // skip (e.g. window blur).
-  const captureTarget = !opts.skipCapture && !pluckSessionCaptured ? pluckHoverEl : null;
+  // On release, prefer any drag-selected text over the hovered element. Skip
+  // entirely if click/contextmenu/mouseup already captured this session or the
+  // caller asked us to (e.g. window blur).
+  const shouldCapture = !opts.skipCapture && !pluckSessionCaptured;
+  const captureTarget = shouldCapture ? pluckHoverEl : null;
 
   pluckActive = false;
+  pluckMouseDown = false;
   document.body.style.cursor = pluckPrevBodyCursor;
   setPluckHover(null);
   document.removeEventListener('mousemove', onPluckMove, true);
+  document.removeEventListener('mousedown', onPluckMouseDown, true);
+  document.removeEventListener('mouseup', onPluckMouseUpCapture, true);
   document.removeEventListener('click', onPluckClickCapture, true);
-  document.removeEventListener('contextmenu', onPluckContextMenu, true);
 
-  if (captureTarget) {
-    pluckCaptureElement(captureTarget);
+  if (shouldCapture) {
+    pluckCaptureSelectionOrElement(captureTarget);
   }
 }
 
 function isPluckModifier(e: KeyboardEvent | MouseEvent): boolean {
-  if ('key' in e) return e.key === 'Control' || e.key === 'Meta';
-  return e.ctrlKey || e.metaKey;
+  if ('key' in e) return e.key === 'Alt';
+  return e.altKey;
 }
 
 function onPluckKeyDown(e: KeyboardEvent) {
+  // Esc cancels an in-progress pluck without saving the hovered element.
+  if (e.key === 'Escape' && pluckActive) {
+    console.log('[ScrollLearn:notes] pluck cancelled via Escape');
+    stopPluck({ skipCapture: true });
+    return;
+  }
   if (!isPluckModifier(e)) return;
   if (!ctx.active) {
     console.log(
@@ -385,7 +448,7 @@ function onPluckKeyDown(e: KeyboardEvent) {
 
 function onPluckKeyUp(e: KeyboardEvent) {
   // Stop when the modifier is released or no longer held
-  if (e.key === 'Control' || e.key === 'Meta' || (!e.ctrlKey && !e.metaKey)) {
+  if (e.key === 'Alt' || !e.altKey) {
     stopPluck();
   }
 }
@@ -438,16 +501,30 @@ function showStatusToast(message: string, kind: 'warn' | 'error' = 'warn') {
   }
 }
 
+function describeError(err: unknown): string {
+  if (err && typeof err === 'object' && 'name' in err && 'message' in err) {
+    return `${String((err as { name: unknown }).name)}: ${String((err as { message: unknown }).message)}`;
+  }
+  return String(err);
+}
+
 async function copyTextToClipboard(text: string): Promise<boolean> {
   // Try the modern clipboard API first; fall back to execCommand for sites where
-  // the API is blocked by permissions-policy or the user-gesture chain has lapsed.
-  try {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+  // the API is blocked by permissions-policy or the document is not focused
+  // (common on preview/iframe surfaces). hasFocus() avoids a guaranteed
+  // DOMException on the most frequent failure mode.
+  let modernErr: unknown = null;
+  if (
+    navigator.clipboard &&
+    typeof navigator.clipboard.writeText === 'function' &&
+    document.hasFocus()
+  ) {
+    try {
       await navigator.clipboard.writeText(text);
       return true;
+    } catch (err) {
+      modernErr = err;
     }
-  } catch (err) {
-    console.warn('[ScrollLearn:notes] navigator.clipboard.writeText failed, trying fallback:', err);
   }
   try {
     const ta = document.createElement('textarea');
@@ -457,11 +534,15 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
     ta.select();
     const ok = document.execCommand('copy');
     ta.remove();
-    return ok;
+    if (ok) return true;
   } catch (err) {
-    console.warn('[ScrollLearn:notes] execCommand copy failed:', err);
+    console.warn('[ScrollLearn:notes] clipboard fallback threw:', describeError(err));
     return false;
   }
+  if (modernErr) {
+    console.warn('[ScrollLearn:notes] clipboard write blocked:', describeError(modernErr));
+  }
+  return false;
 }
 
 async function trySendNote(text: string) {
@@ -506,88 +587,17 @@ async function trySendNote(text: string) {
   }
 }
 
-function handleSelection() {
-  if (!ctx.active) return;
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed) return;
-
-  const raw = selection.toString();
-  const text = raw.trim();
-  if (!text) return;
-  if (text.length < ctx.settings.noteMinLength) return;
-  if (isInsideEditable(selection.anchorNode)) return;
-
-  const now = Date.now();
-  if (text === lastSentText && now - lastSentAt < LOCAL_DEDUPE_MS) return;
-
-  lastSentText = text;
-  lastSentAt = now;
-  trySendNote(text);
-}
-
-function scheduleCapture() {
-  if (debounceTimer !== null) {
-    clearTimeout(debounceTimer);
-  }
-  debounceTimer = window.setTimeout(() => {
-    debounceTimer = null;
-    handleSelection();
-  }, DEBOUNCE_MS);
-}
-
-function onMouseUp() {
-  scheduleCapture();
-}
-
-function onCopy() {
-  // Explicit copy (Ctrl+C / right-click Copy / programmatic copy) is strong
-  // intent — capture immediately without the debounce so the toast confirms
-  // the action right when the keystroke happens.
-  if (!ctx.active) return;
-  handleSelection();
-}
-
-function onKeyUp(e: KeyboardEvent) {
-  // Only react to keys that can extend or finish a selection
-  const k = e.key;
-  if (
-    k === 'Shift' ||
-    k === 'Control' ||
-    k === 'Meta' ||
-    k === 'ArrowLeft' ||
-    k === 'ArrowRight' ||
-    k === 'ArrowUp' ||
-    k === 'ArrowDown' ||
-    k === 'Home' ||
-    k === 'End' ||
-    k === 'PageUp' ||
-    k === 'PageDown'
-  ) {
-    scheduleCapture();
-  }
-}
-
 function attachListeners() {
-  document.addEventListener('mouseup', onMouseUp, true);
-  document.addEventListener('keyup', onKeyUp, true);
-  document.addEventListener('copy', onCopy, true);
   document.addEventListener('keydown', onPluckKeyDown, true);
   document.addEventListener('keyup', onPluckKeyUp, true);
   window.addEventListener('blur', onWindowBlur);
 }
 
 function detachListeners() {
-  document.removeEventListener('mouseup', onMouseUp, true);
-  document.removeEventListener('keyup', onKeyUp, true);
-  document.removeEventListener('copy', onCopy, true);
   document.removeEventListener('keydown', onPluckKeyDown, true);
   document.removeEventListener('keyup', onPluckKeyUp, true);
   window.removeEventListener('blur', onWindowBlur);
   stopPluck();
-  if (debounceTimer !== null) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
 }
 
 function applyState() {
