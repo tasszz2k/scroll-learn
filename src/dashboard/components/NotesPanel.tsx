@@ -1,8 +1,22 @@
 import { useMemo, useState } from 'react';
-import type { Note, Settings as SettingsType } from '../../common/types';
+import type { Note, Settings as SettingsType, PartOfSpeech } from '../../common/types';
 import { detectVietnamese, translateMany, type TranslateLang } from '../../common/translate';
 import EditorialHeader from './EditorialHeader';
 import PromptGenerator from './PromptGenerator';
+
+function posShort(pos: PartOfSpeech): string {
+  switch (pos) {
+    case 'noun': return 'noun';
+    case 'verb': return 'verb';
+    case 'adjective': return 'adj';
+    case 'adverb': return 'adv';
+    case 'pronoun': return 'pron';
+    case 'preposition': return 'prep';
+    case 'conjunction': return 'conj';
+    case 'interjection': return 'interj';
+    default: return '';
+  }
+}
 
 interface NotesPanelProps {
   notes: Note[];
@@ -414,6 +428,47 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
                     title={note.translationLang ? `Translated to ${note.translationLang.toUpperCase()}` : 'Translation'}
                   >
                     {note.translation}
+                  </div>
+                )}
+                {note.senses && note.senses.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {note.senses.map((s, idx) => {
+                      const label = posShort(s.pos);
+                      const terms = s.terms.join(', ');
+                      if (!terms) return null;
+                      return (
+                        <div
+                          key={`${s.pos}-${idx}`}
+                          className="text-xs"
+                          style={{ color: 'var(--clay-deep)', fontStyle: 'italic' }}
+                        >
+                          {label && (
+                            <span className="px-1.5 py-0.5 mr-1.5 rounded-full bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300" style={{ fontStyle: 'normal' }}>
+                              {label}
+                            </span>
+                          )}
+                          {terms}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {note.derivedForms && note.derivedForms.length > 0 && (
+                  <div className="mt-1 text-xs flex flex-wrap items-center gap-x-1.5 gap-y-1" style={{ color: 'var(--clay-deep)' }}>
+                    <span style={{ opacity: 0.7 }}>family:</span>
+                    {note.derivedForms.map((f, idx) => {
+                      const label = posShort(f.pos);
+                      return (
+                        <span key={`${f.word}-${idx}`} className="inline-flex items-center gap-1">
+                          <span>{f.word}</span>
+                          {label && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300">
+                              {label}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-surface-500">

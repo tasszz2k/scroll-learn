@@ -1,7 +1,8 @@
 import type { Message, Response, Card, Deck, Note, NewNote, Settings, Stats, Grade, TranslateLang, UpdateInfo } from '../common/types';
 import { createCard, createDeck, createNote } from '../common/types';
 import * as storage from '../common/storage';
-import { detectVietnamese, translate } from '../common/translate';
+import { detectVietnamese, isSingleWord, translate, translateWithDictionary } from '../common/translate';
+import { wordFamilyFor } from '../common/wordFamily';
 import { sm2Update, sortCardsForReview } from './scheduler';
 import {
   ALARM_CHECK_UPDATE,
@@ -649,7 +650,7 @@ async function handleOpenDashboard(): Promise<Response<void>> {
 async function handleSaveNote(noteData: NewNote): Promise<Response<Note>> {
   try {
     const settings = await storage.getSettings();
-    let enriched = noteData;
+    let enriched: NewNote = noteData;
 
     if (settings.noteAutoTranslate) {
       const text = noteData.text.trim();
@@ -657,10 +658,29 @@ async function handleSaveNote(noteData: NewNote): Promise<Response<Note>> {
         const { from, to } = resolveTranslateDirection(text, settings.noteTranslateDirection);
         if (from !== to) {
           try {
-            const translated = (await translate(text, from, to)).trim();
-            // Skip if the endpoint returned the same string (means it could not translate)
-            if (translated && translated.toLowerCase() !== text.toLowerCase()) {
-              enriched = { ...noteData, translation: translated, translationLang: to };
+            if (isSingleWord(text)) {
+              const { translation, senses } = await translateWithDictionary(text, from, to);
+              const trimmed = translation.trim();
+              if (trimmed && trimmed.toLowerCase() !== text.toLowerCase()) {
+                enriched = { ...noteData, translation: trimmed, translationLang: to };
+              }
+              if (senses.length > 0) {
+                enriched = { ...enriched, senses };
+              }
+              // Derivational family is English-only by design (rules + dict are en).
+              if (from === 'en') {
+                const primaryPos = senses[0]?.pos ?? 'other';
+                const derivedForms = await wordFamilyFor(text.toLowerCase(), primaryPos);
+                if (derivedForms.length > 0) {
+                  enriched = { ...enriched, derivedForms };
+                }
+              }
+            } else {
+              const translated = (await translate(text, from, to)).trim();
+              // Skip if the endpoint returned the same string (means it could not translate)
+              if (translated && translated.toLowerCase() !== text.toLowerCase()) {
+                enriched = { ...noteData, translation: translated, translationLang: to };
+              }
             }
           } catch (err) {
             console.warn('[ScrollLearn] auto-translate failed:', err);

@@ -120,6 +120,13 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export type TranslateLang = 'en' | 'vi';
 
+// Re-exported from translate/wordFamily so consumers can import note-shape
+// helpers from a single place.
+export type { DictionarySense, PartOfSpeech } from './translate';
+export type { DerivedForm } from './wordFamily';
+import type { DictionarySense } from './translate';
+import type { DerivedForm } from './wordFamily';
+
 // Notes feature
 export interface Note {
   id: string;
@@ -130,6 +137,11 @@ export interface Note {
   createdAt: number;
   translation?: string;
   translationLang?: TranslateLang;
+  // Single-word enrichment. Both fields are only populated when the captured
+  // selection is a single word (see isSingleWord). senses lists POS-grouped
+  // translations; derivedForms is the morphological family (English source only).
+  senses?: DictionarySense[];
+  derivedForms?: DerivedForm[];
 }
 
 export type NewNote = Omit<Note, 'id' | 'createdAt'>;

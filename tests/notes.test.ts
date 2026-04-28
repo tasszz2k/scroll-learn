@@ -99,65 +99,91 @@ describe('notes storage', () => {
     expect(all).toEqual([]);
   });
 
-  it('dedupes identical text+domain saved within 5 seconds', async () => {
+  it('dedupes identical normalized text regardless of domain or time window', async () => {
     const base = createNote({
-      text: 'duplicate',
-      url: 'https://example.com/a',
+      text: 'concept',
+      url: 'https://a.example/',
       pageTitle: 'a',
-      domain: 'example.com',
+      domain: 'a.example',
     });
+    base.createdAt = Date.now() - 60_000; // far outside any time window
     await saveNote(base);
 
-    const second = createNote({
-      text: 'duplicate',
-      url: 'https://example.com/b',
+    // Same text, different domain, much later — should still dedupe.
+    await saveNote(createNote({
+      text: 'concept',
+      url: 'https://b.example/',
       pageTitle: 'b',
-      domain: 'example.com',
-    });
-    // createdAt should be very close to base.createdAt — within the 5s window
-    await saveNote(second);
+      domain: 'b.example',
+    }));
+
+    // Case + whitespace differences also collapse to the same normalized text.
+    await saveNote(createNote({
+      text: '  CONCEPT  ',
+      url: 'https://c.example/',
+      pageTitle: 'c',
+      domain: 'c.example',
+    }));
 
     const all = await getNotes();
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe(base.id);
   });
 
-  it('does not dedupe identical text from a different domain', async () => {
-    await saveNote(createNote({
-      text: 'duplicate',
-      url: 'https://a.example/',
-      pageTitle: 'a',
-      domain: 'a.example',
-    }));
-    await saveNote(createNote({
-      text: 'duplicate',
-      url: 'https://b.example/',
-      pageTitle: 'b',
-      domain: 'b.example',
-    }));
-    const all = await getNotes();
-    expect(all).toHaveLength(2);
-  });
-
-  it('does not dedupe identical text outside the 5s window', async () => {
-    const old = createNote({
-      text: 'duplicate',
+  it('merges enrichment fields onto the existing note when the new save has them', async () => {
+    const base = createNote({
+      text: 'concept',
       url: 'u',
       pageTitle: 't',
       domain: 'd',
     });
-    // Force createdAt to be 10 seconds in the past
-    old.createdAt = Date.now() - 10_000;
-    await saveNote(old);
+    await saveNote(base);
 
-    await saveNote(createNote({
-      text: 'duplicate',
+    const enriched = createNote({
+      text: 'concept',
       url: 'u',
       pageTitle: 't',
       domain: 'd',
-    }));
+      translation: 'ý tưởng',
+      translationLang: 'vi',
+      senses: [{ pos: 'noun', posLabel: 'noun', terms: ['khái niệm'] }],
+      derivedForms: [{ word: 'conception', pos: 'noun' }],
+    });
+    const result = await saveNote(enriched);
+
+    expect(result.id).toBe(base.id);
+    expect(result.translation).toBe('ý tưởng');
+    expect(result.senses).toHaveLength(1);
+    expect(result.derivedForms?.[0].word).toBe('conception');
+
     const all = await getNotes();
-    expect(all).toHaveLength(2);
+    expect(all).toHaveLength(1);
+    expect(all[0].translation).toBe('ý tưởng');
+  });
+
+  it('does not overwrite enrichment that the existing note already has', async () => {
+    const original = createNote({
+      text: 'concept',
+      url: 'u',
+      pageTitle: 't',
+      domain: 'd',
+      translation: 'original',
+      translationLang: 'vi',
+    });
+    await saveNote(original);
+
+    await saveNote(createNote({
+      text: 'concept',
+      url: 'u',
+      pageTitle: 't',
+      domain: 'd',
+      translation: 'should-not-replace',
+      translationLang: 'vi',
+    }));
+
+    const all = await getNotes();
+    expect(all).toHaveLength(1);
+    expect(all[0].translation).toBe('original');
   });
 });
 

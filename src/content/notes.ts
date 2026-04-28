@@ -3,7 +3,7 @@
 // its text to the background service worker for storage. Plain text selection
 // alone never triggers a save; the user must opt in by holding the modifier.
 
-import type { Settings } from '../common/types';
+import type { Settings, DictionarySense, DerivedForm } from '../common/types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../common/types';
 import { isHostAllowed } from '../common/allowlist';
 
@@ -91,7 +91,29 @@ function ensureToastStack(): HTMLElement {
   return stack;
 }
 
-function showToast(preview: string, opts: { copied?: boolean; translation?: string } = {}) {
+function posLabel(pos: DictionarySense['pos']): string {
+  switch (pos) {
+    case 'noun': return 'noun';
+    case 'verb': return 'verb';
+    case 'adjective': return 'adj';
+    case 'adverb': return 'adv';
+    case 'pronoun': return 'pron';
+    case 'preposition': return 'prep';
+    case 'conjunction': return 'conj';
+    case 'interjection': return 'interj';
+    default: return '';
+  }
+}
+
+function showToast(
+  preview: string,
+  opts: {
+    copied?: boolean;
+    translation?: string;
+    senses?: DictionarySense[];
+    derivedForms?: DerivedForm[];
+  } = {},
+) {
   try {
     const stack = ensureToastStack();
 
@@ -195,6 +217,58 @@ function showToast(preview: string, opts: { copied?: boolean; translation?: stri
         'word-break: break-word',
       ].join(';');
       body.appendChild(translatedEl);
+    }
+
+    const senses = opts.senses ?? [];
+    for (const sense of senses) {
+      const label = posLabel(sense.pos);
+      const display = sense.terms.join(', ');
+      if (!display) continue;
+      const senseEl = document.createElement('span');
+      senseEl.textContent = label ? `(${label}) ${display}` : display;
+      senseEl.style.cssText = [
+        'all: initial',
+        'margin-top: 2px',
+        'color: rgba(255,255,255,0.92)',
+        "font: 400 11px/1.4 'Segoe UI', system-ui, -apple-system, sans-serif",
+        'font-style: italic',
+        'display: -webkit-box',
+        '-webkit-line-clamp: 3',
+        '-webkit-box-orient: vertical',
+        'overflow: hidden',
+        'max-width: 340px',
+        'word-break: break-word',
+      ].join(';');
+      body.appendChild(senseEl);
+    }
+
+    const derivedForms = opts.derivedForms ?? [];
+    if (derivedForms.length > 0) {
+      const parts = derivedForms
+        .map(f => {
+          const label = posLabel(f.pos);
+          return label ? `${f.word} (${label})` : f.word;
+        })
+        .filter(Boolean);
+      if (parts.length > 0) {
+        const familyEl = document.createElement('span');
+        familyEl.textContent = `family: ${parts.join(' · ')}`;
+        familyEl.style.cssText = [
+          'all: initial',
+          'margin-top: 4px',
+          'padding-top: 4px',
+          'border-top: 1px solid rgba(255,255,255,0.18)',
+          'color: rgba(255,255,255,0.88)',
+          "font: 400 11px/1.4 'Segoe UI', system-ui, -apple-system, sans-serif",
+          'display: -webkit-box',
+          '-webkit-line-clamp: 3',
+          '-webkit-box-orient: vertical',
+          'overflow: hidden',
+          'max-width: 340px',
+          'word-break: break-word',
+        ].join(';');
+        body.appendChild(familyEl);
+      }
     }
 
     toast.appendChild(icon);
@@ -574,12 +648,18 @@ async function trySendNote(text: string) {
         showStatusToast(`Save failed: ${response.error ?? 'unknown'}`, 'error');
         return;
       }
-      const savedTranslation = response.data && typeof response.data === 'object'
-        ? (response.data as { translation?: unknown }).translation
-        : undefined;
-      const translation = typeof savedTranslation === 'string' ? savedTranslation : undefined;
-      console.log('[ScrollLearn:notes] save_note ok, clipboard:', copied, 'translation:', !!translation);
-      showToast(text, { copied, translation });
+      const data = (response.data && typeof response.data === 'object')
+        ? response.data as {
+            translation?: unknown;
+            senses?: unknown;
+            derivedForms?: unknown;
+          }
+        : {};
+      const translation = typeof data.translation === 'string' ? data.translation : undefined;
+      const senses = Array.isArray(data.senses) ? data.senses as DictionarySense[] : undefined;
+      const derivedForms = Array.isArray(data.derivedForms) ? data.derivedForms as DerivedForm[] : undefined;
+      console.log('[ScrollLearn:notes] save_note ok, clipboard:', copied, 'translation:', !!translation, 'senses:', senses?.length ?? 0, 'family:', derivedForms?.length ?? 0);
+      showToast(text, { copied, translation, senses, derivedForms });
     });
   } catch (err) {
     console.warn('[ScrollLearn:notes] sendMessage threw:', err);

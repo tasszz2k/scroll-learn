@@ -292,7 +292,9 @@ export async function isCardSnoozed(cardId: string): Promise<boolean> {
 }
 
 // Notes Operations
-const NOTE_DEDUPE_WINDOW_MS = 5000;
+function normalizeNoteText(text: string): string {
+  return text.trim().replace(/\s+/g, ' ').toLowerCase();
+}
 
 export async function getNotes(): Promise<Note[]> {
   return get<Note[]>(STORAGE_KEYS.NOTES, []);
@@ -301,12 +303,32 @@ export async function getNotes(): Promise<Note[]> {
 export async function saveNote(note: Note): Promise<Note> {
   const notes = await getNotes();
 
-  // Dedupe: if the most recent note has identical text+domain within the window, return it
-  const recent = notes
-    .filter(n => n.text === note.text && n.domain === note.domain)
-    .sort((a, b) => b.createdAt - a.createdAt)[0];
-  if (recent && note.createdAt - recent.createdAt < NOTE_DEDUPE_WINDOW_MS) {
-    return recent;
+  // Permanent dedupe by normalized text (case-insensitive, whitespace-collapsed).
+  // Identical captures from any domain or time return the original note instead
+  // of stacking duplicates. When the incoming save carries enrichment the
+  // existing note lacks (translation, senses, derivedForms), merge it in so a
+  // re-capture after enabling auto-translate still adds value.
+  const normalized = normalizeNoteText(note.text);
+  if (normalized) {
+    const existingIndex = notes.findIndex(n => normalizeNoteText(n.text) === normalized);
+    if (existingIndex >= 0 && notes[existingIndex].id !== note.id) {
+      const existing = notes[existingIndex];
+      let merged = existing;
+      if (!existing.translation && note.translation) {
+        merged = { ...merged, translation: note.translation, translationLang: note.translationLang };
+      }
+      if ((!existing.senses || existing.senses.length === 0) && note.senses && note.senses.length > 0) {
+        merged = { ...merged, senses: note.senses };
+      }
+      if ((!existing.derivedForms || existing.derivedForms.length === 0) && note.derivedForms && note.derivedForms.length > 0) {
+        merged = { ...merged, derivedForms: note.derivedForms };
+      }
+      if (merged !== existing) {
+        notes[existingIndex] = merged;
+        await set(STORAGE_KEYS.NOTES, notes);
+      }
+      return merged;
+    }
   }
 
   // Replace if id collides, otherwise append
