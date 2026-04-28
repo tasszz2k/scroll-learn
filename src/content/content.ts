@@ -1161,12 +1161,14 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
     const correctAnswer = getCorrectAnswerDisplay(card);
     message += ` The answer: ${correctAnswer}`;
     showFeedback(message, type, correctAnswer);
+    if (settings.autoSpeakAnswer) speak(correctAnswer);
   } else if (grade === 1) {
     type = 'partial';
     message = 'Almost there...';
     const correctAnswer = getCorrectAnswerDisplay(card);
     message += `. The answer was: ${correctAnswer}`;
     showFeedback(message, type, correctAnswer);
+    if (settings.autoSpeakAnswer) speak(correctAnswer);
   } else {
     type = 'error';
     // For wrong answers on text/audio/cloze, show diff-style feedback
@@ -1420,6 +1422,7 @@ function handleRetrySubmit(card: Card) {
     const correct = card.back.toLowerCase();
     if (userInput === correct) {
       isRetryMode = false;
+      if (settings.autoSpeakAnswer) speak(card.back);
       // Clear the feedback since they got it right this time
       const feedback = document.getElementById('ss-feedback');
       if (feedback) feedback.style.display = 'none';
@@ -1449,6 +1452,7 @@ function handleRetrySubmit(card: Card) {
 
     if (allCorrect) {
       isRetryMode = false;
+      if (settings.autoSpeakAnswer) speak(parseClozeAnswersFromBack(card.back).join(', '));
       // Clear the feedback since they got it right this time
       const feedback = document.getElementById('ss-feedback');
       if (feedback) feedback.style.display = 'none';
