@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { playSuccessChime, primeChime } from '../../../common/successChime';
 import type { GeminiJobStage } from '../../../common/types';
 import {
   closeGeminiWindow,
@@ -135,6 +136,7 @@ function installRuntimeListener(): void {
           currentQuestion: state.currentQuestion,
           text: finalText,
         });
+        playSuccessChime();
         // Keep the Gemini window open so the next Ask click can reuse the
         // same conversation and inherit the chat history. The window is
         // closed on dismiss(), on dashboard unload, or when the user closes
@@ -191,6 +193,11 @@ function buildHistoryFor(contextKey: AiContextKey): ConversationTurn[] {
 
 async function start({ prompt, contextKey, userTurn }: StartParams): Promise<void> {
   if (state.kind === 'running') return;
+
+  // Unlock the success chime's audio element while we're still inside the
+  // user-click frame; without this Chrome's autoplay policy blocks the
+  // later success play() (which fires from a runtime message, not a gesture).
+  primeChime();
 
   installRuntimeListener();
 

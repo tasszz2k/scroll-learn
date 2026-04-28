@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { playSuccessChime, primeChime } from '../../common/successChime';
 import type { GeminiJobStage } from '../../common/types';
 import { closeGeminiWindow, openGeminiWindow, type GeminiWindowHandle } from '../utils/geminiTab';
 
@@ -114,6 +115,7 @@ export function useGeminiAutomation({ onResult }: UseGeminiAutomationOptions = {
           const csv = result.csv.trim();
           const cardCount = Math.max(0, csv.split(/\r?\n/).filter(l => l.trim()).length - 1);
           setAiState({ kind: 'success', count: cardCount });
+          playSuccessChime();
           onResultRef.current?.({ csv, cardCount, deckName: inferDeckNameFromCsv(csv) });
           // Job ran in a side window -- close it now that we have the data.
           void closeAiWindow();
@@ -149,6 +151,10 @@ export function useGeminiAutomation({ onResult }: UseGeminiAutomationOptions = {
   }, [aiState.kind]);
 
   async function sendToGemini(prompt: string): Promise<void> {
+    // Unlock the success chime's audio element while we're still inside the
+    // user-click frame; the chime itself fires later from a runtime message
+    // and would be silent under Chrome's autoplay policy otherwise.
+    primeChime();
     const jobId = generateJobId();
     aiJobIdRef.current = jobId;
     aiStartedAtRef.current = Date.now();
