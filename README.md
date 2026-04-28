@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/icon.png" alt="ScrollLearn Logo" width="128" height="128">
+  <img src="public/icons/icon128.png" alt="ScrollLearn Logo" width="128" height="128">
 </p>
 
 <h1 align="center">ScrollLearn</h1>
