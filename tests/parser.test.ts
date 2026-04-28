@@ -251,6 +251,23 @@ Test,Answer`;
     expect(result.cards[2].back).toBe('paradigm');
   });
 
+  it('should pad short rows so trailing tags lands correctly in canonical fallback', () => {
+    // Mimics the AI sometimes dropping mediaUrl on text rows: 9 cells
+    // instead of 10. The trailing tag value must still register as tags.
+    const input = [
+      'Vocab,text,word,headword,"backExtra body",,,,sociology|academic',
+      'Vocab,mcq-single,which one?,headword,"contrast body",headword|alt|other|misc,0,,,sociology|academic',
+    ].join('\n');
+
+    const result = parseCSV(input);
+    expect(result.errors).toEqual([]);
+    expect(result.cards).toHaveLength(2);
+    expect(result.cards[0].tags).toEqual(['sociology', 'academic']);
+    expect(result.cards[1].tags).toEqual(['sociology', 'academic']);
+    expect(result.cards[1].options).toEqual(['headword', 'alt', 'other', 'misc']);
+    expect(result.cards[1].correct).toBe(0);
+  });
+
   it('should still treat a real header row as a header (not data)', () => {
     const input = [
       'deck,kind,front,back',

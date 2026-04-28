@@ -278,10 +278,23 @@ export function parseCSV(content: string): ParseResult {
   for (let i = dataStartIndex; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    
+
     try {
-      const values = parseCSVLine(line);
-      
+      const rawValues = parseCSVLine(line);
+      // In canonical-fallback mode the AI sometimes drops trailing
+      // columns (commonly mediaUrl on text/cloze rows). When a row has
+      // trailing data beyond backExtra (length > 5) but is still short
+      // of canonical, pad before the last cell so the trailing tags
+      // value lands on the tags index. Rows that stop at backExtra
+      // (length <= 5) are left alone — there's no tags to preserve.
+      let values = rawValues;
+      if (looksLikeDataRow && rawValues.length > 5 && rawValues.length < headers.length) {
+        const padCount = headers.length - rawValues.length;
+        const last = rawValues[rawValues.length - 1];
+        const head = rawValues.slice(0, -1);
+        values = [...head, ...Array(padCount).fill(''), last];
+      }
+
       const getValueByIdx = (idx: number | undefined): string => {
         return idx !== undefined ? (values[idx] || '').trim() : '';
       };
