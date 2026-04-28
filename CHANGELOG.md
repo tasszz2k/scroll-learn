@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.11.0](https://github.com/tasszz2k/scroll-learn/compare/v1.10.1...v1.11.0) (2026-04-28)
+
+
+### Features
+
+* **ai-assist:** play a success chime when a Gemini job finishes ([771d298](https://github.com/tasszz2k/scroll-learn/commit/771d29820eb0b9ae475c04d94311bd1ea14948d4))
+
 ## [1.10.1](https://github.com/tasszz2k/scroll-learn/compare/v1.10.0...v1.10.1) (2026-04-28)
 
 
