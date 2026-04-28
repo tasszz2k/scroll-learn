@@ -4,6 +4,24 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.8.0](https://github.com/tasszz2k/scroll-learn/compare/v1.7.0...v1.8.0) (2026-04-28)
+
+
+### Features
+
+* **cards:** rich Back details reveal panel and pronounce-aloud button ([75168cb](https://github.com/tasszz2k/scroll-learn/commit/75168cbda96dd718ac1273abe9ecb92484d6927b))
+* **dashboard:** in-app Guide tab and storage live-sync ([abeedd0](https://github.com/tasszz2k/scroll-learn/commit/abeedd0bb12fbc7be5db3fe4f8ba11e8735b15b3))
+* **notes:** enrich single-word captures with senses and word family ([cc32b92](https://github.com/tasszz2k/scroll-learn/commit/cc32b928f16a79b6d2ad279f4cd8ca4db61c73a4))
+* **popup:** guide shortcut and active-deck dropdown ([2672ff4](https://github.com/tasszz2k/scroll-learn/commit/2672ff4023b7416d16410d19f061466518925c4e))
+* **quiz:** auto-pronounce the answer when autoSpeakAnswer is on ([4ae9105](https://github.com/tasszz2k/scroll-learn/commit/4ae9105e73c7b48accd4bc3e7ea5513c94c93fe2))
+* **settings:** About section with extension name and version ([8350cdd](https://github.com/tasszz2k/scroll-learn/commit/8350cdd744f2b9449d42ba63b5bf67c6bbbd3b6f))
+
+
+### Bug Fixes
+
+* **import:** pad trailing tags column when CSV rows drop mediaUrl ([2b7eb72](https://github.com/tasszz2k/scroll-learn/commit/2b7eb72b78cf39390e878d202d217e2c3a8f3b21))
+* **updater:** always re-check on view, surface version in popup ([819e4f5](https://github.com/tasszz2k/scroll-learn/commit/819e4f57ab5f728d919fb980ddc86eeb50c32d0a))
+
 ## [1.7.0](https://github.com/tasszz2k/scroll-learn/compare/v1.6.0...v1.7.0) (2026-04-28)
 
 
