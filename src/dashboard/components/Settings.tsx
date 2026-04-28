@@ -527,7 +527,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
 
       {/* === B · QUIZ BEHAVIOUR === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="B" label="Quiz behaviour" count="5 SETTINGS" />
+        <SectionHead num="B" label="Quiz behaviour" count="6 SETTINGS" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Show after N posts" hint="Cards appear once you have scrolled past this many feed items.">
             <Stepper value={localSettings.showAfterNPosts} unit="posts" min={1} max={50} onChange={n => update('showAfterNPosts', n)} />
@@ -537,6 +537,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
           </Row>
           <Row label="Allow skip" hint="Show a Skip button and let Esc move past a card without grading.">
             <ToggleControl on={localSettings.allowSkip} onClick={() => toggle('allowSkip')} ariaLabel="Allow skip" />
+          </Row>
+          <Row label="Auto-speak answer" hint="Pronounce the correct answer aloud when you answer correctly or finish a retry.">
+            <ToggleControl on={localSettings.autoSpeakAnswer} onClick={() => toggle('autoSpeakAnswer')} ariaLabel="Auto speak answer" />
           </Row>
           <Row label="Keyboard shortcuts" hint="Number keys to pick MCQ options, Enter to submit, Esc to skip.">
             <ToggleControl on={localSettings.enableKeyboardShortcuts} onClick={() => toggle('enableKeyboardShortcuts')} ariaLabel="Keyboard shortcuts" />
@@ -761,6 +764,23 @@ export default function Settings({ settings, onSave }: SettingsProps) {
             >
               Clear all data
             </button>
+          </Row>
+        </div>
+      </section>
+
+      {/* === G · ABOUT === */}
+      <section style={{ marginTop: 48, marginBottom: 48 }}>
+        <SectionHead num="G" label="About" count={`v${chrome.runtime.getManifest().version}`} />
+        <div className="card-flat" style={{ padding: '4px 28px' }}>
+          <Row label="Extension" hint="Name and current installed version." last>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+              <span className="serif" style={{ fontSize: 16, fontWeight: 600 }}>
+                {chrome.runtime.getManifest().name}
+              </span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', letterSpacing: '.05em' }}>
+                v{chrome.runtime.getManifest().version}
+              </span>
+            </div>
           </Row>
         </div>
       </section>
