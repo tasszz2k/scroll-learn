@@ -268,15 +268,30 @@ async function handleGetNextCard(domain: string): Promise<Response<Card | null>>
       return { ok: true, data: null };
     }
 
-    // Get due cards using shared logic with deck rotation
+    const decks = await storage.getDecks();
+    const deckMap = new Map(decks.map(d => [d.id, d.name]));
+
+    let activeDeckId = settings.activeDeckId;
+    if (activeDeckId && !decks.some(deck => deck.id === activeDeckId)) {
+      activeDeckId = null;
+    }
+
+    // Serve from the active deck directly so its cards aren't shadowed by the
+    // global 100-card slice when other decks have many older overdue cards.
+    if (activeDeckId) {
+      const card = await selectNextDueCard(activeDeckId);
+      if (card) {
+        console.log('[ScrollLearn Background] Returning card from active deck:', card.front.substring(0, 30));
+        return { ok: true, data: card };
+      }
+    }
+
+    // Active deck is exhausted (or none set): rotate across all due decks.
     const dueCards = await storage.getDueCards(100);
     if (dueCards.length === 0) {
       console.log('[ScrollLearn Background] No due cards');
       return { ok: true, data: null };
     }
-
-    const decks = await storage.getDecks();
-    const deckMap = new Map(decks.map(d => [d.id, d.name]));
 
     const sorted = sortCardsForReview(dueCards);
     const snoozedFlags = await Promise.all(sorted.map(card => storage.isCardSnoozed(card.id)));
@@ -287,18 +302,9 @@ async function handleGetNextCard(domain: string): Promise<Response<Card | null>>
       return { ok: true, data: null };
     }
 
-    // Keep serving the active deck until it has no due cards, then move to next due deck.
     const availableDeckIds = getAvailableDeckIds(availableCards, decks);
-    let activeDeckId = settings.activeDeckId;
-
-    if (activeDeckId && !decks.some(deck => deck.id === activeDeckId)) {
-      activeDeckId = null;
-    }
-
     let selectedDeckId: string | null = null;
-    if (activeDeckId && availableDeckIds.includes(activeDeckId)) {
-      selectedDeckId = activeDeckId;
-    } else if (availableDeckIds.length > 0) {
+    if (availableDeckIds.length > 0) {
       selectedDeckId = activeDeckId
         ? getNextDeckId(activeDeckId, availableDeckIds, decks)
         : availableDeckIds[0];
