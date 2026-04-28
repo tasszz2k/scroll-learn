@@ -28,18 +28,25 @@
 
 - **Feed Integration**: Quizzes appear naturally in Facebook, YouTube, and Instagram feeds after scrolling past N posts
 - **Spaced Repetition**: SM-2 algorithm for optimal learning retention
-- **Multiple Card Types**: 
+- **Multiple Card Types**:
   - Text (type your answer)
   - Multiple Choice (single select)
   - Multi-Select (check all correct answers)
   - Cloze (fill in the blanks)
   - Audio (listen and respond)
+- **Rich Back Details**: Each card can carry an optional `backExtra` reveal panel (markdown-lite — paragraphs, bullets, **bold**, indented continuation lines) shown only after answering, both in-feed and in study mode. Great for definitions, examples, word families, and contrast notes.
+- **Pronounce Aloud**: Web Speech API speaker buttons next to questions, options, and correct answers. Optional auto-pronounce on success (`autoSpeakAnswer`).
+- **Pluck-mode Notes**: Hold Option/Alt on any allowlisted site to outline an element and capture its text into the Notes tab. Drag-select to capture only the highlighted span. Saved text is auto-copied to the clipboard. Allowlist supports plain hostnames and regex (e.g. `/^.*\.zim\.vn$/`).
+- **Single-word Note Enrichment**: When a note is a single word, ScrollLearn fetches POS-grouped translations (Google Translate dictionary block) and the morphological word family (Datamuse) at save time. Both render in the capture toast and the dashboard.
 - **Content Blocking**: Hide distracting content from your feeds
   - Facebook: Reels, Sponsored posts, Suggested posts, Strangers' posts
   - Instagram: Reels, Sponsored posts, Suggested posts, Strangers' posts
   - YouTube: Shorts
   - Per-category blocked count with hover breakdown
-- **Import Formats**: Quizlet-like simple format, CSV, and JSON
+- **Import Formats**: Quizlet-like simple format, CSV, and JSON. CSV honors RFC 4180 quoted-newline cells so multi-line `backExtra` round-trips correctly. The Import preview gains an expandable per-row inspector and warns when rows are missing back details.
+- **Prompt Generator**: Drafts a Claude/ChatGPT/Gemini prompt that emits cards in the format you want, with explicit instructions and a worked cluster example for dense, per-card `backExtra`.
+- **One-click Updater**: Banner in the dashboard plus a pulsing version pill in the popup. Both check GitHub on view; the native helper installs new releases in place.
+- **In-app Guide**: A `#guide` tab walks through every feature so the dashboard is self-documenting.
 - **Grammar Police Integration**: AI-powered skill that converts [Grammar Police](https://github.com/tasszz2k/GrammarPolice) exports into flashcard decks, grammar reports, exercises, and related knowledge
 - **Fuzzy Matching**: Intelligent answer matching with configurable thresholds
 - **Progress Tracking**: Statistics, streaks, and review history
@@ -167,21 +174,30 @@ Capital of France?|Paris|London|Berlin|Madrid
 
 #### CSV Format
 ```csv
-front,back,kind,options,correct
-What is 2+2?,4,text,,
-Pick the color,Red,mcq-single,Red|Blue|Green,0
+deck,kind,front,back,backExtra,options,correct,fuzziness,mediaUrl,tags
+Vocab,text,sự bất bình đẳng,inequality,"**inequality** (noun)
+
+Meaning: an unfair social or economic difference.
+
+Example:
+* Income inequality has risen sharply.
+    -> Sự bất bình đẳng thu nhập đã tăng mạnh.",,,,,academic|sociology
+General,mcq-single,Pick the color,Red,,Red|Blue|Green|Yellow,0,,,colors
 ```
+
+The `backExtra` column is optional rich content (markdown-lite — paragraphs, `* ` bullets, `**bold**`, indented continuation lines) shown only after the learner answers. Multi-line cells must be wrapped in double quotes; embedded `"`s are doubled (RFC 4180).
 
 #### JSON Format
 ```json
 [
   { "front": "Question", "back": "Answer", "kind": "text" },
-  { 
-    "front": "Pick one", 
-    "back": "A", 
+  {
+    "front": "Pick one",
+    "back": "A",
     "kind": "mcq-single",
     "options": ["A", "B", "C"],
-    "correct": 0
+    "correct": 0,
+    "backExtra": "**A** is the correct choice because…"
   }
 ]
 ```
@@ -251,6 +267,7 @@ In the **Settings** tab:
 - **Quiz Behavior**
   - Show after N posts (1-20)
   - Pause after quiz (0-60 minutes)
+  - Auto-pronounce the correct answer on success (Web Speech API)
 
 - **Enabled Sites**
   - Toggle Facebook/YouTube/Instagram
@@ -260,10 +277,18 @@ In the **Settings** tab:
   - Instagram: Hide Reels, Sponsored, Suggested, Strangers' Posts
   - YouTube: Hide Shorts
 
+- **Notes**
+  - Capture allowlist (plain hostnames or regex)
+  - Minimum capture length
+  - Toast duration
+  - Auto-translate direction (EN ↔ VI)
+
 - **Answer Matching**
   - Characters to ignore
   - Case sensitivity
   - Fuzzy matching thresholds
+
+- **About** — extension name and currently installed version
 
 ## Architecture
 
@@ -329,8 +354,12 @@ npm run test
 ```
 
 Tests cover:
-- Parser functions (normalizeText, parseSimpleLine, etc.)
+- Parser functions (normalizeText, parseSimpleLine, multi-line CSV)
 - SM-2 scheduler (grade calculations, intervals)
+- Notes storage and dedup (case/whitespace-insensitive, enrichment merge)
+- Translate dictionary parsing (`parseDictionarySenses`)
+- Word family lookup (`parseDatamuseFamily`)
+- Updater version comparison and badge logic
 
 ### Extending to New Sites
 

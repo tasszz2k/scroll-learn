@@ -45,14 +45,19 @@ Content scripts ↔ Background service worker via `chrome.runtime.sendMessage`. 
 | Module | Path | Purpose |
 |--------|------|---------|
 | Types | `src/common/types.ts` | All interfaces, message types, factory functions (`createCard`, `createDeck`, `generateId`) |
-| Storage | `src/common/storage.ts` | Chrome Storage API wrapper, CRUD for decks/cards/settings/stats |
+| Storage | `src/common/storage.ts` | Chrome Storage API wrapper, CRUD for decks/cards/settings/stats; permanent note dedup by normalized text with enrichment merge |
 | Scheduler | `src/background/scheduler.ts` | SM-2 spaced repetition algorithm |
 | Grading | `src/common/grading.ts` | Answer evaluation per card type |
 | Fuzzy | `src/common/fuzzy.ts` | Levenshtein, Damerau-Levenshtein, Jaro-Winkler similarity |
-| Parser | `src/common/parser.ts` | Import parsing (Simple, CSV, JSON formats) |
+| Parser | `src/common/parser.ts` | Import parsing (Simple, CSV, JSON formats); CSV honors RFC 4180 multi-line quoted cells for `backExtra` |
+| Markdown-lite | `src/common/markdown.ts` | Tiny safe parser/renderer for the `backExtra` reveal panel (paragraphs, `* ` bullets, `**bold**`, indented continuation lines) |
+| Speak | `src/common/speak.ts` | Web Speech API wrapper; powers `SpeakButton` and the optional auto-pronounce on success |
+| Translate | `src/common/translate.ts` | Public Google translate endpoint; `translateWithDictionary` adds the `dt=bd` block for POS-grouped senses on single-word captures |
+| Word Family | `src/common/wordFamily.ts` | Datamuse-backed morphological family lookup for English single-word note captures (rules + API; English source only) |
 | Feed detectors | `src/content/fb.ts`, `youtube.ts`, `instagram.ts` | Domain-specific feed post detection |
 | Blocker | `src/content/blocker.ts` | Hides Reels/Shorts, Sponsored, Suggested, Strangers content; tracks per-category counts |
-| Study Session | `src/dashboard/components/study/` | Standalone study mode — StudySession, QuizCard, AnswerFeedback, utils |
+| Study Session | `src/dashboard/components/study/` | Standalone study mode — StudySession, QuizCard, AnswerFeedback, RenderBackExtra, SpeakButton, utils |
+| Guide | `src/dashboard/components/Guide.tsx` | Self-documenting walkthrough rendered at `#guide` |
 
 ### Path Alias
 
@@ -65,6 +70,8 @@ Content scripts ↔ Background service worker via `chrome.runtime.sendMessage`. 
 - `mcq-multi` — Multiple correct answers. Options are shuffled each time card is shown.
 - `cloze` — Fill-in-the-blank (`{{answer}}` syntax). Wrong answers trigger retry practice mode.
 - `audio` — Audio playback with text response. Wrong answers trigger retry practice mode.
+
+Every card kind also accepts an optional **`backExtra`** field — markdown-lite content (paragraphs, `* ` bullets, `**bold**`, indented continuation lines) shown only after the learner answers, both in the in-feed quiz and in the dashboard study session and card preview.
 
 ## SM-2 Algorithm Details
 
@@ -87,7 +94,7 @@ Content scripts ↔ Background service worker via `chrome.runtime.sendMessage`. 
 
 - Tests live in `tests/` at the project root
 - Test files use `*.test.ts` naming
-- Currently covers: parser functions, SM-2 scheduler
+- Currently covers: parser, SM-2 scheduler, notes storage/dedup, translate dictionary parsing, word-family lookup, updater
 - Run a specific test: `npx vitest run tests/parser.test.ts`
 
 ## Quiz Interaction Features
@@ -141,7 +148,11 @@ Facebook obfuscates "Sponsored" using character-level `<span>` elements with CSS
 - Retry practice uses exact match (no fuzzy matching) — users must type answer exactly right
 - Shuffled MCQ indices are stored in module-level `shuffledIndices` array, reset on card change
 - Dashboard `loadData(showLoading)` accepts a boolean — pass `false` when refreshing from study session to avoid unmounting components and losing local state (streak, stats)
-- Dashboard uses hash-based routing (`#study`, `#decks`, `#import`, `#settings`, `#stats`) — the popup links to these hashes directly
+- Dashboard uses hash-based routing (`#study`, `#decks`, `#notes`, `#import`, `#settings`, `#stats`, `#guide`) — the popup links to these hashes directly
+- Dashboard subscribes to `chrome.storage.onChanged` and `visibilitychange` to silently re-fetch notes/cards/decks/stats/settings when the background updates them; use this pattern instead of polling
+- Note dedup is permanent and case/whitespace-insensitive (see `normalizeNoteText` in `storage.ts`). Re-saving the same text returns the original note and merges in any new enrichment (`translation`, `senses`, `derivedForms`) the original lacked
+- `backExtra` is markdown-lite only (no nested formatting, no links, no images). The renderer escapes HTML before applying markup so user content cannot inject markup. CSV imports must wrap multi-line `backExtra` in double quotes and double internal `"`s — the parser honors RFC 4180 quoted-newline cells
+- Single-word note enrichment uses two public APIs at save time: Google Translate (`dt=bd` block) for POS-grouped senses, and Datamuse for the morphological family (English source only). Both have ~2-3s timeouts so a slow network never blocks a save
 - The `selectNextDueCard(filterDeckId?)` helper in background is shared between domain-based and standalone study flows. When filtering by deck, it fetches deck-specific cards directly (not from the global 100-card limit) to avoid missing cards
 - **Content script CSS**: `public/content.css` is used for content script styles (copied to `dist/` during build). The `src/styles/` directory is for dashboard/popup styles only
 - Facebook sidebar nav items are plain `<div>` elements (not `<a>` links) -- href-based selectors don't work for the sidebar Reels button. Use text-based detection with DOM walk-up instead.
