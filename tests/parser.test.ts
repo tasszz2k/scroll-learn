@@ -194,6 +194,90 @@ Test,Answer`;
     expect(result.cards).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
   });
+
+  it('should preserve newlines inside quoted backExtra fields', () => {
+    const input = [
+      'deck,kind,front,back,backExtra',
+      'Vocab,text,sự bất bình đẳng,inequality,"**inequality** (noun)',
+      '',
+      'Example:',
+      '* Social inequality is real."',
+      'Vocab,text,paradigm,paradigm,"**paradigm** (noun)',
+      '',
+      'Meaning: a model."',
+    ].join('\n');
+
+    const result = parseCSV(input);
+    expect(result.errors).toEqual([]);
+    expect(result.cards).toHaveLength(2);
+    expect(result.cards[0].front).toBe('sự bất bình đẳng');
+    expect(result.cards[0].back).toBe('inequality');
+    expect(result.cards[0].backExtra).toBe(
+      '**inequality** (noun)\n\nExample:\n* Social inequality is real.'
+    );
+    expect(result.cards[1].front).toBe('paradigm');
+    expect(result.cards[1].backExtra).toBe(
+      '**paradigm** (noun)\n\nMeaning: a model.'
+    );
+  });
+
+  it('should fall back to canonical header when first row looks like data', () => {
+    const input = [
+      'Vocab,text,sự bất bình đẳng,inequality,"**inequality** (noun)',
+      '',
+      'Meaning: an unfair difference."',
+      'Vocab,mcq-single,Which word means unfair?,inequality,,inequality|opinion|paradigm|analysis,0,,,sociology',
+      'Vocab,cloze,The {{paradigm}} shifted dramatically.,paradigm,,,,,,academic',
+    ].join('\n');
+
+    const result = parseCSV(input);
+    expect(result.errors).toEqual([]);
+    expect(result.cards).toHaveLength(3);
+
+    expect(result.cards[0].kind).toBe('text');
+    expect(result.cards[0].deckName).toBe('Vocab');
+    expect(result.cards[0].front).toBe('sự bất bình đẳng');
+    expect(result.cards[0].back).toBe('inequality');
+    expect(result.cards[0].backExtra).toBe('**inequality** (noun)\n\nMeaning: an unfair difference.');
+
+    expect(result.cards[1].kind).toBe('mcq-single');
+    expect(result.cards[1].front).toBe('Which word means unfair?');
+    expect(result.cards[1].options).toEqual(['inequality', 'opinion', 'paradigm', 'analysis']);
+    expect(result.cards[1].correct).toBe(0);
+    expect(result.cards[1].tags).toEqual(['sociology']);
+
+    expect(result.cards[2].kind).toBe('cloze');
+    expect(result.cards[2].front).toBe('The {{paradigm}} shifted dramatically.');
+    expect(result.cards[2].back).toBe('paradigm');
+  });
+
+  it('should still treat a real header row as a header (not data)', () => {
+    const input = [
+      'deck,kind,front,back',
+      'Vocab,text,Hello,Xin chào',
+    ].join('\n');
+
+    const result = parseCSV(input);
+    expect(result.errors).toEqual([]);
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].front).toBe('Hello');
+  });
+
+  it('should handle escaped double quotes inside multi-line backExtra', () => {
+    const input = [
+      'front,back,backExtra',
+      'agree,agree,"**agree** (verb)',
+      '',
+      'Use ""agree with"" for people."',
+    ].join('\n');
+
+    const result = parseCSV(input);
+    expect(result.errors).toEqual([]);
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].backExtra).toBe(
+      '**agree** (verb)\n\nUse "agree with" for people.'
+    );
+  });
 });
 
 describe('parseJSON', () => {

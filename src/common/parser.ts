@@ -150,27 +150,99 @@ export function parseSimpleFormat(
 }
 
 /**
+ * Split CSV content into rows, respecting quoted fields that may contain
+ * literal newlines. RFC 4180 allows newlines inside double-quoted fields
+ * so long as embedded quotes are doubled. Without this, multi-line cells
+ * (e.g. the markdown-lite backExtra column) get shredded across rows.
+ */
+function splitCSVRows(content: string): string[] {
+  const rows: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < content.length; i++) {
+    const c = content[i];
+    if (c === '"') {
+      if (inQuotes && content[i + 1] === '"') {
+        current += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      current += c;
+    } else if ((c === '\n' || c === '\r') && !inQuotes) {
+      if (c === '\r' && content[i + 1] === '\n') i++;
+      rows.push(current);
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  if (current.length > 0) rows.push(current);
+  return rows;
+}
+
+/**
+ * Canonical column order matching the AI prompt generator's CSV instructions.
+ * Used as a fallback when the user pastes data without the header row.
+ */
+const CANONICAL_CSV_HEADER = [
+  'deck', 'kind', 'front', 'back', 'backextra',
+  'options', 'correct', 'fuzziness', 'mediaurl', 'tags',
+];
+
+const VALID_CARD_KINDS = ['text', 'mcq-single', 'mcq-multi', 'cloze', 'audio'];
+
+const FRONT_HEADER_NAMES = ['front', 'question', 'q', 'prompt', 'term'];
+
+/**
  * Parse CSV content
- * Expected columns: deck,kind,front,back,options,correct,fuzziness,mediaUrl,tags
+ * Expected columns: deck,kind,front,back,backExtra,options,correct,fuzziness,mediaUrl,tags
+ *
+ * If the first row doesn't look like a header (no `front`-like column, but
+ * column 1 is a recognized card kind), assume the user pasted header-less
+ * AI output and fall back to the canonical schema. Treat the first row as
+ * data instead of skipping it.
  */
 export function parseCSV(content: string): ParseResult {
-  const lines = content.split('\n');
+  const lines = splitCSVRows(content);
   const cards: ParsedCard[] = [];
   const errors: ParseError[] = [];
-  
-  if (lines.length < 2) {
+
+  if (lines.length === 0 || (lines.length === 1 && !lines[0].trim())) {
+    return { cards, errors: [{ line: 1, message: 'CSV is empty', raw: '' }] };
+  }
+
+  // Parse first row to decide whether it's a header or a data row.
+  const firstRow = parseCSVLine(lines[0].trim());
+  const firstRowLower = firstRow.map(h => h.toLowerCase().trim());
+  const hasFrontHeader = firstRowLower.some(h => FRONT_HEADER_NAMES.includes(h));
+  const looksLikeDataRow =
+    !hasFrontHeader
+    && firstRowLower.length >= 3
+    && VALID_CARD_KINDS.includes(firstRowLower[1] || '');
+
+  let headers: string[];
+  let dataStartIndex: number;
+  let headerSource: string;
+  if (looksLikeDataRow) {
+    headers = CANONICAL_CSV_HEADER.slice();
+    dataStartIndex = 0;
+    headerSource = '(synthetic canonical header)';
+  } else {
+    headers = firstRow;
+    dataStartIndex = 1;
+    headerSource = lines[0].trim();
+  }
+
+  if (!looksLikeDataRow && lines.length < 2) {
     return { cards, errors: [{ line: 1, message: 'CSV must have header and at least one data row', raw: '' }] };
   }
-  
-  // Parse header
-  const headerLine = lines[0].trim();
-  const headers = parseCSVLine(headerLine);
-  
+
   const columnMap: Record<string, number> = {};
   headers.forEach((h, i) => {
     columnMap[h.toLowerCase().trim()] = i;
   });
-  
+
   // Helper to get value by column name with fallback aliases
   const getColumnIndex = (...names: string[]): number | undefined => {
     for (const name of names) {
@@ -180,29 +252,30 @@ export function parseCSV(content: string): ParseResult {
     }
     return undefined;
   };
-  
+
   // Map common column name variations
   const frontIdx = getColumnIndex('front', 'question', 'q', 'prompt', 'term');
   const backIdx = getColumnIndex('back', 'answer', 'a', 'response', 'definition');
+  const backExtraIdx = getColumnIndex('backextra', 'back_extra', 'details', 'notes', 'extra');
   const kindIdx = getColumnIndex('kind', 'type', 'cardtype', 'card_type');
   const optionsIdx = getColumnIndex('options', 'choices', 'answers', 'alternatives');
   const correctIdx = getColumnIndex('correct', 'correct_answer', 'answer_index', 'correctindex', 'right');
   const tagsIdx = getColumnIndex('tags', 'tag', 'categories', 'labels');
   const deckIdx = getColumnIndex('deck', 'deckname', 'deck_name', 'collection');
   const mediaIdx = getColumnIndex('mediaurl', 'media_url', 'media', 'audio', 'image');
-  
+
   // Required columns - 'front' (or alias) is always required
   if (frontIdx === undefined) {
     errors.push({
       line: 1,
       message: 'Missing required column: front (or question/q/prompt/term)',
-      raw: headerLine,
+      raw: headerSource,
     });
     return { cards, errors };
   }
-  
+
   // Parse data rows
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = dataStartIndex; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     
@@ -290,9 +363,12 @@ export function parseCSV(content: string): ParseResult {
         canonicalAnswers = correct.map(idx => normalizeText(options[idx] || ''));
       }
       
+      const backExtra = getValueByIdx(backExtraIdx) || undefined;
+
       cards.push({
         front,
         back: finalBack,
+        backExtra,
         kind,
         options,
         correct,
@@ -437,7 +513,7 @@ export function parseJSON(content: string): ParseResult {
         return;
       }
       
-      const { front, back, kind, options, correct, canonicalAnswers, mediaUrl, tags, deck, deckName: itemDeckName } = item;
+      const { front, back, kind, options, correct, canonicalAnswers, mediaUrl, tags, deck, deckName: itemDeckName, backExtra, back_extra, details } = item;
       
       if (!front) {
         errors.push({
@@ -486,9 +562,12 @@ export function parseJSON(content: string): ParseResult {
         finalCanonicalAnswers = [normalizeText(finalBack)];
       }
       
+      const finalBackExtra = backExtra ?? back_extra ?? details;
+
       cards.push({
         front: String(front),
         back: finalBack,
+        backExtra: finalBackExtra ? String(finalBackExtra) : undefined,
         kind: validKind,
         options: parsedOptions,
         correct: parsedCorrect,

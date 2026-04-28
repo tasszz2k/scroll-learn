@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Card } from '../../common/types';
+import RenderBackExtra from './study/RenderBackExtra';
+import SpeakButton from './study/SpeakButton';
+
+function clozeFrontForSpeech(front: string): string {
+  return front.replace(/\{\{|\}\}/g, '');
+}
 
 interface CardPreviewProps {
   cards: Card[];
@@ -174,7 +180,13 @@ export default function CardPreview({ cards, deckName, initialIndex = 0, onClose
         {/* Body */}
         <div style={{ padding: '32px 28px', overflowY: 'auto', flex: 1 }}>
           {/* Front */}
-          <div className="eyebrow" style={{ marginBottom: 12 }}>Question</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div className="eyebrow">Question</div>
+            <SpeakButton
+              text={card.kind === 'cloze' ? clozeFrontForSpeech(card.front) : card.front}
+              ariaLabel="Speak question"
+            />
+          </div>
           <div
             className="serif"
             style={{
@@ -230,7 +242,10 @@ export default function CardPreview({ cards, deckName, initialIndex = 0, onClose
                     </span>
                     <span style={{ flex: 1 }}>{opt}</span>
                     {showCorrect && (
-                      <span className="pill pill-moss" style={{ fontSize: 10 }}>correct</span>
+                      <>
+                        <SpeakButton text={opt} ariaLabel="Speak correct option" />
+                        <span className="pill pill-moss" style={{ fontSize: 10 }}>correct</span>
+                      </>
                     )}
                   </div>
                 );
@@ -257,7 +272,19 @@ export default function CardPreview({ cards, deckName, initialIndex = 0, onClose
                 gap: 12,
               }}
             >
-              <div className="eyebrow">Answer</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="eyebrow">Answer</div>
+                {revealed && (
+                  <SpeakButton
+                    text={
+                      card.kind === 'mcq-single' || card.kind === 'mcq-multi'
+                        ? correct.map(i => card.options?.[i] ?? '').filter(Boolean).join(', ')
+                        : acceptedAnswers.join(', ')
+                    }
+                    ariaLabel="Speak answer"
+                  />
+                )}
+              </div>
               <button
                 type="button"
                 className="ulink"
@@ -286,6 +313,17 @@ export default function CardPreview({ cards, deckName, initialIndex = 0, onClose
                     {acceptedAnswers.join('  ·  ')}
                   </span>
                 )}
+              </div>
+            )}
+            {revealed && card.backExtra && card.backExtra.trim() && (
+              <div
+                style={{
+                  marginTop: 14,
+                  paddingTop: 14,
+                  borderTop: '1px solid var(--rule)',
+                }}
+              >
+                <RenderBackExtra text={card.backExtra} />
               </div>
             )}
             {revealed && card.tags && card.tags.length > 0 && (

@@ -10,6 +10,7 @@ export interface Card {
   kind: CardKind;
   front: string;
   back: string;
+  backExtra?: string; // Optional rich, reveal-only content (markdown-lite)
   options?: string[];
   correct?: number | number[]; // Index(es) for MCQ
   canonicalAnswers?: string[]; // Acceptable text answers
@@ -79,6 +80,8 @@ export interface Settings {
   noteTranslateDirection: TranslateDirection;
   noteAutoTranslate: boolean;
   noteToastDurationSeconds: number;
+  // Speak mode
+  autoSpeakAnswer: boolean; // Default true. Auto-pronounce the correct answer on success/retry-success.
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -116,6 +119,7 @@ export const DEFAULT_SETTINGS: Settings = {
   noteTranslateDirection: 'auto',
   noteAutoTranslate: false,
   noteToastDurationSeconds: 5,
+  autoSpeakAnswer: true,
 };
 
 export type TranslateLang = 'en' | 'vi';
@@ -334,6 +338,7 @@ export type Response<T = undefined> = SuccessResponse<T> | ErrorResponse;
 export interface ParsedCard {
   front: string;
   back: string;
+  backExtra?: string;
   kind: CardKind;
   options?: string[];
   correct?: number | number[];

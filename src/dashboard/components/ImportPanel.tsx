@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { Fragment, useState, useRef } from 'react';
 import type { Deck, Card, ParsedCard, Response } from '../../common/types';
 import { parseSimpleFormat, parseCSV, parseJSON } from '../../common/parser';
 import EditorialHeader from './EditorialHeader';
 import PromptGenerator from './PromptGenerator';
+import RenderBackExtra from './study/RenderBackExtra';
 
 type ImportFormat = 'simple' | 'csv' | 'json';
 
@@ -61,8 +62,18 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
   const [importResult, setImportResult] = useState<{ success: boolean; count: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showAllCards, setShowAllCards] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const [showPromptGenerator, setShowPromptGenerator] = useState(false);
+
+  function toggleExpand(i: number) {
+    setExpandedIndex(prev => (prev === i ? null : i));
+  }
+
+  function correctIndices(card: ParsedCard): number[] {
+    if (card.correct === undefined) return [];
+    return Array.isArray(card.correct) ? card.correct : [card.correct];
+  }
 
   function handleParse() {
     let result;
@@ -75,6 +86,7 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
     setErrors(result.errors);
     setImportResult(null);
     setShowAllCards(false);
+    setExpandedIndex(null);
   }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -107,6 +119,7 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
         kind: pc.kind,
         front: pc.front,
         back: pc.back,
+        backExtra: pc.backExtra,
         options: pc.options,
         correct: pc.correct,
         canonicalAnswers: pc.canonicalAnswers,
@@ -135,11 +148,13 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
     setErrors([]);
     setImportResult(null);
     setShowAllCards(false);
+    setExpandedIndex(null);
   }
 
   const lineCount = content.split('\n').filter(l => l.trim()).length;
   const previewCards = showAllCards ? parsedCards : parsedCards.slice(0, 5);
   const importDisabled = importing || parsedCards.length === 0 || (createNewDeck ? !newDeckName.trim() : !selectedDeck);
+  const missingBackExtraCount = parsedCards.filter(c => !c.backExtra || !c.backExtra.trim()).length;
 
   return (
     <div>
@@ -345,6 +360,26 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
             </div>
           </div>
 
+          {/* backExtra coverage warning (gold) — flags rows the AI left empty */}
+          {parsedCards.length > 0 && missingBackExtraCount > 0 && (
+            <div
+              className="card-flat"
+              style={{
+                marginTop: 20,
+                padding: '14px 18px',
+                borderColor: 'rgba(184,146,58,.45)',
+                background: 'rgba(184,146,58,.06)',
+              }}
+            >
+              <div className="eyebrow" style={{ color: '#6E5A20' }}>
+                {missingBackExtraCount} of {parsedCards.length} card{parsedCards.length === 1 ? '' : 's'} have no back details
+              </div>
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: '#6E5A20', lineHeight: 1.5 }}>
+                The reveal panel won't show on those cards. If they're learnable items (vocab / cloze / mcq), re-generate the prompt — the model probably skipped backExtra on the mcq/cloze rows.
+              </p>
+            </div>
+          )}
+
           {/* Errors */}
           {errors.length > 0 && (
             <div className="card-flat" style={{ marginTop: 20, padding: '14px 18px', borderColor: 'rgba(196,115,107,.45)', background: 'rgba(196,115,107,.06)' }}>
@@ -406,68 +441,10 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
           )}
         </div>
 
-        {/* RIGHT — preview + pipeline */}
+        {/* RIGHT — pipeline */}
         <div>
-          <div className="eyebrow">
-            C · Preview {parsedCards.length > 0 && `· ${numberFmt(parsedCards.length)} ${parsedCards.length === 1 ? 'card' : 'cards'}`}
-          </div>
-          {parsedCards.length === 0 ? (
-            <div
-              className="card-flat"
-              style={{
-                marginTop: 10,
-                padding: '40px 24px',
-                textAlign: 'center',
-                color: 'var(--ink-3)',
-                fontSize: 13,
-              }}
-            >
-              Paste source on the left, then press <span className="mono" style={{ fontSize: 12, padding: '1px 6px', border: '1px solid var(--rule-2)', borderRadius: 4, background: 'var(--paper-2)' }}>Parse</span>.
-            </div>
-          ) : (
-            <table className="dtable" style={{ marginTop: 10 }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 36 }}>#</th>
-                  <th style={{ width: 80 }}>Type</th>
-                  <th>Front</th>
-                  <th>Back</th>
-                </tr>
-              </thead>
-              <tbody>
-                {previewCards.map((card, i) => (
-                  <tr key={i}>
-                    <td className="mono" style={{ color: 'var(--ink-4)' }}>{String(i + 1).padStart(2, '0')}</td>
-                    <td><span className="pill">{shortKind(card.kind)}</span></td>
-                    <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {card.front}
-                    </td>
-                    <td className="serif" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {Array.isArray(card.back) ? card.back.join(', ') : card.back}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {parsedCards.length > 5 && (
-            <div style={{ marginTop: 10, textAlign: 'center' }}>
-              <button
-                type="button"
-                onClick={() => setShowAllCards(v => !v)}
-                className="ulink"
-                style={{ background: 'none', padding: 0, fontSize: 12, cursor: 'pointer' }}
-              >
-                {showAllCards ? 'show less' : `show all ${numberFmt(parsedCards.length)}`}
-              </button>
-            </div>
-          )}
-
-          {/* Pipeline ASCII */}
-          <div style={{ marginTop: 28 }}>
-            <div className="eyebrow">Pipeline</div>
-            <pre className="ascii" style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.55 }}>
+          <div className="eyebrow">Pipeline</div>
+          <pre className="ascii" style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.55 }}>
 {`  paste / upload
         │
         ▼
@@ -482,9 +459,216 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
                        │  TARGET DECK  │
                        │  ${(decks.find(d => d.id === selectedDeck)?.name || newDeckName || '— none —').padEnd(11).slice(0, 11)}  │
                        └───────────────┘`}
-            </pre>
-          </div>
+          </pre>
         </div>
+      </div>
+
+      {/* Full-width preview row */}
+      <div style={{ marginTop: 36 }}>
+        <div className="eyebrow">
+          C · Preview {parsedCards.length > 0 && `· ${numberFmt(parsedCards.length)} ${parsedCards.length === 1 ? 'card' : 'cards'}`}
+        </div>
+
+        {parsedCards.length === 0 ? (
+          <div
+            className="card-flat"
+            style={{
+              marginTop: 10,
+              padding: '40px 24px',
+              textAlign: 'center',
+              color: 'var(--ink-3)',
+              fontSize: 13,
+            }}
+          >
+            Paste source above, then press <span className="mono" style={{ fontSize: 12, padding: '1px 6px', border: '1px solid var(--rule-2)', borderRadius: 4, background: 'var(--paper-2)' }}>Parse</span>.
+          </div>
+        ) : (
+          <div style={{ marginTop: 10, overflowX: 'auto' }}>
+            <table className="dtable" style={{ width: '100%', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: 36 }} />
+                <col style={{ width: 70 }} />
+                <col style={{ width: 130 }} />
+                <col />
+                <col style={{ width: 160 }} />
+                <col style={{ width: 90 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 70 }} />
+                <col style={{ width: 130 }} />
+                <col style={{ width: 60 }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Type</th>
+                  <th>Deck</th>
+                  <th>Front</th>
+                  <th>Back</th>
+                  <th>Extra</th>
+                  <th>Options</th>
+                  <th>Correct</th>
+                  <th>Tags</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewCards.map((card, i) => {
+                  const correct = correctIndices(card);
+                  const correctText = correct.length === 0 ? '—' : correct.join(', ');
+                  const optsText = card.options && card.options.length > 0
+                    ? `${card.options.length} opt${card.options.length === 1 ? '' : 's'}`
+                    : '—';
+                  const tagsText = card.tags && card.tags.length > 0 ? card.tags.join(', ') : '—';
+                  const deckText = card.deckName || '—';
+                  const hasExtra = !!(card.backExtra && card.backExtra.trim());
+                  const extraChars = hasExtra ? card.backExtra!.length : 0;
+                  const isExpanded = expandedIndex === i;
+                  const cellEllipsis: React.CSSProperties = {
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  };
+                  return (
+                    <Fragment key={i}>
+                      <tr
+                        onClick={() => toggleExpand(i)}
+                        style={{ cursor: 'pointer', background: isExpanded ? 'var(--paper-2)' : undefined }}
+                      >
+                        <td className="mono" style={{ color: 'var(--ink-4)' }}>
+                          {String(i + 1).padStart(2, '0')}
+                        </td>
+                        <td><span className="pill">{shortKind(card.kind)}</span></td>
+                        <td className="mono" style={{ ...cellEllipsis, fontSize: 11, color: 'var(--ink-3)' }} title={deckText}>
+                          {deckText}
+                        </td>
+                        <td className="serif" style={cellEllipsis} title={card.front}>
+                          {card.front}
+                        </td>
+                        <td className="serif" style={cellEllipsis} title={Array.isArray(card.back) ? card.back.join(', ') : card.back}>
+                          {Array.isArray(card.back) ? card.back.join(', ') : (card.back || <span style={{ color: 'var(--ink-4)' }}>—</span>)}
+                        </td>
+                        <td>
+                          {hasExtra ? (
+                            <span
+                              className="pill pill-moss"
+                              style={{ fontSize: 10 }}
+                              title={`${extraChars} characters`}
+                            >
+                              {extraChars} ch
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--gold)', fontSize: 11 }} title="No back details">—</span>
+                          )}
+                        </td>
+                        <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{optsText}</td>
+                        <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{correctText}</td>
+                        <td className="mono" style={{ ...cellEllipsis, fontSize: 11, color: 'var(--ink-3)' }} title={tagsText}>
+                          {tagsText}
+                        </td>
+                        <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
+                          {isExpanded ? '−' : '+'}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={10} style={{ padding: 0, background: 'var(--paper-2)' }}>
+                            <div style={{ padding: '18px 22px', display: 'grid', gridTemplateColumns: '120px 1fr', gap: '12px 16px', fontSize: 13 }}>
+                              <div className="eyebrow" style={{ alignSelf: 'start', paddingTop: 2 }}>Front</div>
+                              <div className="serif" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--ink)' }}>
+                                {card.front}
+                              </div>
+
+                              <div className="eyebrow" style={{ alignSelf: 'start', paddingTop: 2 }}>Back</div>
+                              <div className="serif" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--ink)' }}>
+                                {Array.isArray(card.back) ? card.back.join(' || ') : card.back || <span style={{ color: 'var(--ink-3)', fontStyle: 'italic' }}>(empty)</span>}
+                              </div>
+
+                              {card.options && card.options.length > 0 && (
+                                <>
+                                  <div className="eyebrow" style={{ alignSelf: 'start', paddingTop: 2 }}>Options</div>
+                                  <ol style={{ margin: 0, paddingLeft: 20 }}>
+                                    {card.options.map((opt, oi) => (
+                                      <li
+                                        key={oi}
+                                        style={{
+                                          color: correct.includes(oi) ? '#3F4A33' : 'var(--ink-2)',
+                                          fontWeight: correct.includes(oi) ? 600 : 400,
+                                          marginBottom: 2,
+                                        }}
+                                      >
+                                        {opt}
+                                        {correct.includes(oi) && (
+                                          <span className="pill pill-moss" style={{ marginLeft: 8, fontSize: 10 }}>correct</span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </>
+                              )}
+
+                              {card.canonicalAnswers && card.canonicalAnswers.length > 0 && (
+                                <>
+                                  <div className="eyebrow" style={{ alignSelf: 'start', paddingTop: 2 }}>Canonical</div>
+                                  <div className="mono" style={{ fontSize: 12, color: 'var(--ink-2)' }}>
+                                    {card.canonicalAnswers.join(' · ')}
+                                  </div>
+                                </>
+                              )}
+
+                              {card.mediaUrl && (
+                                <>
+                                  <div className="eyebrow" style={{ alignSelf: 'start', paddingTop: 2 }}>Media</div>
+                                  <div className="mono" style={{ fontSize: 12, color: 'var(--ink-2)', wordBreak: 'break-all' }}>
+                                    {card.mediaUrl}
+                                  </div>
+                                </>
+                              )}
+
+                              {card.tags && card.tags.length > 0 && (
+                                <>
+                                  <div className="eyebrow" style={{ alignSelf: 'start', paddingTop: 2 }}>Tags</div>
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    {card.tags.map(t => (
+                                      <span key={t} className="pill" style={{ fontSize: 10 }}>{t}</span>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+
+                              <div className="eyebrow" style={{ alignSelf: 'start', paddingTop: 2 }}>Back details</div>
+                              <div>
+                                {hasExtra ? (
+                                  <RenderBackExtra text={card.backExtra!} />
+                                ) : (
+                                  <span style={{ color: '#6E5A20', fontStyle: 'italic', fontSize: 13 }}>
+                                    (empty — the reveal panel won't show in study mode)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {parsedCards.length > 5 && (
+          <div style={{ marginTop: 10, textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowAllCards(v => !v)}
+              className="ulink"
+              style={{ background: 'none', padding: 0, fontSize: 12, cursor: 'pointer' }}
+            >
+              {showAllCards ? 'show less' : `show all ${numberFmt(parsedCards.length)}`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

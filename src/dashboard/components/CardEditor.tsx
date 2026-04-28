@@ -13,6 +13,7 @@ export default function CardEditor({ card, deckId, onSave, onCancel }: CardEdito
   const [kind, setKind] = useState<CardKind>(card?.kind || 'text');
   const [front, setFront] = useState(card?.front || '');
   const [back, setBack] = useState(card?.back || '');
+  const [backExtra, setBackExtra] = useState(card?.backExtra || '');
   const [options, setOptions] = useState<string[]>(card?.options || ['', '', '', '']);
   const [correct, setCorrect] = useState<number | number[]>(card?.correct ?? 0);
   const [mediaUrl, setMediaUrl] = useState(card?.mediaUrl || '');
@@ -49,6 +50,7 @@ export default function CardEditor({ card, deckId, onSave, onCancel }: CardEdito
         kind,
         front: front.trim(),
         back: back.trim(),
+        backExtra: backExtra.trim() || undefined,
         options: kind.startsWith('mcq') ? options.filter(o => o.trim()) : undefined,
         correct: kind.startsWith('mcq') ? correct : undefined,
         canonicalAnswers: kind === 'cloze' 
@@ -269,6 +271,22 @@ export default function CardEditor({ card, deckId, onSave, onCancel }: CardEdito
           )}
         </div>
       )}
+
+      {/* Back details (optional rich reveal) */}
+      <div>
+        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
+          Back details (optional)
+        </label>
+        <textarea
+          className="w-full rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 min-h-[140px] resize-y font-mono"
+          value={backExtra}
+          onChange={e => setBackExtra(e.target.value)}
+          placeholder={`Definition, examples, or notes shown after answering.\n\nMarkdown-lite: blank lines = paragraphs, "* " = bullets, **word** = bold.`}
+        />
+        <p className="text-xs text-surface-500 mt-1">
+          Shown only after the learner submits an answer. Leave blank when no extra context helps.
+        </p>
+      </div>
 
       {/* Tags */}
       <div>

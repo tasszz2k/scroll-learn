@@ -14,6 +14,8 @@ import { facebookDetector, getVisiblePosts, type DomainDetector } from './fb';
 import { youtubeDetector, isYouTubeFeedPage, isYouTubeWatchPage } from './youtube';
 import { instagramDetector, isInstagramFeedPage } from './instagram';
 import { normalizeText } from '../common/parser';
+import { renderBackExtraHTML } from '../common/markdown';
+import { speak, stopSpeaking, isSpeechSupported } from '../common/speak';
 import { startBlocker, updateBlocker, getBlockedCount, getBlockedCounts } from './blocker';
 
 // State
@@ -1128,11 +1130,16 @@ function gradeAnswerLocally(card: Card, userAnswer: string | number | number[]):
 /**
  * Show feedback message
  */
-function showFeedback(message: string, type: 'success' | 'error' | 'partial') {
+function showFeedback(message: string, type: 'success' | 'error' | 'partial', speakText?: string) {
   const feedback = document.getElementById('ss-feedback');
   if (!feedback) return;
-  
-  feedback.textContent = message;
+
+  if (speakText && speakText.trim()) {
+    feedback.innerHTML = `<span>${escapeHTML(message)}</span>${speakButtonHTML(speakText, 'Speak answer aloud')}`;
+    wireSpeakButtons(feedback);
+  } else {
+    feedback.textContent = message;
+  }
   feedback.className = `scrolllearn-quiz-feedback ${type}`;
   feedback.style.display = 'flex';
 }
@@ -1153,13 +1160,13 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
     // Always show correct answer for reference, even when correct
     const correctAnswer = getCorrectAnswerDisplay(card);
     message += ` The answer: ${correctAnswer}`;
-    showFeedback(message, type);
+    showFeedback(message, type, correctAnswer);
   } else if (grade === 1) {
     type = 'partial';
     message = 'Almost there...';
     const correctAnswer = getCorrectAnswerDisplay(card);
     message += `. The answer was: ${correctAnswer}`;
-    showFeedback(message, type);
+    showFeedback(message, type, correctAnswer);
   } else {
     type = 'error';
     // For wrong answers on text/audio/cloze, show diff-style feedback
@@ -1180,7 +1187,22 @@ function showAnswerFeedback(card: Card, grade: 0 | 1 | 2 | 3) {
       message = 'Not quite right';
       const correctAnswer = getCorrectAnswerDisplay(card);
       message += `. The answer was: ${correctAnswer}`;
-      showFeedback(message, type);
+      showFeedback(message, type, correctAnswer);
+    }
+  }
+
+  // Append optional rich back-extra reveal panel
+  if (card.backExtra && card.backExtra.trim()) {
+    const feedback = document.getElementById('ss-feedback');
+    if (feedback) {
+      const rendered = renderBackExtraHTML(card.backExtra);
+      if (rendered) {
+        feedback.insertAdjacentHTML(
+          'beforeend',
+          `<div class="scrolllearn-quiz-back-extra"><div class="scrolllearn-quiz-back-extra-eyebrow">More about the answer</div>${rendered}</div>`
+        );
+        feedback.style.display = 'flex';
+      }
     }
   }
 
@@ -1216,10 +1238,13 @@ function showInitialWrongAnswerDiff(userAnswer: string, correctAnswer: string) {
   if (!feedback) return;
 
   const inlineDiff = generateInlineDiff(userAnswer, correctAnswer);
+  const speaker = speakButtonHTML(correctAnswer, 'Speak correct answer');
 
   const diffHTML = `
     <div style="text-align: left; font-size: 13px; line-height: 1.8;">
-      <div style="margin-bottom: 8px; font-weight: 600;">Not quite right — here's the difference:</div>
+      <div style="margin-bottom: 8px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+        <span>Not quite right — here's the difference:</span>${speaker}
+      </div>
       <div style="font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; padding: 8px; background: #f8fafc; border-radius: 6px; word-break: break-word; margin-bottom: 8px;">
         ${inlineDiff}
       </div>
@@ -1230,6 +1255,7 @@ function showInitialWrongAnswerDiff(userAnswer: string, correctAnswer: string) {
   feedback.innerHTML = diffHTML;
   feedback.className = 'scrolllearn-quiz-feedback error';
   feedback.style.display = 'flex';
+  wireSpeakButtons(feedback);
 }
 
 /**
@@ -1727,13 +1753,16 @@ function closeQuiz() {
 function removeQuizUI() {
   // Disable scroll blocking first
   disableScrollBlock();
-  
+
+  // Stop any in-flight speech synthesis from a speaker button.
+  stopSpeaking();
+
   const confirmDialog = document.getElementById(DELETE_CONFIRM_ID);
   confirmDialog?.remove();
 
   const container = document.getElementById(QUIZ_CONTAINER_ID);
   container?.remove();
-  
+
   const blocker = document.getElementById(BLOCKER_ID);
   blocker?.remove();
 }
@@ -1745,6 +1774,45 @@ function escapeHTML(str: string): string {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+const SPEAKER_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+const SPEAKER_STOP_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+
+function speakButtonHTML(text: string, ariaLabel = 'Speak aloud'): string {
+  if (!isSpeechSupported() || !text.trim()) return '';
+  return `<button type="button" class="scrolllearn-quiz-speak-btn" data-speak="${escapeHTML(text)}" aria-label="${escapeHTML(ariaLabel)}">${SPEAKER_ICON_SVG}</button>`;
+}
+
+function wireSpeakButtons(root: HTMLElement | null): void {
+  if (!root || !isSpeechSupported()) return;
+  const buttons = root.querySelectorAll<HTMLButtonElement>('.scrolllearn-quiz-speak-btn');
+  buttons.forEach((btn) => {
+    if (btn.dataset.wired === '1') return;
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const text = btn.getAttribute('data-speak') || '';
+      const playing = btn.classList.contains('playing');
+      if (playing) {
+        stopSpeaking();
+        btn.classList.remove('playing');
+        btn.innerHTML = SPEAKER_ICON_SVG;
+        return;
+      }
+      const ok = speak(text, {
+        onEnd: () => {
+          btn.classList.remove('playing');
+          btn.innerHTML = SPEAKER_ICON_SVG;
+        },
+      });
+      if (ok) {
+        btn.classList.add('playing');
+        btn.innerHTML = SPEAKER_STOP_SVG;
+      }
+    });
+  });
 }
 
 // Handle messages from the popup (blocked count query)
