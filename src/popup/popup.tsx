@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Card, Deck, Stats, Settings, UpdateInfo } from '../common/types';
 import type { BlockedCounts } from '../content/blocker';
 import { isHostAllowed, parseRegexEntry } from '../common/allowlist';
+import DeckDropdown from '../dashboard/components/DeckDropdown';
 import './popup.css';
 
 interface PopupState {
@@ -250,11 +251,6 @@ function Popup() {
   const isInstagram = currentSite.includes('instagram');
   const isSocialSite = isFacebook || isYouTube || isInstagram;
 
-  // Active deck lookup
-  const activeDeck = decks.find(d => d.id === settings?.activeDeckId) || null;
-  const activeDeckCount = activeDeck ? (cardCounts[activeDeck.id] ?? 0) : 0;
-  const activeDeckDue = activeDeck ? (dueCounts[activeDeck.id] ?? 0) : 0;
-
   // Blocked breakdown ordered for grid (Reels, Shorts, Sponsored, Suggested, Strangers)
   const blockKeys: Array<{ key: keyof BlockedCounts; label: string }> = [
     { key: 'reels', label: 'Reels' },
@@ -409,46 +405,25 @@ function Popup() {
         <div className="section-head">
           <span className="eyebrow">Active deck</span>
         </div>
-        {activeDeck ? (
-          <div className="deck-card">
-            <div>
-              <div className="name">{activeDeck.name}</div>
-              <div className="meta">
-                {activeDeckCount} {activeDeckCount === 1 ? 'card' : 'cards'}
-                {activeDeckDue > 0 && ` · ${activeDeckDue} due`}
-              </div>
-            </div>
-            {activeDeckDue > 0
-              ? <span className="pill pill-clay">{activeDeckDue}</span>
-              : <span className="pill">none due</span>}
-          </div>
+        {decks.length > 0 ? (
+          <DeckDropdown
+            decks={decks}
+            activeDeckId={settings?.activeDeckId ?? ''}
+            totalDue={totalDue}
+            dueByDeck={new Map(Object.entries(dueCounts))}
+            cardCountByDeck={new Map(Object.entries(cardCounts))}
+            allLabel="Auto-select"
+            allHint="Most overdue deck is chosen for you"
+            variant="rich"
+            onChange={id => setActiveDeck(id || null)}
+          />
         ) : (
           <div className="deck-card">
             <div>
               <div className="name" style={{ color: 'var(--ink-3)' }}>Auto-select</div>
-              <div className="meta">Most overdue deck is chosen for you</div>
+              <div className="meta">No decks yet — import some to begin</div>
             </div>
-            {totalDue > 0 && <span className="pill pill-clay">{totalDue}</span>}
           </div>
-        )}
-        {decks.length > 0 && (
-          <select
-            className="deck-select"
-            value={settings?.activeDeckId ?? ''}
-            onChange={e => setActiveDeck(e.target.value || null)}
-            aria-label="Choose active deck"
-          >
-            <option value="">Auto-select ({totalDue} due)</option>
-            {decks.map(deck => {
-              const due = dueCounts[deck.id] ?? 0;
-              const count = cardCounts[deck.id] ?? 0;
-              return (
-                <option key={deck.id} value={deck.id}>
-                  {deck.name} ({count} cards · {due} due)
-                </option>
-              );
-            })}
-          </select>
         )}
       </section>
 

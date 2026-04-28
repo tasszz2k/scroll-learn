@@ -5,6 +5,7 @@ import EditorialHeader from '../EditorialHeader';
 import QuizCard from './QuizCard';
 import { shuffleArray } from './utils';
 import AnswerFeedback from './AnswerFeedback';
+import DeckDropdown from '../DeckDropdown';
 
 type SessionState = 'loading' | 'answering' | 'feedback' | 'complete';
 type Outcome = 'right' | 'wrong';
@@ -242,18 +243,13 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
       }}
     >
       <span className="eyebrow" style={{ whiteSpace: 'nowrap' }}>Active deck</span>
-      <select
-        value={activeDeckId}
-        onChange={e => handleDeckChange(e.target.value)}
-        className="input-editorial"
-        style={{ flex: 1, padding: '8px 12px', fontFamily: "'Source Serif 4', Georgia, serif", fontWeight: 500 }}
-      >
-        <option value="">All decks ({totalDue} due)</option>
-        {decks.map(deck => {
-          const due = dueByDeck.get(deck.id) || 0;
-          return <option key={deck.id} value={deck.id}>{deck.name} ({due} due)</option>;
-        })}
-      </select>
+      <DeckDropdown
+        decks={decks}
+        activeDeckId={activeDeckId}
+        totalDue={totalDue}
+        dueByDeck={dueByDeck}
+        onChange={handleDeckChange}
+      />
       <span className={'pill' + (filteredDue > 0 ? ' pill-clay' : '')} style={{ whiteSpace: 'nowrap' }}>
         {filteredDue} due
       </span>
