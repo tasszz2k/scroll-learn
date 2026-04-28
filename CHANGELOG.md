@@ -4,6 +4,18 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.9.0](https://github.com/tasszz2k/scroll-learn/compare/v1.8.0...v1.9.0) (2026-04-28)
+
+
+### Features
+
+* **ui:** editorial deck dropdown across study + popup ([92b576a](https://github.com/tasszz2k/scroll-learn/commit/92b576aaa7eec328c0371ba9b5f048a53cd863d2))
+
+
+### Bug Fixes
+
+* **background:** serve active deck directly instead of through global slice ([0227b05](https://github.com/tasszz2k/scroll-learn/commit/0227b0519a9424483d7e057d9dbec1ad1516e548))
+
 ## [1.8.0](https://github.com/tasszz2k/scroll-learn/compare/v1.7.0...v1.8.0) (2026-04-28)
 
 
