@@ -166,32 +166,108 @@ async function pasteIntoEditor(editor: HTMLElement, text: string): Promise<void>
     /* ignore */
   }
 
-  // We deliberately use a SINGLE insertion strategy here.
+  // Insert the multi-line prompt without triggering Gemini's submit-on-Enter
+  // handler.
   //
-  // The previous implementation tried a synthetic ClipboardEvent first and
-  // then fell back to execCommand('insertText') if a sync check showed no
-  // text had landed. Gemini's paste handler is asynchronous AND calls
-  // preventDefault() in its own handler, so the sync check always fired
-  // before the text landed. The fallback then ran execCommand a moment
-  // before Gemini's async paste handler also inserted -- producing a
-  // perfectly doubled prompt. Polling for async-paste completion before
-  // falling through is brittle (the handler can take >100ms on long
-  // prompts, especially during Gemini's first-time editor warm-up).
+  // Pitfalls we have to avoid:
+  //   * execCommand('insertText', false, multilineText) -- Gemini's Angular
+  //     beforeinput handler reads the first \n in the data payload as Enter
+  //     and submits the message right then, so only the preamble before the
+  //     first \n\n actually reaches the model.
+  //   * execCommand('insertParagraph') between lines -- fires a beforeinput
+  //     with inputType='insertParagraph', which Gemini also treats as Enter
+  //     (plain Enter sends; Shift+Enter inserts a line break). Same submit
+  //     trap as above.
   //
-  // execCommand('insertText') alone is synchronous, fires beforeinput +
-  // input events that Angular / Gemini's input model picks up, and never
-  // double-inserts. It's the path that the legacy "cards" import has been
-  // relying on in practice (the ClipboardEvent path was usually a no-op
-  // for synthetic events).
-  let inserted = false;
-  try {
-    inserted = document.execCommand('insertText', false, text);
-  } catch {
-    inserted = false;
-  }
-  if (inserted && (editor.innerText || '').trim().length > 0) return;
+  // Strategy:
+  //   1. Try a synthetic ClipboardEvent with the full text in DataTransfer.
+  //      Paste is the user-equivalent way to drop multi-line text into the
+  //      editor and Gemini's paste handler accepts the entire payload in one
+  //      shot. Gemini's handler is async, so we poll innerText until enough
+  //      text has landed.
+  //   2. Fall back to per-line execCommand with insertLineBreak (Shift+Enter
+  //      equivalent, does NOT submit) between lines. Each insertText call
+  //      carries a single-line payload, so the multi-line submit trap from
+  //      (1)'s fallback path never fires.
+  //   3. Last-ditch: textContent + InputEvent.
+  //
+  // Doubling (the original ClipboardEvent + insertText fallback bug) is
+  // avoided because the paste branch returns as soon as the editor reflects
+  // the full text -- the fallback only runs when paste was a no-op.
 
-  // Last-ditch fallback for unusual contenteditable shells where
+  // (1) Synthetic clipboard paste.
+  const dt = new DataTransfer();
+  dt.setData('text/plain', text);
+  let pasteDispatched = false;
+  try {
+    const pasteEvent = new ClipboardEvent('paste', {
+      clipboardData: dt,
+      bubbles: true,
+      cancelable: true,
+    });
+    pasteDispatched = editor.dispatchEvent(pasteEvent);
+  } catch {
+    pasteDispatched = false;
+  }
+
+  if (pasteDispatched) {
+    // Poll up to ~3s for Gemini's async paste handler to land the text.
+    // We require ~70% of the input length so a partial paste (e.g. text/html
+    // path that strips some characters) doesn't pass the check while still
+    // tolerating whitespace/newline normalization in innerText readback.
+    const target = Math.max(Math.floor(text.length * 0.7), 40);
+    for (let i = 0; i < 30; i++) {
+      await sleep(100);
+      const current = editor.innerText || '';
+      if (current.length >= target) return;
+    }
+  }
+
+  // (2) Fallback: per-line insertText with insertLineBreak between lines.
+  // Re-clear before falling through so a partial paste from (1) doesn't
+  // get concatenated with the manual insertion.
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.execCommand('delete', false);
+  } catch {
+    /* ignore */
+  }
+
+  let anyInserted = false;
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0) {
+      try {
+        // insertLineBreak fires beforeinput inputType='insertLineBreak',
+        // matching Shift+Enter -- Gemini treats this as "newline within
+        // message" rather than "send". insertParagraph would submit.
+        document.execCommand('insertLineBreak');
+      } catch {
+        /* ignore */
+      }
+    }
+    if (lines[i]) {
+      try {
+        if (document.execCommand('insertText', false, lines[i])) {
+          anyInserted = true;
+        }
+      } catch {
+        /* ignore */
+      }
+    } else {
+      // Empty line -- the line break above is enough; still counts as
+      // progress so we don't drop into the textContent fallback.
+      anyInserted = true;
+    }
+  }
+
+  if (anyInserted && (editor.innerText || '').trim().length > 0) return;
+
+  // (3) Last-ditch fallback for unusual contenteditable shells where
   // execCommand is unavailable (e.g. some browser quirks). Write directly
   // and fire an input event so frameworks notice the change.
   editor.textContent = text;
