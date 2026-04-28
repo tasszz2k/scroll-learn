@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.7.0](https://github.com/tasszz2k/scroll-learn/compare/v1.6.0...v1.7.0) (2026-04-28)
+
+
+### Features
+
+* **notes:** switch capture modifier to Option and prefer drag-selection ([b07cd38](https://github.com/tasszz2k/scroll-learn/commit/b07cd38dfcade971d45f85f264e0708d696d1d96))
+
 ## [1.6.0](https://github.com/tasszz2k/scroll-learn/compare/v1.5.0...v1.6.0) (2026-04-27)
 
 
