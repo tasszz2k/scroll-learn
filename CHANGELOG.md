@@ -4,6 +4,15 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Features
+
+- **ai-assist:** chat-style Explain & Ask panel on cards and notes that streams Gemini responses with full markdown formatting (bold, bullets, paragraphs) recovered from the rendered DOM.
+- **ai-assist:** conversation history stays visible across follow-ups; the Gemini window is reused so the model retains chat context within the same subject.
+- **ai-assist:** always-on composer below the panel — Enter sends, Shift+Enter inserts a newline, Send disables only while a response is still streaming.
+- **ai-assist:** Copy grabs the full conversation (all turns) so it can be pasted into Back details or notes.
+
 ## [1.9.0](https://github.com/tasszz2k/scroll-learn/compare/v1.8.0...v1.9.0) (2026-04-28)
 
 

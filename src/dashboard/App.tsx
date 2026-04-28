@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import DeckList from './components/DeckList';
 import Guide from './components/Guide';
-import ImportPanel from './components/ImportPanel';
+import ImportPanel, { type PendingImport } from './components/ImportPanel';
 import NotesPanel from './components/NotesPanel';
 import Settings from './components/Settings';
 import Stats from './components/Stats';
@@ -9,6 +9,7 @@ import StudySession from './components/study/StudySession';
 import UpdateBanner from './components/UpdateBanner';
 import type { Deck, Card, Note, Settings as SettingsType, Stats as StatsType } from '../common/types';
 import { STORAGE_KEYS } from '../common/types';
+import { uniqueDeckName } from './utils/deckNames';
 
 type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study' | 'guide';
 
@@ -37,6 +38,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [editCardId, setEditCardId] = useState<string | null>(null);
   const [editDeckId, setEditDeckId] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
   function setActiveTab(tab: Tab) {
     setActiveTabState(tab);
@@ -352,6 +354,14 @@ export default function App() {
             notes={notes}
             settings={settings}
             onRefresh={() => loadData(false)}
+            onPendingImport={(payload) => {
+              const existing = new Set(decks.map(d => d.name));
+              setPendingImport({
+                ...payload,
+                deckName: uniqueDeckName(payload.deckName, existing),
+              });
+              setActiveTab('import');
+            }}
           />
         )}
 
@@ -360,6 +370,8 @@ export default function App() {
             decks={decks}
             onImport={handleImport}
             onCreateDeck={handleSaveDeck}
+            pendingImport={pendingImport}
+            onPendingImportConsumed={() => setPendingImport(null)}
           />
         )}
         

@@ -85,14 +85,14 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  showAfterNPosts: 5,
+  showAfterNPosts: 10,
   pauseMinutesAfterQuiz: 0,
   activeDeckId: null,
   eliminateChars: '.,!?()\'"',
   lowercaseNormalization: true,
   domainSettings: {
     'facebook.com': { enabled: true },
-    'youtube.com': { enabled: true },
+    'youtube.com': { enabled: false },
     'instagram.com': { enabled: true },
   },
   fuzzyThresholds: {
@@ -103,22 +103,22 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   enableKeyboardShortcuts: true,
   showKeyboardHints: true,
-  allowSkip: true,
+  allowSkip: false,
   hideFacebookReels: true,
   hideFacebookSponsored: true,
   hideFacebookSuggested: true,
-  hideInstagramReels: true,
+  hideInstagramReels: false,
   hideInstagramSponsored: true,
   hideInstagramSuggested: true,
   hideYouTubeShorts: true,
   hideFacebookStrangers: true,
   hideInstagramStrangers: true,
-  noteCaptureAllowlist: [],
+  noteCaptureAllowlist: ['app.zim.vn'],
   noteMinLength: 2,
   noteRetentionDays: 0,
   noteTranslateDirection: 'auto',
-  noteAutoTranslate: false,
-  noteToastDurationSeconds: 5,
+  noteAutoTranslate: true,
+  noteToastDurationSeconds: 10,
   autoSpeakAnswer: true,
 };
 
@@ -260,6 +260,10 @@ export interface OpenDashboardMessage {
   type: 'open_dashboard';
 }
 
+export interface OpenSidePanelMessage {
+  type: 'open_side_panel';
+}
+
 export interface GetNextStudyCardMessage {
   type: 'get_next_study_card';
   deckId?: string;
@@ -295,6 +299,57 @@ export interface InstallUpdateMessage {
   type: 'install_update';
 }
 
+// AI provider automation (Gemini)
+export type GeminiJobStage =
+  | 'opening'
+  | 'pasting'
+  | 'submitting'
+  | 'streaming'
+  | 'extracting'
+  | 'done'
+  | 'error'
+  | 'fallback';
+
+// 'cards' is the legacy note->quiz import flow that pastes a prompt and
+// extracts a CSV at the end. 'explain' is the AI-support flow that streams the
+// full text response back to the dashboard token-by-token.
+export type GeminiJobMode = 'cards' | 'explain';
+
+export interface GeminiJob {
+  jobId: string;
+  prompt: string;
+  // Optional for back-compat with any older queued job; defaults to 'cards'.
+  mode?: GeminiJobMode;
+  createdAt: number;
+}
+
+export interface GeminiJobStatusMessage {
+  type: 'gemini_job_status';
+  jobId: string;
+  stage: GeminiJobStage;
+  detail?: string;
+}
+
+export interface GeminiResultMessage {
+  type: 'gemini_result';
+  jobId: string;
+  ok: boolean;
+  csv?: string;
+  raw?: string;
+  // Final raw text from explain-mode jobs (no CSV extraction performed).
+  text?: string;
+  error?: string;
+}
+
+export interface GeminiStreamChunkMessage {
+  type: 'gemini_stream_chunk';
+  jobId: string;
+  // Full accumulated text snapshot, not a delta. Sending whole snapshots is
+  // simpler and idempotent: the renderer just shows the latest.
+  text: string;
+  done: boolean;
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -312,6 +367,7 @@ export type Message =
   | DisableSiteMessage
   | SkipCardMessage
   | OpenDashboardMessage
+  | OpenSidePanelMessage
   | GetNextStudyCardMessage
   | SaveNoteMessage
   | GetNotesMessage
@@ -319,7 +375,10 @@ export type Message =
   | ClearNotesMessage
   | CheckForUpdateMessage
   | GetUpdateInfoMessage
-  | InstallUpdateMessage;
+  | InstallUpdateMessage
+  | GeminiJobStatusMessage
+  | GeminiResultMessage
+  | GeminiStreamChunkMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {

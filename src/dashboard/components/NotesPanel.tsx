@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import type { Note, Settings as SettingsType, PartOfSpeech } from '../../common/types';
 import { detectVietnamese, translateMany, type TranslateLang } from '../../common/translate';
+import AiAssistTrigger from './aiAssist/AiAssistTrigger';
 import EditorialHeader from './EditorialHeader';
+import GeminiProgressBanner from './GeminiProgressBanner';
 import PromptGenerator from './PromptGenerator';
+import { useGeminiAutomation } from '../hooks/useGeminiAutomation';
 
 function posShort(pos: PartOfSpeech): string {
   switch (pos) {
@@ -22,6 +25,7 @@ interface NotesPanelProps {
   notes: Note[];
   settings: SettingsType;
   onRefresh: () => void;
+  onPendingImport?: (payload: { content: string; format: 'csv'; deckName: string }) => void;
 }
 
 type CopyState =
@@ -43,7 +47,7 @@ function toISODate(ts: number): string {
   return `${y}-${m}-${day}`;
 }
 
-export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelProps) {
+export default function NotesPanel({ notes, settings, onRefresh, onPendingImport }: NotesPanelProps) {
   const [search, setSearch] = useState('');
   const [domainFilter, setDomainFilter] = useState<string>('');
   // null = "use derived default from notes"; '' = "user explicitly cleared"
@@ -53,6 +57,11 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
   const [pairsCopy, setPairsCopy] = useState<CopyState>({ kind: 'idle' });
   const [showPromptGenerator, setShowPromptGenerator] = useState(false);
   const [showClearAfterGenerate, setShowClearAfterGenerate] = useState(false);
+  const { aiState, aiElapsedMs, liveText, sendToGemini, dismissError } = useGeminiAutomation({
+    onResult: ({ csv, deckName }) => {
+      onPendingImport?.({ content: csv, format: 'csv', deckName });
+    },
+  });
 
   // Anchor "now" once per mount; the panel session is short-lived.
   const [now] = useState(() => Date.now());
@@ -254,6 +263,15 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
             mode="translation"
             defaultDirection={settings.noteTranslateDirection === 'vi->en' ? 'vi->en' : 'en->vi'}
             onGenerated={() => setShowClearAfterGenerate(true)}
+            enableAiAutomation
+            aiBusy={aiState.kind === 'running'}
+            onSendToAi={sendToGemini}
+          />
+          <GeminiProgressBanner
+            aiState={aiState}
+            aiElapsedMs={aiElapsedMs}
+            liveText={liveText}
+            onDismissError={dismissError}
           />
           {showClearAfterGenerate && notes.length > 0 && (
             <div
@@ -485,6 +503,9 @@ export default function NotesPanel({ notes, settings, onRefresh }: NotesPanelPro
                     {note.domain}
                   </span>
                   <span title={formatDate(note.createdAt)}>{toISODate(note.createdAt)}</span>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <AiAssistTrigger subject={{ kind: 'note', note }} variant="inline" />
                 </div>
               </div>
               <button

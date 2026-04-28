@@ -1,0 +1,267 @@
+/* Sidebar-specific tweaks layered on top of the dashboard's index.css. */
+
+html, body, #sidebar-root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+}
+
+.sidebar-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(245, 241, 235, 0.92);
+  backdrop-filter: saturate(160%) blur(8px);
+  -webkit-backdrop-filter: saturate(160%) blur(8px);
+  border-bottom: 1px solid var(--rule);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-mark {
+  width: 32px;
+  height: 32px;
+  background: var(--ink);
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-title .eyebrow {
+  font-size: 10px;
+}
+
+.sidebar-title h1 {
+  margin: 1px 0 0;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.sidebar-body {
+  padding: 18px 16px 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sidebar-body > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- Tab bar -------------------------------------------------------- */
+
+.sidebar-tabs {
+  position: sticky;
+  top: 60px;
+  z-index: 9;
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(245, 241, 235, 0.92);
+  backdrop-filter: saturate(160%) blur(8px);
+  -webkit-backdrop-filter: saturate(160%) blur(8px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sidebar-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-3);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color .15s ease, border-color .15s ease;
+}
+
+.sidebar-tab:hover {
+  color: var(--ink);
+}
+
+.sidebar-tab.is-active {
+  color: var(--ink);
+  border-bottom-color: var(--clay);
+}
+
+.sidebar-tab-num {
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--ink-4);
+}
+
+.sidebar-tab.is-active .sidebar-tab-num {
+  color: var(--clay);
+}
+
+.sidebar-tab-label {
+  letter-spacing: .01em;
+}
+
+.sidebar-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--clay);
+  color: #FFF8F2;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ---- Sidebar study -------------------------------------------------- */
+
+.sidebar-study {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sidebar-study-meta {
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+}
+
+.sidebar-study-deck {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.sidebar-study-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+}
+
+.sidebar-study-stats strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.sidebar-study-card {
+  padding: 18px 18px 20px;
+}
+
+.sidebar-study-complete {
+  padding: 24px 18px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--card);
+  text-align: center;
+}
+
+/* The full study card inputs and MCQ buttons were sized for the dashboard's
+   wider column. Trim them so they fit comfortably in the side panel. */
+.sidebar-study-card .input-editorial {
+  font-size: 16px;
+  padding: 12px 14px;
+}
+
+.sidebar-study-card button[type="button"] {
+  /* MCQ option buttons render as plain <button>; keep their padding tight. */
+}
+
+/* ---- Chat panel ----------------------------------------------------- */
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 60vh;
+  gap: 12px;
+}
+
+.chat-history {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.chat-empty {
+  padding: 24px 18px;
+  border: 1px dashed var(--rule);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.chat-composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+}
+
+.chat-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
+.chat-composer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-composer-hint {
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+}

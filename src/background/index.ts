@@ -99,9 +99,56 @@ async function handleAlarm(alarm: chrome.alarms.Alarm) {
  */
 function handleMessage(
   message: Message,
-  _sender: chrome.runtime.MessageSender,
+  sender: chrome.runtime.MessageSender,
   sendResponse: (response: Response<unknown>) => void
 ): boolean {
+  // AI-automation messages are point-to-point between the Gemini content
+  // script and the dashboard page. The background has nothing to add here, so
+  // bail out without claiming the response channel — that lets the dashboard's
+  // listener answer instead.
+  if (
+    message.type === 'gemini_job_status' ||
+    message.type === 'gemini_result' ||
+    message.type === 'gemini_stream_chunk'
+  ) {
+    return false;
+  }
+
+  // chrome.sidePanel.open() requires the originating user gesture to still be
+  // in scope, so we must call it synchronously from this handler — not from
+  // the async worker below — and resolve the response immediately.
+  if (message.type === 'open_side_panel') {
+    const tabId = sender.tab?.id;
+    if (tabId == null) {
+      sendResponse({ ok: false, error: 'No sender tab' });
+      return false;
+    }
+    // If the extension was upgraded but not reloaded at chrome://extensions,
+    // the new "sidePanel" permission isn't granted yet and the namespace is
+    // undefined. Detect this clearly so the content script can tell the user
+    // exactly what to do.
+    const sp = (chrome as unknown as { sidePanel?: typeof chrome.sidePanel }).sidePanel;
+    if (!sp || typeof sp.open !== 'function' || typeof sp.setOptions !== 'function') {
+      sendResponse({
+        ok: false,
+        error: 'Side panel API unavailable. Reload the extension at chrome://extensions (Chrome 116+ required).',
+      });
+      return false;
+    }
+    try {
+      void sp.setOptions({
+        tabId,
+        path: 'src/sidebar/sidebar.html',
+        enabled: true,
+      });
+      void sp.open({ tabId });
+      sendResponse({ ok: true });
+    } catch (err) {
+      sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return false;
+  }
+
   // Handle message asynchronously
   handleMessageAsync(message)
     .then(sendResponse)
@@ -109,7 +156,7 @@ function handleMessage(
       console.error('[ScrollLearn] Message handler error:', error);
       sendResponse({ ok: false, error: String(error) });
     });
-  
+
   // Return true to indicate async response
   return true;
 }

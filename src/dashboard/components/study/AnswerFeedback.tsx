@@ -3,6 +3,7 @@ import type { Card, Grade } from '@/common/types';
 import { getGradeFeedback, getCorrectAnswerDisplay } from '@/common/grading';
 import { getSettings } from '@/common/storage';
 import { speak } from '@/common/speak';
+import AiAssistTrigger from '../aiAssist/AiAssistTrigger';
 import RenderBackExtra from './RenderBackExtra';
 import SpeakButton from './SpeakButton';
 
@@ -290,6 +291,19 @@ export default function AnswerFeedback({ card, grade, userAnswer, shuffledIndice
           )}
         </div>
       )}
+
+      {/* AI support: explain or ask a follow-up about this card. */}
+      <div
+        style={{
+          padding: '14px 18px',
+          borderRadius: 10,
+          border: '1px solid var(--rule)',
+          background: 'var(--paper)',
+        }}
+      >
+        <div className="eyebrow" style={{ marginBottom: 8 }}>AI support</div>
+        <AiAssistTrigger subject={{ kind: 'card', card }} variant="card" />
+      </div>
 
       {/* Next button (shown when retry not needed or retry complete) */}
       {(!needsRetry || retryComplete) && (

@@ -206,6 +206,26 @@ function Popup() {
   function openStudy()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#study') }); }
   function openGuide()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#guide') }); }
 
+  async function openSidebar() {
+    // chrome.sidePanel.open() must be called from a user gesture. The popup's
+    // click counts, so we route through the background which knows the active
+    // tab to bind the panel to.
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id != null) {
+        await chrome.sidePanel.setOptions({
+          tabId: tab.id,
+          path: 'src/sidebar/sidebar.html',
+          enabled: true,
+        });
+        await chrome.sidePanel.open({ tabId: tab.id });
+        window.close();
+      }
+    } catch (err) {
+      console.warn('[ScrollLearn:popup] open sidebar failed:', err);
+    }
+  }
+
   async function toggleBlockingSetting(key: keyof Settings) {
     if (!state.settings) return;
     const newSettings = { ...state.settings, [key]: !state.settings[key] };
@@ -315,6 +335,16 @@ function Popup() {
           Dashboard <ArrowRight />
         </button>
       </div>
+      <div className="actions-grid actions-grid-secondary">
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={openSidebar}
+          title="Open quizzes, notes, and chat in a Chrome side panel"
+        >
+          Open sidebar <ArrowRight />
+        </button>
+      </div>
 
       {/* Headline numbers — cards due / day streak */}
       <div className="numbers-row">
@@ -381,7 +411,7 @@ function Popup() {
               {noteCaptureLockedByRegex
                 ? 'Allowlisted by a regex pattern — manage in Settings.'
                 : currentSite
-                  ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Ctrl/Cmd</span> and hover to pluck text.</>
+                  ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.</>
                   : 'Open a tab to enable.'}
             </div>
           </div>

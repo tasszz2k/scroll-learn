@@ -12,13 +12,15 @@
     "storage",
     "alarms",
     "tabs",
-    "nativeMessaging"
+    "nativeMessaging",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://www.facebook.com/*",
     "https://m.facebook.com/*",
     "https://www.youtube.com/*",
     "https://www.instagram.com/*",
+    "https://gemini.google.com/*",
     "<all_urls>"
   ],
   "background": {
@@ -35,6 +37,9 @@
     }
   },
   "options_page": "index.html",
+  "side_panel": {
+    "default_path": "src/sidebar/sidebar.html"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -59,6 +64,15 @@
       ],
       "css": [
         "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "src/content/gemini.ts"
       ],
       "run_at": "document_idle"
     }

@@ -45,6 +45,7 @@
   - Per-category blocked count with hover breakdown
 - **Import Formats**: Quizlet-like simple format, CSV, and JSON. CSV honors RFC 4180 quoted-newline cells so multi-line `backExtra` round-trips correctly. The Import preview gains an expandable per-row inspector and warns when rows are missing back details.
 - **Prompt Generator**: Drafts a Claude/ChatGPT/Gemini prompt that emits cards in the format you want, with explicit instructions and a worked cluster example for dense, per-card `backExtra`.
+- **AI Assist (Explain & Ask)**: One-click "Explain" and "Ask" buttons on every card and note open a Gemini chat in the background, paste a tutor-style prompt, and stream the response back into a side-by-side conversation panel. Bold, bullet, and paragraph formatting are recovered from Gemini's rendered DOM. Follow-ups stay on the same conversation (Gemini history is reused) and the composer is always visible — Enter sends, Shift+Enter inserts a newline.
 - **One-click Updater**: Banner in the dashboard plus a pulsing version pill in the popup. Both check GitHub on view; the native helper installs new releases in place.
 - **In-app Guide**: A `#guide` tab walks through every feature so the dashboard is self-documenting.
 - **Grammar Police Integration**: AI-powered skill that converts [Grammar Police](https://github.com/tasszz2k/GrammarPolice) exports into flashcard decks, grammar reports, exercises, and related knowledge

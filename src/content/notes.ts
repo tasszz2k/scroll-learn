@@ -326,6 +326,9 @@ function pluckTargetFromPoint(x: number, y: number): HTMLElement | null {
   if (el.id === 'scrolllearn-note-toast-stack' || el.closest('#scrolllearn-note-toast-stack')) {
     return null;
   }
+  if (el.id === 'scrolllearn-sidebar-fab' || el.closest('#scrolllearn-sidebar-fab')) {
+    return null;
+  }
   return el;
 }
 
@@ -680,15 +683,108 @@ function detachListeners() {
   stopPluck();
 }
 
+// Floating action button that opens the Scroll Learn side panel. Positioned
+// just above the toast stack baseline so an in-flight save toast doesn't
+// occlude it. Inline-styled with `all: initial` so the host page CSS cannot
+// hide or restyle it.
+function ensureSidebarFab(): HTMLElement {
+  const existing = document.getElementById('scrolllearn-sidebar-fab');
+  if (existing) return existing;
+  const fab = document.createElement('button');
+  fab.id = 'scrolllearn-sidebar-fab';
+  fab.type = 'button';
+  fab.setAttribute('aria-label', 'Open Scroll Learn sidebar');
+  fab.title = 'Open Scroll Learn sidebar';
+  fab.style.cssText = [
+    'all: initial',
+    'box-sizing: border-box',
+    'position: fixed',
+    'right: 16px',
+    'bottom: 88px',
+    'z-index: 2147483646',
+    'width: 44px',
+    'height: 44px',
+    'border-radius: 999px',
+    'background: #1F1B16',
+    'color: #FBF8F2',
+    'display: inline-flex',
+    'align-items: center',
+    'justify-content: center',
+    'box-shadow: 0 10px 24px rgba(0,0,0,0.28)',
+    'cursor: pointer',
+    'transition: transform 0.15s ease, box-shadow 0.15s ease',
+  ].join(';');
+  fab.innerHTML = [
+    '<svg width="22" height="22" viewBox="0 0 64 64" aria-hidden="true" style="display:block">',
+    '<rect x="14" y="16" width="36" height="3" fill="#FBF8F2" />',
+    '<rect x="14" y="26" width="28" height="3" fill="#FBF8F2" />',
+    '<rect x="14" y="36" width="32" height="3" fill="#FBF8F2" />',
+    '<path d="M 50 12 Q 60 32 50 52" fill="none" stroke="#C96442" stroke-width="3" stroke-linecap="round" />',
+    '<circle cx="50" cy="46" r="3" fill="#C96442" />',
+    '</svg>',
+  ].join('');
+  fab.addEventListener('mouseenter', () => {
+    fab.style.transform = 'translateY(-1px)';
+    fab.style.boxShadow = '0 14px 28px rgba(0,0,0,0.32)';
+  });
+  fab.addEventListener('mouseleave', () => {
+    fab.style.transform = '';
+    fab.style.boxShadow = '0 10px 24px rgba(0,0,0,0.28)';
+  });
+  fab.addEventListener('click', e => {
+    // Prevent the page from interpreting the click on its own elements.
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      chrome.runtime.sendMessage({ type: 'open_side_panel' }, response => {
+        if (chrome.runtime.lastError) {
+          const msg = chrome.runtime.lastError.message ?? 'unknown';
+          console.warn('[ScrollLearn:notes] open_side_panel failed:', msg);
+          showStatusToast(`Sidebar failed: ${msg}`, 'error');
+          return;
+        }
+        if (response && response.ok === false) {
+          const errMsg = String(response.error ?? 'unknown');
+          console.warn('[ScrollLearn:notes] open_side_panel error:', errMsg);
+          showStatusToast(`Sidebar: ${errMsg}`, 'error');
+        }
+      });
+    } catch (err) {
+      console.warn('[ScrollLearn:notes] open_side_panel threw:', err);
+      showStatusToast('Sidebar: extension context invalid. Reload the extension.', 'error');
+    }
+  });
+  document.body.appendChild(fab);
+  return fab;
+}
+
+function mountFab() {
+  if (!document.body) {
+    // Body may not exist yet on document_start; wait for DOMContentLoaded.
+    document.addEventListener('DOMContentLoaded', () => {
+      if (ctx.active) ensureSidebarFab();
+    }, { once: true });
+    return;
+  }
+  ensureSidebarFab();
+}
+
+function unmountFab() {
+  const fab = document.getElementById('scrolllearn-sidebar-fab');
+  fab?.remove();
+}
+
 function applyState() {
   const shouldBeActive = isAllowed();
   if (shouldBeActive && !ctx.active) {
     ctx.active = true;
     attachListeners();
+    mountFab();
     console.log('[ScrollLearn:notes] capture ACTIVE on', normalizeHost(location.hostname));
   } else if (!shouldBeActive && ctx.active) {
     ctx.active = false;
     detachListeners();
+    unmountFab();
     console.log('[ScrollLearn:notes] capture INACTIVE on', normalizeHost(location.hostname));
   } else if (!shouldBeActive) {
     console.log(

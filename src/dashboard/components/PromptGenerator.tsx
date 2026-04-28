@@ -26,6 +26,12 @@ interface PromptGeneratorProps {
   mode?: PromptMode;
   defaultDirection?: TranslationDirection;
   onGenerated?: () => void;
+  // When true, render a second action that hands the prompt off for AI
+  // automation (e.g. opening Gemini and pasting the prompt automatically).
+  enableAiAutomation?: boolean;
+  aiBusy?: boolean;
+  aiButtonLabel?: string;
+  onSendToAi?: (prompt: string) => void;
 }
 
 function formatInstructionsFor(format: PromptOutputFormat): string {
@@ -338,6 +344,10 @@ export default function PromptGenerator({
   mode = 'general',
   defaultDirection = 'en->vi',
   onGenerated,
+  enableAiAutomation = false,
+  aiBusy = false,
+  aiButtonLabel = 'Generate with Gemini',
+  onSendToAi,
 }: PromptGeneratorProps) {
   const [promptInput, setPromptInput] = useState(initialInput);
   const [promptCardCount, setPromptCardCount] = useState(defaultCardCount);
@@ -358,13 +368,25 @@ export default function PromptGenerator({
     try { localStorage.setItem(ENGLISH_LEVEL_KEY, englishLevel); } catch { /* ignore */ }
   }, [englishLevel]);
 
-  function handleGenerate() {
-    const prompt = mode === 'translation'
+  function buildCurrentPrompt(): string {
+    return mode === 'translation'
       ? buildTranslationPrompt(promptInput, promptCardCount, promptOutputFormat, promptCardType, direction, englishLevel)
       : buildGeneralPrompt(promptInput, promptCardCount, promptOutputFormat, promptCardType);
+  }
+
+  function handleGenerate() {
+    const prompt = buildCurrentPrompt();
     setGeneratedPrompt(prompt);
     setPromptCopied(false);
     onGenerated?.();
+  }
+
+  function handleSendToAi() {
+    const prompt = buildCurrentPrompt();
+    setGeneratedPrompt(prompt);
+    setPromptCopied(false);
+    onGenerated?.();
+    onSendToAi?.(prompt);
   }
 
   async function handleCopy() {
@@ -462,10 +484,21 @@ export default function PromptGenerator({
               </>
             )}
           </div>
-          <div style={{ marginTop: 14 }}>
-            <button onClick={handleGenerate} className="btn btn-clay" type="button">
+          <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button onClick={handleGenerate} className="btn btn-clay" type="button" disabled={aiBusy}>
               Generate prompt
             </button>
+            {enableAiAutomation && (
+              <button
+                onClick={handleSendToAi}
+                className="btn btn-dark"
+                type="button"
+                disabled={aiBusy}
+                title="Open Gemini in a new tab, paste this prompt, and import the result automatically"
+              >
+                {aiBusy ? 'Working with Gemini...' : aiButtonLabel}
+              </button>
+            )}
           </div>
         </div>
         <div>

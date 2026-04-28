@@ -1,16 +1,27 @@
-import { Fragment, useState, useRef } from 'react';
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react';
 import type { Deck, Card, ParsedCard, Response } from '../../common/types';
 import { parseSimpleFormat, parseCSV, parseJSON } from '../../common/parser';
 import EditorialHeader from './EditorialHeader';
+import GeminiProgressBanner from './GeminiProgressBanner';
 import PromptGenerator from './PromptGenerator';
 import RenderBackExtra from './study/RenderBackExtra';
+import { useGeminiAutomation } from '../hooks/useGeminiAutomation';
+import { uniqueDeckName } from '../utils/deckNames';
 
 type ImportFormat = 'simple' | 'csv' | 'json';
+
+export interface PendingImport {
+  content: string;
+  format: ImportFormat;
+  deckName: string;
+}
 
 interface ImportPanelProps {
   decks: Deck[];
   onImport: (cards: Card[], deckId: string) => Promise<Response<{ inserted: number }>>;
   onCreateDeck: (deck: Omit<Deck, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Response<Deck>>;
+  pendingImport?: PendingImport | null;
+  onPendingImportConsumed?: () => void;
 }
 
 const numberFmt = new Intl.NumberFormat('en-US').format;
@@ -49,7 +60,7 @@ function shortKind(kind: ParsedCard['kind']): string {
   }
 }
 
-export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPanelProps) {
+export default function ImportPanel({ decks, onImport, onCreateDeck, pendingImport, onPendingImportConsumed }: ImportPanelProps) {
   const [format, setFormat] = useState<ImportFormat>('csv');
   const [content, setContent] = useState('');
   const [separator, setSeparator] = useState('|');
@@ -65,6 +76,54 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const [showPromptGenerator, setShowPromptGenerator] = useState(false);
+
+  // Shared seeding routine used by both the cross-tab handoff (via the
+  // `pendingImport` prop) and the in-panel Gemini automation flow. Replaces
+  // the source/target/preview state in one shot and runs the parser so the
+  // preview lights up immediately.
+  const seedImport = useCallback((payload: { content: string; format: ImportFormat; deckName: string }) => {
+    setFormat(payload.format);
+    setContent(payload.content);
+    setCreateNewDeck(true);
+    setNewDeckName(payload.deckName);
+    setImportResult(null);
+    setShowAllCards(false);
+    setExpandedIndex(null);
+    let result;
+    switch (payload.format) {
+      case 'simple': result = parseSimpleFormat(payload.content, separator); break;
+      case 'csv':    result = parseCSV(payload.content); break;
+      case 'json':   result = parseJSON(payload.content); break;
+    }
+    setParsedCards(result.cards);
+    setErrors(result.errors);
+    // Intentionally exclude `separator` so the seed routine uses the value at
+    // call time without forcing the callback identity to change every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Seed from a pending import (e.g. handed over by the Notes -> Import AI flow).
+  useEffect(() => {
+    if (!pendingImport) return;
+    seedImport(pendingImport);
+    onPendingImportConsumed?.();
+    // Intentionally exclude `seedImport` and `onPendingImportConsumed` so we
+    // only run once per pendingImport handoff.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImport]);
+
+  // In-panel Gemini automation: when the result comes back, drop it straight
+  // into the source/target/preview area without bouncing through the parent.
+  const { aiState, aiElapsedMs, liveText, sendToGemini, dismissError } = useGeminiAutomation({
+    onResult: ({ csv, deckName }) => {
+      const existing = new Set(decks.map(d => d.name));
+      seedImport({
+        content: csv,
+        format: 'csv',
+        deckName: uniqueDeckName(deckName, existing),
+      });
+    },
+  });
 
   function toggleExpand(i: number) {
     setExpandedIndex(prev => (prev === i ? null : i));
@@ -178,7 +237,21 @@ export default function ImportPanel({ decks, onImport, onCreateDeck }: ImportPan
         }
       />
 
-      {showPromptGenerator && <PromptGenerator />}
+      {showPromptGenerator && (
+        <>
+          <PromptGenerator
+            enableAiAutomation
+            aiBusy={aiState.kind === 'running'}
+            onSendToAi={sendToGemini}
+          />
+          <GeminiProgressBanner
+            aiState={aiState}
+            aiElapsedMs={aiElapsedMs}
+            liveText={liveText}
+            onDismissError={dismissError}
+          />
+        </>
+      )}
 
       {/* Two-column main */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 40 }}>

@@ -249,7 +249,28 @@ Capital of France? | Paris`}</Pre>
         </List>
       </Section>
 
-      <Section num="10" label="Updates">
+      <Section num="10" label="AI assist (Explain &amp; Ask)">
+        <H>A tutor next to every card and note.</H>
+        <P>
+          Each card in study mode and each note in the Notes tab carries an <strong>Explain</strong> and an <strong>Ask</strong> button. Click either to fire a tutor-style prompt at Gemini in the background — the response streams back into a chat-style panel underneath, with bold, bullets, and paragraph breaks preserved from Gemini's output.
+        </P>
+        <List>
+          <Bullet><strong>Explain</strong> — runs a pre-written prompt that summarises meaning, examples, word family, and common pitfalls (or, for grammar cards, the rule plus contrasts).</Bullet>
+          <Bullet><strong>Ask</strong> — type a free-form follow-up question scoped to the card or note. The captured text is automatically included as context.</Bullet>
+          <Bullet><strong>Conversation history</strong> — every Q&amp;A you fire on the same subject stays in the panel as a back-and-forth thread. The Gemini tab is reused so the model also has the chat history, not just our prompt.</Bullet>
+          <Bullet><strong>Always-on composer</strong> — once a panel is open the input bar stays visible. <Kbd>Enter</Kbd> sends, <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> inserts a newline, and Send unlocks as soon as the previous response settles.</Bullet>
+          <Bullet><strong>Copy</strong> — grabs the entire conversation (all turns) so you can paste it into a card's Back details or your notes.</Bullet>
+          <Bullet><strong>Close</strong> — ends the conversation and shuts the background Gemini window. The next click on Explain or Ask starts a fresh chat.</Bullet>
+        </List>
+        <P>
+          Only one AI assist job runs at a time across the whole dashboard. If you click Explain on one card while another is still streaming, the second click is held until the first one finishes — a small "AI busy elsewhere" hint shows on the inactive surface.
+        </P>
+        <P>
+          Requires a signed-in Gemini account (<Code>gemini.google.com</Code>). Nothing is sent to a ScrollLearn server; the prompt and response live entirely between your browser and Gemini.
+        </P>
+      </Section>
+
+      <Section num="11" label="Updates">
         <H>One-click in-place upgrade.</H>
         <P>
           When a new release is published, a banner appears at the top of the dashboard. Click <strong>Update now</strong> and a local helper downloads, unpacks, and reloads the extension automatically — no <Code>chrome://extensions</Code> trip needed.
