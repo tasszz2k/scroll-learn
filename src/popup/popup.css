@@ -155,6 +155,31 @@ button.popup-version {
   50%      { box-shadow: 0 0 0 4px rgba(201, 100, 66, 0); }
 }
 
+.popup-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.popup-help:hover {
+  color: var(--clay);
+  border-color: var(--clay-tint);
+  background: var(--clay-wash);
+}
+.popup-help:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+}
+
 .status-dot {
   width: 8px;
   height: 8px;

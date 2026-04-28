@@ -203,6 +203,7 @@ function Popup() {
 
   function openDashboard() { chrome.runtime.openOptionsPage(); }
   function openStudy()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#study') }); }
+  function openGuide()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#guide') }); }
 
   async function toggleBlockingSetting(key: keyof Settings) {
     if (!state.settings) return;
@@ -295,6 +296,19 @@ function Popup() {
             )}
           </p>
         </div>
+        <button
+          type="button"
+          className="popup-help"
+          onClick={openGuide}
+          title="Open the user guide"
+          aria-label="Open the user guide"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.25" />
+            <path d="M6.4 6.2a1.6 1.6 0 1 1 2.6 1.3c-.7.45-1 .9-1 1.5" />
+            <circle cx="8" cy="11.4" r="0.55" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
         <div className={'status-dot' + (!siteEnabled ? ' disabled' : '')} title={siteEnabled ? 'Active' : 'Paused on this site'} />
       </header>
 
@@ -396,12 +410,7 @@ function Popup() {
           <span className="eyebrow">Active deck</span>
         </div>
         {activeDeck ? (
-          <button
-            type="button"
-            className="deck-card deck-card-button"
-            onClick={() => setActiveDeck(null)}
-            title="Clear active deck"
-          >
+          <div className="deck-card">
             <div>
               <div className="name">{activeDeck.name}</div>
               <div className="meta">
@@ -412,21 +421,34 @@ function Popup() {
             {activeDeckDue > 0
               ? <span className="pill pill-clay">{activeDeckDue}</span>
               : <span className="pill">none due</span>}
-          </button>
+          </div>
         ) : (
-          <button
-            type="button"
-            className="deck-card deck-card-button"
-            onClick={() => decks[0] && setActiveDeck(decks[0].id)}
-            title={decks.length === 0 ? 'No decks yet' : 'Pick a deck'}
-            disabled={decks.length === 0}
-          >
+          <div className="deck-card">
             <div>
               <div className="name" style={{ color: 'var(--ink-3)' }}>Auto-select</div>
               <div className="meta">Most overdue deck is chosen for you</div>
             </div>
             {totalDue > 0 && <span className="pill pill-clay">{totalDue}</span>}
-          </button>
+          </div>
+        )}
+        {decks.length > 0 && (
+          <select
+            className="deck-select"
+            value={settings?.activeDeckId ?? ''}
+            onChange={e => setActiveDeck(e.target.value || null)}
+            aria-label="Choose active deck"
+          >
+            <option value="">Auto-select ({totalDue} due)</option>
+            {decks.map(deck => {
+              const due = dueCounts[deck.id] ?? 0;
+              const count = cardCounts[deck.id] ?? 0;
+              return (
+                <option key={deck.id} value={deck.id}>
+                  {deck.name} ({count} cards · {due} due)
+                </option>
+              );
+            })}
+          </select>
         )}
       </section>
 
