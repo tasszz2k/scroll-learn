@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.10.1](https://github.com/tasszz2k/scroll-learn/compare/v1.10.0...v1.10.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **ai-assist:** paste full multi-line prompt into Gemini without auto-submit ([ba0843b](https://github.com/tasszz2k/scroll-learn/commit/ba0843bbafc319ac2efae696eba3d1dbdb06ca2e))
+
 ## [1.10.0](https://github.com/tasszz2k/scroll-learn/compare/v1.9.0...v1.10.0) (2026-04-28)
 
 
