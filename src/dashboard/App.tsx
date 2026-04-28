@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import DeckList from './components/DeckList';
+import Guide from './components/Guide';
 import ImportPanel from './components/ImportPanel';
 import NotesPanel from './components/NotesPanel';
 import Settings from './components/Settings';
@@ -7,8 +8,9 @@ import Stats from './components/Stats';
 import StudySession from './components/study/StudySession';
 import UpdateBanner from './components/UpdateBanner';
 import type { Deck, Card, Note, Settings as SettingsType, Stats as StatsType } from '../common/types';
+import { STORAGE_KEYS } from '../common/types';
 
-type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study';
+type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study' | 'guide';
 
 const HASH_TO_TAB: Record<string, Tab> = {
   '#decks': 'decks',
@@ -17,6 +19,7 @@ const HASH_TO_TAB: Record<string, Tab> = {
   '#settings': 'settings',
   '#stats': 'stats',
   '#study': 'study',
+  '#guide': 'guide',
 };
 
 function getTabFromHash(): Tab {
@@ -54,27 +57,7 @@ export default function App() {
     }
   }, []);
 
-  // Load initial data
-  useEffect(() => {
-    void loadData();
-
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setDarkMode(prefersDark);
-
-    if (prefersDark) {
-      document.documentElement.classList.add('dark');
-    }
-
-    void checkEditCardRequest();
-
-    function onHashChange() {
-      setActiveTabState(getTabFromHash());
-    }
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, [checkEditCardRequest]);
-
-  async function loadData(showLoading = true) {
+  const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
       const [decksRes, cardsRes, settingsRes, statsRes, notesRes] = await Promise.all([
@@ -95,7 +78,58 @@ export default function App() {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }
+  }, []);
+
+  // Load initial data
+  useEffect(() => {
+    void loadData();
+
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setDarkMode(prefersDark);
+
+    if (prefersDark) {
+      document.documentElement.classList.add('dark');
+    }
+
+    void checkEditCardRequest();
+
+    function onHashChange() {
+      setActiveTabState(getTabFromHash());
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [checkEditCardRequest, loadData]);
+
+  // Live-sync: when the background writes new notes (or other tracked stores)
+  // to chrome.storage, re-fetch silently so the dashboard reflects captures
+  // made on other tabs without a manual refresh.
+  useEffect(() => {
+    const watched: string[] = [
+      STORAGE_KEYS.NOTES,
+      STORAGE_KEYS.CARDS,
+      STORAGE_KEYS.DECKS,
+      STORAGE_KEYS.STATS,
+      STORAGE_KEYS.SETTINGS,
+    ];
+    function onChanged(changes: { [key: string]: chrome.storage.StorageChange }, area: string) {
+      if (area !== 'local') return;
+      if (!watched.some(k => k in changes)) return;
+      void loadData(false);
+    }
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, [loadData]);
+
+  // Also refresh when the dashboard tab becomes visible again — covers cases
+  // where chrome.storage.onChanged fires while the tab was throttled in the
+  // background.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') void loadData(false);
+    }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadData]);
 
   function toggleDarkMode() {
     setDarkMode(!darkMode);
@@ -161,6 +195,7 @@ export default function App() {
     { id: 'import',   label: 'Import',     num: '04' },
     { id: 'settings', label: 'Settings',   num: '05' },
     { id: 'stats',    label: 'Statistics', num: '06' },
+    { id: 'guide',    label: 'Guide',      num: '07' },
   ];
 
   const totalDue = cards.filter(c => c.due <= Date.now()).length;
@@ -343,6 +378,8 @@ export default function App() {
             cards={cards}
           />
         )}
+
+        {activeTab === 'guide' && <Guide />}
       </main>
     </div>
   );
