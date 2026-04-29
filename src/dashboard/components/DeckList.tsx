@@ -3,6 +3,7 @@ import type { Deck, Card, Stats, Response } from '../../common/types';
 import CardEditor from './CardEditor';
 import CardPreview from './CardPreview';
 import EditorialHeader from './EditorialHeader';
+import { useConfirm } from '../hooks/useConfirm';
 
 interface DeckListProps {
   decks: Deck[];
@@ -66,6 +67,7 @@ export default function DeckList({
   onEditCardHandled,
   onBeginStudy,
 }: DeckListProps) {
+  const confirm = useConfirm();
   const [expandedDeck, setExpandedDeck] = useState<string | null>(null);
   const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
   const [editingCard, setEditingCard] = useState<Card | null>(null);
@@ -199,7 +201,13 @@ export default function DeckList({
   }
 
   async function handleDeleteDeck(deckId: string) {
-    if (window.confirm('Delete this deck and all its cards? This cannot be undone.')) {
+    const ok = await confirm({
+      title: 'Delete deck',
+      message: 'Delete this deck and all its cards? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (ok) {
       await onDeleteDeck(deckId);
       if (expandedDeck === deckId) setExpandedDeck(null);
     }
@@ -642,8 +650,14 @@ export default function DeckList({
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          if (window.confirm('Delete this card?')) onDeleteCard(card.id);
+                                        onClick={async () => {
+                                          const ok = await confirm({
+                                            title: 'Delete card',
+                                            message: 'Delete this card?',
+                                            confirmLabel: 'Delete',
+                                            variant: 'danger',
+                                          });
+                                          if (ok) onDeleteCard(card.id);
                                         }}
                                         className="ulink"
                                         style={{ background: 'none', padding: 0, fontSize: 12, color: 'var(--rose)', borderBottomColor: 'var(--rose)', cursor: 'pointer' }}

@@ -5,13 +5,14 @@ import ImportPanel, { type PendingImport } from './components/ImportPanel';
 import NotesPanel from './components/NotesPanel';
 import Settings from './components/Settings';
 import Stats from './components/Stats';
+import ShadowPanel from './components/shadow/ShadowPanel';
 import StudySession from './components/study/StudySession';
 import UpdateBanner from './components/UpdateBanner';
 import type { Deck, Card, Note, Settings as SettingsType, Stats as StatsType } from '../common/types';
 import { STORAGE_KEYS } from '../common/types';
 import { uniqueDeckName } from './utils/deckNames';
 
-type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study' | 'guide';
+type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study' | 'shadow' | 'guide';
 
 const HASH_TO_TAB: Record<string, Tab> = {
   '#decks': 'decks',
@@ -20,11 +21,17 @@ const HASH_TO_TAB: Record<string, Tab> = {
   '#settings': 'settings',
   '#stats': 'stats',
   '#study': 'study',
+  '#shadow': 'shadow',
   '#guide': 'guide',
 };
 
 function getTabFromHash(): Tab {
-  return HASH_TO_TAB[window.location.hash] || 'decks';
+  // Shadow uses sub-routes (#shadow:foundation, #shadow:practice). Treat any
+  // hash that starts with '#shadow' as the shadow tab; ShadowPanel reads the
+  // suffix internally.
+  const h = window.location.hash;
+  if (h.startsWith('#shadow')) return 'shadow';
+  return HASH_TO_TAB[h] || 'decks';
 }
 
 export default function App() {
@@ -42,6 +49,15 @@ export default function App() {
 
   function setActiveTab(tab: Tab) {
     setActiveTabState(tab);
+    // For Shadow, only set the bare '#shadow' hash if the user isn't already
+    // on a sub-route (foundation/practice); otherwise we'd reset their inner
+    // section every time another tab handed back focus.
+    if (tab === 'shadow') {
+      if (!window.location.hash.startsWith('#shadow')) {
+        window.location.hash = '#shadow';
+      }
+      return;
+    }
     window.location.hash = `#${tab}`;
   }
 
@@ -192,12 +208,13 @@ export default function App() {
 
   const tabs: { id: Tab; label: string; num: string }[] = [
     { id: 'study',    label: 'Study',      num: '01' },
-    { id: 'decks',    label: 'Decks',      num: '02' },
-    { id: 'notes',    label: 'Notes',      num: '03' },
-    { id: 'import',   label: 'Import',     num: '04' },
-    { id: 'settings', label: 'Settings',   num: '05' },
-    { id: 'stats',    label: 'Statistics', num: '06' },
-    { id: 'guide',    label: 'Guide',      num: '07' },
+    { id: 'shadow',   label: 'Shadow',     num: '02' },
+    { id: 'decks',    label: 'Decks',      num: '03' },
+    { id: 'notes',    label: 'Notes',      num: '04' },
+    { id: 'import',   label: 'Import',     num: '05' },
+    { id: 'settings', label: 'Settings',   num: '06' },
+    { id: 'stats',    label: 'Statistics', num: '07' },
+    { id: 'guide',    label: 'Guide',      num: '08' },
   ];
 
   const totalDue = cards.filter(c => c.due <= Date.now()).length;
@@ -390,6 +407,8 @@ export default function App() {
             cards={cards}
           />
         )}
+
+        {activeTab === 'shadow' && <ShadowPanel notes={notes} />}
 
         {activeTab === 'guide' && <Guide />}
       </main>

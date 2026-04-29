@@ -3,6 +3,7 @@ import type { Settings as SettingsType, Response, TranslateDirection } from '../
 import { DEFAULT_SETTINGS } from '../../common/types';
 import { parseRegexEntry, validateAllowlistEntry } from '../../common/allowlist';
 import EditorialHeader from './EditorialHeader';
+import { useConfirm } from '../hooks/useConfirm';
 
 interface SettingsProps {
   settings: SettingsType;
@@ -124,7 +125,12 @@ function ToggleControl({ on, onClick, label, ariaLabel }: { on: boolean; onClick
   );
 }
 
-function FieldInput({ value, onChange, mono, placeholder }: { value: string; onChange: (v: string) => void; mono?: boolean; placeholder?: string }) {
+function FieldInput({ value, onChange, mono, placeholder, secret }: { value: string; onChange: (v: string) => void; mono?: boolean; placeholder?: string; secret?: boolean }) {
+  // Secrets render masked by default with a small reveal toggle. Browsers
+  // also avoid autofill / spellcheck / password-manager prompts on
+  // type="password", which is what we want for an HF token field.
+  const [revealed, setRevealed] = useState(false);
+  const isSecret = !!secret;
   return (
     <div
       style={{
@@ -139,11 +145,13 @@ function FieldInput({ value, onChange, mono, placeholder }: { value: string; onC
       }}
     >
       <input
-        type="text"
+        type={isSecret && !revealed ? 'password' : 'text'}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className={mono ? 'mono' : 'serif'}
+        autoComplete={isSecret ? 'off' : undefined}
+        spellCheck={isSecret ? false : undefined}
         style={{
           width: '100%',
           textAlign: 'right',
@@ -158,6 +166,28 @@ function FieldInput({ value, onChange, mono, placeholder }: { value: string; onC
           height: '100%',
         }}
       />
+      {isSecret && (
+        <button
+          type="button"
+          onClick={() => setRevealed(r => !r)}
+          aria-label={revealed ? 'Hide token' : 'Show token'}
+          title={revealed ? 'Hide token' : 'Show token'}
+          className="mono"
+          style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'var(--ink-3)',
+            fontSize: 11,
+            padding: '0 12px',
+            height: '100%',
+            borderLeft: '1px solid var(--rule-2)',
+            letterSpacing: '.06em',
+          }}
+        >
+          {revealed ? 'HIDE' : 'SHOW'}
+        </button>
+      )}
     </div>
   );
 }
@@ -252,6 +282,7 @@ function SiteToggle({ on, onClick, dim, ariaLabel }: { on: boolean; onClick: () 
 /* ----- Settings ----- */
 
 export default function Settings({ settings, onSave }: SettingsProps) {
+  const confirm = useConfirm();
   const [localSettings, setLocalSettings] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -344,8 +375,13 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     }
   }
 
-  function handleResetDefaults() {
-    if (!window.confirm('Reset all settings to defaults? Note capture allowlist and active deck will be preserved.')) return;
+  async function handleResetDefaults() {
+    const ok = await confirm({
+      title: 'Reset settings',
+      message: 'Reset all settings to defaults? Note capture allowlist and active deck will be preserved.',
+      confirmLabel: 'Reset',
+    });
+    if (!ok) return;
     setLocalSettings(prev => ({
       ...DEFAULT_SETTINGS,
       activeDeckId: prev.activeDeckId,
@@ -527,7 +563,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
 
       {/* === B · QUIZ BEHAVIOUR === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="B" label="Quiz behaviour" count="6 SETTINGS" />
+        <SectionHead num="B" label="Quiz behaviour" count="7 SETTINGS" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Show after N posts" hint="Cards appear once you have scrolled past this many feed items.">
             <Stepper value={localSettings.showAfterNPosts} unit="posts" min={1} max={50} onChange={n => update('showAfterNPosts', n)} />
@@ -544,8 +580,41 @@ export default function Settings({ settings, onSave }: SettingsProps) {
           <Row label="Keyboard shortcuts" hint="Number keys to pick MCQ options, Enter to submit, Esc to skip.">
             <ToggleControl on={localSettings.enableKeyboardShortcuts} onClick={() => toggle('enableKeyboardShortcuts')} ariaLabel="Keyboard shortcuts" />
           </Row>
-          <Row label="Show keyboard hints" hint="Display a small hint row beneath each quiz card." last>
+          <Row label="Show keyboard hints" hint="Display a small hint row beneath each quiz card.">
             <ToggleControl on={localSettings.showKeyboardHints} onClick={() => toggle('showKeyboardHints')} ariaLabel="Keyboard hints" />
+          </Row>
+          <Row
+            label="Kokoro API token"
+            hint={
+              <>
+                Hugging Face access token for the Shadow player's <span className="mono">Kokoro TTS - API</span> engine. Free tokens at <span className="mono">huggingface.co/settings/tokens</span> include ~4 GPU-min/day on the Space (cached audio replays for free).
+              </>
+            }
+          >
+            <FieldInput
+              value={localSettings.kokoroApiToken}
+              onChange={v => update('kokoroApiToken', v)}
+              mono
+              secret
+              placeholder="hf_..."
+            />
+          </Row>
+          <Row
+            label="ElevenLabs API key"
+            hint={
+              <>
+                API key for the Shadow player's <span className="mono">ElevenLabs - API</span> engine. Free keys at <span className="mono">elevenlabs.io/app/settings/api-keys</span> include ~10k monthly credits on Flash v2.5 (cached audio replays for free). Bypasses the browser-driven path entirely.
+              </>
+            }
+            last
+          >
+            <FieldInput
+              value={localSettings.elevenLabsApiKey}
+              onChange={v => update('elevenLabsApiKey', v)}
+              mono
+              secret
+              placeholder="sk_..."
+            />
           </Row>
         </div>
       </section>
@@ -748,8 +817,14 @@ export default function Settings({ settings, onSave }: SettingsProps) {
           <Row label="Clear" hint="Delete every card, deck, note, and setting. This cannot be undone." last>
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm('Are you sure you want to delete ALL data? This cannot be undone.')) {
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Delete all data',
+                  message: 'Are you sure you want to delete ALL data? This cannot be undone.',
+                  confirmLabel: 'Delete everything',
+                  variant: 'danger',
+                });
+                if (ok) {
                   chrome.storage.local.clear();
                   window.location.reload();
                 }
