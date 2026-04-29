@@ -1,4 +1,18 @@
-import type { Message, Response, Card, Deck, Note, NewNote, Settings, Stats, Grade, TranslateLang, UpdateInfo } from '../common/types';
+import type {
+  Message,
+  Response,
+  Card,
+  Deck,
+  Note,
+  NewNote,
+  Settings,
+  Stats,
+  Grade,
+  TranslateLang,
+  UpdateInfo,
+  ShadowScript,
+  IpaProgress,
+} from '../common/types';
 import { createCard, createDeck, createNote } from '../common/types';
 import * as storage from '../common/storage';
 import { detectVietnamese, isSingleWord, translate, translateWithDictionary } from '../common/translate';
@@ -17,6 +31,89 @@ import {
 const ALARM_REFRESH_QUEUE = 'refresh_due_queue';
 const ALARM_CLEANUP = 'cleanup_expired';
 const ALARM_PRUNE_NOTES = 'prune_notes';
+
+// kokoro-local offscreen document for in-browser Kokoro TTS inference.
+const KOKORO_OFFSCREEN_PATH = 'src/offscreen/kokoroOffscreen.html';
+
+interface KokoroLocalSynthRequest {
+  type: 'kokoro_local_synth';
+  reqId: string;
+  text: string;
+  voice: string;
+}
+
+interface KokoroLocalCloseRequest {
+  type: 'kokoro_local_close';
+  target: 'background';
+}
+
+function isKokoroLocalRequest(msg: unknown): msg is KokoroLocalSynthRequest {
+  if (!msg || typeof msg !== 'object') return false;
+  const m = msg as { type?: unknown; target?: unknown };
+  // Forwarded copies carry target='offscreen' and must not loop back through
+  // the relay; only the original (untargeted) dashboard send is for us.
+  return m.type === 'kokoro_local_synth' && m.target !== 'offscreen';
+}
+
+function isKokoroLocalCloseRequest(msg: unknown): msg is KokoroLocalCloseRequest {
+  if (!msg || typeof msg !== 'object') return false;
+  const m = msg as { type?: unknown; target?: unknown };
+  return m.type === 'kokoro_local_close' && m.target === 'background';
+}
+
+async function ensureKokoroOffscreen(): Promise<void> {
+  // chrome.offscreen.hasDocument was added in Chrome 116; older builds need
+  // the legacy try/catch on createDocument. We feature-detect to avoid a
+  // confusing "hasDocument is not a function" in 109-115.
+  const ns = chrome.offscreen as
+    | (typeof chrome.offscreen & { hasDocument?: () => Promise<boolean> })
+    | undefined;
+  if (!ns || typeof ns.createDocument !== 'function') {
+    throw new Error('chrome.offscreen is unavailable. Reload the extension at chrome://extensions.');
+  }
+  if (typeof ns.hasDocument === 'function') {
+    if (await ns.hasDocument()) return;
+  }
+  try {
+    await ns.createDocument({
+      url: chrome.runtime.getURL(KOKORO_OFFSCREEN_PATH),
+      // WORKERS so we can spawn the ONNX runtime; BLOBS so we can ferry
+      // audio Blobs back. Listed in the order Chrome prefers.
+      reasons: ['WORKERS' as chrome.offscreen.Reason, 'BLOBS' as chrome.offscreen.Reason],
+      justification: 'In-browser Kokoro TTS inference for the Shadow player.',
+    });
+  } catch (err) {
+    // Treat "Only a single offscreen document may be created" as success --
+    // a previous create call won the race.
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/single offscreen document/i.test(message)) {
+      throw err;
+    }
+  }
+}
+
+async function closeKokoroOffscreen(): Promise<void> {
+  const ns = chrome.offscreen as
+    | (typeof chrome.offscreen & { hasDocument?: () => Promise<boolean> })
+    | undefined;
+  if (!ns || typeof ns.closeDocument !== 'function') return;
+  if (typeof ns.hasDocument === 'function') {
+    if (!(await ns.hasDocument())) return;
+  }
+  try {
+    await ns.closeDocument();
+  } catch {
+    /* nothing actionable -- document was already gone */
+  }
+}
+
+async function handleKokoroLocalRelay(req: KokoroLocalSynthRequest): Promise<unknown> {
+  await ensureKokoroOffscreen();
+  // Forward to the offscreen document. chrome.runtime.sendMessage with no
+  // tab target broadcasts to every extension context except this sender;
+  // only the offscreen handler matches target='offscreen' and replies.
+  return chrome.runtime.sendMessage({ ...req, target: 'offscreen' });
+}
 
 /**
  * Initialize background service worker
@@ -112,6 +209,27 @@ function handleMessage(
     message.type === 'gemini_stream_chunk'
   ) {
     return false;
+  }
+
+  // kokoro-local relay: chrome.runtime can't address a specific document, so
+  // the dashboard sends synth requests to the background, we ensure the
+  // offscreen exists and forward, and we relay its reply back. Forwarded
+  // requests carry target='offscreen' so the offscreen handler matches and
+  // the dashboard's other listeners ignore them.
+  if (isKokoroLocalRequest(message)) {
+    handleKokoroLocalRelay(message)
+      .then(sendResponse as (response: unknown) => void)
+      .catch((err) => {
+        const error = err instanceof Error ? err.message : String(err);
+        (sendResponse as (response: unknown) => void)({ ok: false, error });
+      });
+    return true;
+  }
+  if (isKokoroLocalCloseRequest(message)) {
+    closeKokoroOffscreen()
+      .catch((err) => console.warn('[ScrollLearn] failed to close kokoro-local offscreen', err))
+      .finally(() => (sendResponse as (response: unknown) => void)({ ok: true }));
+    return true;
   }
 
   // chrome.sidePanel.open() requires the originating user gesture to still be
@@ -238,8 +356,68 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     case 'install_update':
       return installUpdate();
 
+    case 'get_shadow_scripts':
+      return handleGetShadowScripts();
+
+    case 'save_shadow_script':
+      return handleSaveShadowScript(message.script);
+
+    case 'delete_shadow_script':
+      return handleDeleteShadowScript(message.scriptId);
+
+    case 'get_ipa_progress':
+      return handleGetIpaProgress();
+
+    case 'set_ipa_progress':
+      return handleSetIpaProgress(message.progress);
+
     default:
       return { ok: false, error: 'Unknown message type' };
+  }
+}
+
+async function handleGetShadowScripts(): Promise<Response<ShadowScript[]>> {
+  try {
+    const scripts = await storage.getShadowScripts();
+    return { ok: true, data: scripts };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleSaveShadowScript(script: ShadowScript): Promise<Response<ShadowScript>> {
+  try {
+    const saved = await storage.saveShadowScript(script);
+    return { ok: true, data: saved };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleDeleteShadowScript(scriptId: string): Promise<Response<void>> {
+  try {
+    await storage.deleteShadowScript(scriptId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleGetIpaProgress(): Promise<Response<IpaProgress>> {
+  try {
+    const progress = await storage.getIpaProgress();
+    return { ok: true, data: progress };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleSetIpaProgress(progress: IpaProgress): Promise<Response<IpaProgress>> {
+  try {
+    const saved = await storage.saveIpaProgress(progress);
+    return { ok: true, data: saved };
+  } catch (error) {
+    return { ok: false, error: String(error) };
   }
 }
 
