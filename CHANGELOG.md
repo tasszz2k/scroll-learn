@@ -4,6 +4,14 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.15.1](https://github.com/tasszz2k/scroll-learn/compare/v1.15.0...v1.15.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **gemini:** open the Gemini window focused so macOS doesn't throttle it ([ef81959](https://github.com/tasszz2k/scroll-learn/commit/ef81959277174164c563bacc8ed934c41ee9dc49))
+* **gemini:** pulse Gemini window focus every 25s on macOS to outlast Chrome occlusion throttling ([896f393](https://github.com/tasszz2k/scroll-learn/commit/896f3937eb4d373c591ec724ed9e1b0f2a8588e2))
+
 ## [1.15.0](https://github.com/tasszz2k/scroll-learn/compare/v1.14.0...v1.15.0) (2026-04-29)
 
 
