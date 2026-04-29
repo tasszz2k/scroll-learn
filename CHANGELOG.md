@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.16.0](https://github.com/tasszz2k/scroll-learn/compare/v1.15.1...v1.16.0) (2026-04-29)
+
+
+### Features
+
+* **notebooks:** add Notebooks tab with markdown editor, IDB storage, AI assist, and table context menu ([e646942](https://github.com/tasszz2k/scroll-learn/commit/e6469428c7c584b237f342b993ada9d1bf539e16))
+
 ## [1.15.1](https://github.com/tasszz2k/scroll-learn/compare/v1.15.0...v1.15.1) (2026-04-29)
 
 
