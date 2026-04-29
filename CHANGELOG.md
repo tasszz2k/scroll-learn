@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.16.1](https://github.com/tasszz2k/scroll-learn/compare/v1.16.0...v1.16.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **notebooks:** declare @tiptap/core as direct dep so pnpm CI can resolve it ([703396f](https://github.com/tasszz2k/scroll-learn/commit/703396fcd2bcb21786c75a744c3391fe9b00229b))
+
 ## [1.16.0](https://github.com/tasszz2k/scroll-learn/compare/v1.15.1...v1.16.0) (2026-04-29)
 
 
