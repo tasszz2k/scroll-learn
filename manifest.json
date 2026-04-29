@@ -13,7 +13,8 @@
     "alarms",
     "tabs",
     "nativeMessaging",
-    "sidePanel"
+    "sidePanel",
+    "offscreen"
   ],
   "host_permissions": [
     "https://www.facebook.com/*",
@@ -21,11 +22,15 @@
     "https://www.youtube.com/*",
     "https://www.instagram.com/*",
     "https://gemini.google.com/*",
+    "https://hexgrad-kokoro-tts.hf.space/*",
     "<all_urls>"
   ],
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "action": {
     "default_title": "ScrollLearn",

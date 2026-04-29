@@ -20,6 +20,10 @@ export default defineConfig({
       input: {
         dashboard: resolve(__dirname, 'index.html'),
         sidebar: resolve(__dirname, 'src/sidebar/sidebar.html'),
+        // The offscreen page is invoked at runtime via
+        // chrome.offscreen.createDocument and isn't referenced from the
+        // manifest, so we list it here explicitly to make Rollup emit it.
+        kokoroOffscreen: resolve(__dirname, 'src/offscreen/kokoroOffscreen.html'),
       },
     },
   },
