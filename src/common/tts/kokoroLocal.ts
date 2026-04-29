@@ -21,8 +21,8 @@
 //   * Only English voices ship in the model -- same KOKORO_VOICES catalog.
 
 import type { TTSProvider, TTSSpeakRequest } from './index';
+import { fallbackChain } from './index';
 import type { SpeakLineHandle } from '../speak';
-import { speakLine } from '../speak';
 import { getCached, putCached } from './audioCache';
 import { base64ToAudioBlob, playAudioBlob } from './playback';
 
@@ -47,16 +47,6 @@ interface SynthFailure {
 }
 
 type SynthResponse = SynthSuccess | SynthFailure;
-
-function fallbackToWebSpeech(req: TTSSpeakRequest): SpeakLineHandle {
-  return speakLine(req.text, {
-    rate: req.rate,
-    pitch: req.pitch,
-    onBoundary: req.onBoundary,
-    onEnd: req.onEnd,
-    onError: req.onError ? (ev) => req.onError?.(new Error(ev.error || 'speech error')) : undefined,
-  });
-}
 
 function notify(req: TTSSpeakRequest, stage: Parameters<NonNullable<TTSSpeakRequest['onStatus']>>[0], detail?: { message?: string }): void {
   if (!req.onStatus) return;
@@ -149,7 +139,7 @@ function startSpeak(req: TTSSpeakRequest): SpeakLineHandle {
     if (req.onError) {
       try { req.onError(err instanceof Error ? err : new Error(message)); } catch { /* ignore */ }
     }
-    state.playbackHandle = fallbackToWebSpeech(req);
+    state.playbackHandle = fallbackChain(PROVIDER_ID, req);
   });
 
   return {

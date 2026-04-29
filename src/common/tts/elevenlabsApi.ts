@@ -25,10 +25,10 @@
 // surfaces via onStatus so the player's pill shows what went wrong.
 
 import type { TTSProvider, TTSSpeakRequest } from './index';
+import { fallbackChain } from './index';
 import type { TTSJobStage } from '../types';
 import { STORAGE_KEYS } from '../types';
 import type { SpeakLineHandle } from '../speak';
-import { speakLine } from '../speak';
 import type { AudioAlignment } from './audioCache';
 import { getCached, putCached } from './audioCache';
 import { playAudioBlob, base64ToAudioBlob } from './playback';
@@ -282,16 +282,6 @@ function notify(
   try { req.onStatus(stage, detail); } catch { /* listener errors are not fatal */ }
 }
 
-function fallbackToWebSpeech(req: TTSSpeakRequest): SpeakLineHandle {
-  return speakLine(req.text, {
-    rate: req.rate,
-    pitch: req.pitch,
-    onBoundary: req.onBoundary,
-    onEnd: req.onEnd,
-    onError: req.onError ? (ev) => req.onError?.(new Error(ev.error || 'speech error')) : undefined,
-  });
-}
-
 interface PipelineState {
   stopped: boolean;
   playbackHandle: SpeakLineHandle | null;
@@ -330,7 +320,7 @@ function startSpeak(req: TTSSpeakRequest): SpeakLineHandle {
     if (req.onError) {
       try { req.onError(err instanceof Error ? err : new Error(message)); } catch { /* ignore */ }
     }
-    state.playbackHandle = fallbackToWebSpeech(req);
+    state.playbackHandle = fallbackChain(PROVIDER_ID, req);
   });
 
   return {

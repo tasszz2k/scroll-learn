@@ -137,3 +137,48 @@ export async function pickReadyProvider(preferred?: TTSProviderId): Promise<TTSP
   }
   return webSpeechProvider;
 }
+
+// Cascade fallback: when a provider's pipeline errors out, hand off to the
+// next ready provider in TTS_PROVIDERS rather than skipping straight to Web
+// Speech. The order in TTS_PROVIDERS is the priority chain (ElevenLabs ->
+// Kokoro API -> Kokoro Local -> Web Speech), so a configured Kokoro key
+// keeps a learner on a high-quality voice if ElevenLabs runs out of credits,
+// and the in-browser model picks up if the cloud APIs are both unreachable.
+// Web Speech is always ready, so the cascade is guaranteed to find a target.
+//
+// Returns synchronously (the SpeakLineHandle contract). Internally it
+// asynchronously resolves the next ready provider; stop() is forwarded to
+// whichever handle is live by then.
+export function fallbackChain(
+  failedId: TTSProviderId,
+  req: TTSSpeakRequest,
+): SpeakLineHandle {
+  const failedIdx = TTS_PROVIDERS.findIndex(p => p.id === failedId);
+  let live: SpeakLineHandle | null = null;
+  let stopped = false;
+  void (async () => {
+    for (let i = failedIdx + 1; i < TTS_PROVIDERS.length; i++) {
+      if (stopped) return;
+      const next = TTS_PROVIDERS[i];
+      let ready = false;
+      try { ready = await next.isReady(); } catch { ready = false; }
+      if (!ready) continue;
+      if (stopped) return;
+      live = next.speak(req);
+      return;
+    }
+    // Defensive: webSpeechProvider is always ready, but keep an explicit
+    // final fallback in case the chain above is somehow exhausted (e.g. the
+    // failed provider id wasn't in the registry).
+    if (!stopped) live = webSpeechProvider.speak(req);
+  })();
+  return {
+    stop: () => {
+      stopped = true;
+      if (live) {
+        try { live.stop(); } catch { /* ignore */ }
+        live = null;
+      }
+    },
+  };
+}
