@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.13.1](https://github.com/tasszz2k/scroll-learn/compare/v1.13.0...v1.13.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **tts:** cascade fallback through providers instead of jumping to Web Speech ([d03eec2](https://github.com/tasszz2k/scroll-learn/commit/d03eec2331d380d40324ca5dd46e2b1bb62590bf))
+
 ## [1.13.0](https://github.com/tasszz2k/scroll-learn/compare/v1.12.0...v1.13.0) (2026-04-29)
 
 
