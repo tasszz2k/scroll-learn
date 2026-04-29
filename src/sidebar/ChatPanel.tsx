@@ -39,6 +39,7 @@ export default function ChatPanel() {
       contextKey: CHAT_CONTEXT_KEY,
       userTurn: q,
     });
+    chrome.runtime.sendMessage({ type: 'record_conversation' }).catch(() => {});
     setQuestion('');
   }
 

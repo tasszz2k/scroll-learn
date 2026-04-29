@@ -371,6 +371,22 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     case 'set_ipa_progress':
       return handleSetIpaProgress(message.progress);
 
+    case 'record_shadow_practice':
+      try {
+        await storage.recordShadowMs(message.ms);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: String(error) };
+      }
+
+    case 'record_conversation':
+      try {
+        await storage.recordConversationTurn();
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: String(error) };
+      }
+
     default:
       return { ok: false, error: 'Unknown message type' };
   }

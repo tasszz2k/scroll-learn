@@ -1,5 +1,6 @@
 import type {
   Card,
+  DailyStats,
   Deck,
   Note,
   Settings,
@@ -152,22 +153,21 @@ export async function saveStats(stats: Stats): Promise<void> {
   await set(STORAGE_KEYS.STATS, stats);
 }
 
-export async function recordReview(record: ReviewRecord): Promise<void> {
-  const stats = await getStats();
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Add to review history
-  stats.reviewHistory.push(record);
-  
-  // Keep only last 1000 reviews in history
-  if (stats.reviewHistory.length > 1000) {
-    stats.reviewHistory = stats.reviewHistory.slice(-1000);
-  }
-  
-  // Update totals
-  stats.totalReviews++;
-  
-  // Update daily stats
+// Daily stats are kept long enough to backfill the annual heatmap with margin.
+const DAILY_STATS_RETENTION_DAYS = 400;
+
+function todayKey(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function pruneDailyStats(list: DailyStats[]): DailyStats[] {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - DAILY_STATS_RETENTION_DAYS);
+  const cutoffStr = cutoffDate.toISOString().split('T')[0];
+  return list.filter(d => d.date >= cutoffStr);
+}
+
+function ensureToday(stats: Stats, today: string): DailyStats {
   let todayStats = stats.dailyStats.find(d => d.date === today);
   if (!todayStats) {
     todayStats = {
@@ -179,41 +179,86 @@ export async function recordReview(record: ReviewRecord): Promise<void> {
     };
     stats.dailyStats.push(todayStats);
   }
-  
+  return todayStats;
+}
+
+export async function recordReview(record: ReviewRecord): Promise<void> {
+  const stats = await getStats();
+  const today = todayKey();
+
+  // Add to review history
+  stats.reviewHistory.push(record);
+
+  // Keep only last 1000 reviews in history
+  if (stats.reviewHistory.length > 1000) {
+    stats.reviewHistory = stats.reviewHistory.slice(-1000);
+  }
+
+  // Update totals
+  stats.totalReviews++;
+
+  // Update daily stats
+  const todayStats = ensureToday(stats, today);
+
   todayStats.reviews++;
   if (record.grade >= 2) {
     todayStats.correct++;
   } else {
     todayStats.incorrect++;
   }
-  
+  todayStats.practiceMs = (todayStats.practiceMs ?? 0) + (record.responseTimeMs || 0);
+
   // Update streak
   if (stats.lastReviewDate !== today) {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
-    
+
     if (stats.lastReviewDate === yesterdayStr) {
       stats.currentStreak++;
     } else if (stats.lastReviewDate !== today) {
       stats.currentStreak = 1;
     }
-    
+
     stats.longestStreak = Math.max(stats.longestStreak, stats.currentStreak);
     stats.lastReviewDate = today;
   }
-  
+
   // Recalculate average accuracy
   const totalCorrect = stats.dailyStats.reduce((sum, d) => sum + d.correct, 0);
   const totalReviews = stats.dailyStats.reduce((sum, d) => sum + d.reviews, 0);
   stats.averageAccuracy = totalReviews > 0 ? totalCorrect / totalReviews : 0;
-  
-  // Keep only last 90 days of daily stats
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 90);
-  const cutoffStr = cutoffDate.toISOString().split('T')[0];
-  stats.dailyStats = stats.dailyStats.filter(d => d.date >= cutoffStr);
-  
+
+  stats.dailyStats = pruneDailyStats(stats.dailyStats);
+
+  await saveStats(stats);
+}
+
+export async function recordShadowMs(ms: number): Promise<void> {
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  const stats = await getStats();
+  const today = todayKey();
+  const todayStats = ensureToday(stats, today);
+  todayStats.shadowSec = (todayStats.shadowSec ?? 0) + Math.round(ms / 1000);
+  stats.dailyStats = pruneDailyStats(stats.dailyStats);
+  await saveStats(stats);
+}
+
+export async function recordConversationTurn(): Promise<void> {
+  const stats = await getStats();
+  const today = todayKey();
+  const todayStats = ensureToday(stats, today);
+  todayStats.conversationCount = (todayStats.conversationCount ?? 0) + 1;
+  stats.dailyStats = pruneDailyStats(stats.dailyStats);
+  await saveStats(stats);
+}
+
+export async function recordNoteAdded(): Promise<void> {
+  const stats = await getStats();
+  const today = todayKey();
+  const todayStats = ensureToday(stats, today);
+  todayStats.notesAdded = (todayStats.notesAdded ?? 0) + 1;
+  stats.dailyStats = pruneDailyStats(stats.dailyStats);
   await saveStats(stats);
 }
 
@@ -342,6 +387,7 @@ export async function saveNote(note: Note): Promise<Note> {
 
   // Replace if id collides, otherwise append
   const index = notes.findIndex(n => n.id === note.id);
+  const isBrandNew = index < 0;
   if (index >= 0) {
     notes[index] = note;
   } else {
@@ -349,6 +395,11 @@ export async function saveNote(note: Note): Promise<Note> {
   }
 
   await set(STORAGE_KEYS.NOTES, notes);
+  if (isBrandNew) {
+    // Stat counter only ticks on a genuinely-new capture, not on the dedupe-merge
+    // return path above (which already short-circuits) or an id-collision update.
+    await recordNoteAdded();
+  }
   return note;
 }
 

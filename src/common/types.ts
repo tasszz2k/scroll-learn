@@ -175,6 +175,12 @@ export interface DailyStats {
   correct: number;
   incorrect: number;
   averageEase: number;
+  // Optional for back-compat with stored payloads written before these fields
+  // existed; readers must treat undefined the same as 0.
+  practiceMs?: number;          // Sum of responseTimeMs accrued today.
+  shadowSec?: number;           // Total shadow-practice seconds.
+  conversationCount?: number;   // Sidebar chat turns sent.
+  notesAdded?: number;          // Notes captured today (post-dedupe).
 }
 
 export interface Stats {
@@ -476,6 +482,16 @@ export interface SetIpaProgressMessage {
   progress: IpaProgress;
 }
 
+// Practice / engagement counters surfaced in the Statistics tab.
+export interface RecordShadowPracticeMessage {
+  type: 'record_shadow_practice';
+  ms: number;
+}
+
+export interface RecordConversationMessage {
+  type: 'record_conversation';
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -511,7 +527,9 @@ export type Message =
   | SaveShadowScriptMessage
   | DeleteShadowScriptMessage
   | GetIpaProgressMessage
-  | SetIpaProgressMessage;
+  | SetIpaProgressMessage
+  | RecordShadowPracticeMessage
+  | RecordConversationMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {

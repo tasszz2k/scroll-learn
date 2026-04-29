@@ -208,7 +208,7 @@ export default function App() {
 
   const tabs: { id: Tab; label: string; num: string }[] = [
     { id: 'study',    label: 'Study',      num: '01' },
-    { id: 'shadow',   label: 'Shadow',     num: '02' },
+    { id: 'shadow',   label: 'Practice speaking', num: '02' },
     { id: 'decks',    label: 'Decks',      num: '03' },
     { id: 'notes',    label: 'Notes',      num: '04' },
     { id: 'import',   label: 'Import',     num: '05' },
@@ -405,6 +405,7 @@ export default function App() {
             stats={stats}
             decks={decks}
             cards={cards}
+            notes={notes}
           />
         )}
 
