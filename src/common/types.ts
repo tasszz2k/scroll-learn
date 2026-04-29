@@ -453,14 +453,27 @@ export interface ShadowScript {
   createdAt: number;
 }
 
-// Per-phoneme reception accuracy from the IPA drill.
+// Per-phoneme reception (listening) and production (speaking) accuracy. New
+// optional fields default to undefined for entries written before they
+// existed; readers must treat undefined the same as 0.
 export interface IpaProgressEntry {
-  correct: number;
-  total: number;
+  correct: number;            // listening drill correct
+  total: number;              // listening drill attempts
   lastSeen: number;           // Unix ms
+  productionCorrect?: number; // speaking-tab passes
+  productionTotal?: number;   // speaking-tab attempts
+  firstSeen?: number;         // Unix ms; set on first ever record
+  masteredAt?: number;        // Unix ms; set once when isMastered first flips true
 }
 
 export type IpaProgress = Record<string, IpaProgressEntry>;
+
+// Daily-practice calendar for the Foundation header's streak counter. Stored
+// as deduped YYYY-MM-DD strings so the streak survives clock-skew across
+// devices and the comparison is purely string-based.
+export interface IpaStudyStats {
+  practiceDates: string[];
+}
 
 // Messages for Shadow + IPA persistence
 export interface GetShadowScriptsMessage {
@@ -480,6 +493,13 @@ export interface GetIpaProgressMessage {
 export interface SetIpaProgressMessage {
   type: 'set_ipa_progress';
   progress: IpaProgress;
+}
+export interface GetIpaStatsMessage {
+  type: 'get_ipa_stats';
+}
+export interface SetIpaStatsMessage {
+  type: 'set_ipa_stats';
+  stats: IpaStudyStats;
 }
 
 // Practice / engagement counters surfaced in the Statistics tab.
@@ -528,6 +548,8 @@ export type Message =
   | DeleteShadowScriptMessage
   | GetIpaProgressMessage
   | SetIpaProgressMessage
+  | GetIpaStatsMessage
+  | SetIpaStatsMessage
   | RecordShadowPracticeMessage
   | RecordConversationMessage;
 
@@ -586,6 +608,7 @@ export const STORAGE_KEYS = {
   UPDATE_INFO: 'scrolllearn_update_info',
   SHADOW_SCRIPTS: 'scrolllearn_shadow_scripts',
   IPA_PROGRESS: 'scrolllearn_ipa_progress',
+  IPA_STATS: 'scrolllearn_ipa_stats',
 } as const;
 
 // Update Info

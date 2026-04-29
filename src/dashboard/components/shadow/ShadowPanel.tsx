@@ -4,6 +4,7 @@ import { STORAGE_KEYS } from '../../../common/types';
 import { clearCache, listCached } from '../../../common/tts/audioCache';
 import IpaDrill from './ipa/IpaDrill';
 import IpaExplorer from './ipa/IpaExplorer';
+import IpaProgressHeader from './ipa/IpaProgressHeader';
 import { useIpaProgress } from './ipa/useIpaProgress';
 import ShadowComposer from './ShadowComposer';
 import ShadowGuide from './ShadowGuide';
@@ -233,16 +234,19 @@ export default function ShadowPanel({ notes }: ShadowPanelProps) {
         <div>
           <ShadowGuide onGoToFoundation={undefined} />
 
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 18 }}>
             <h3 className="serif" style={{ fontSize: 22, fontWeight: 600, margin: '0 0 6px' }}>
-              Train your ear first.
+              Train your ear, then your mouth.
             </h3>
             <p style={{ color: 'var(--ink-2)', fontSize: 14, lineHeight: 1.6, maxWidth: 720, margin: 0 }}>
-              You can't shadow what you can't hear. Click any phoneme below to hear it; tap through the
-              minimal-pair drill to lock down the contrasts. The script generator will pick up your weakest
-              sounds and weave them into your shadowing scripts.
+              Click any phoneme to open the lab: watch the mouth shape, drill the minimal pairs, then
+              record yourself and get checked. Mastery flips green after 10+ listening reps at 80% accuracy
+              (and, if you've practiced production, 5+ speaking reps at 60%). The script generator weaves
+              your weakest sounds into the Practice tab's shadowing scripts.
             </p>
           </div>
+
+          <IpaProgressHeader />
 
           <div style={{ marginBottom: 28 }}>
             <IpaExplorer />

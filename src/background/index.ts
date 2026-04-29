@@ -12,6 +12,7 @@ import type {
   UpdateInfo,
   ShadowScript,
   IpaProgress,
+  IpaStudyStats,
 } from '../common/types';
 import { createCard, createDeck, createNote } from '../common/types';
 import * as storage from '../common/storage';
@@ -371,6 +372,12 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     case 'set_ipa_progress':
       return handleSetIpaProgress(message.progress);
 
+    case 'get_ipa_stats':
+      return handleGetIpaStats();
+
+    case 'set_ipa_stats':
+      return handleSetIpaStats(message.stats);
+
     case 'record_shadow_practice':
       try {
         await storage.recordShadowMs(message.ms);
@@ -431,6 +438,24 @@ async function handleGetIpaProgress(): Promise<Response<IpaProgress>> {
 async function handleSetIpaProgress(progress: IpaProgress): Promise<Response<IpaProgress>> {
   try {
     const saved = await storage.saveIpaProgress(progress);
+    return { ok: true, data: saved };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleGetIpaStats(): Promise<Response<IpaStudyStats>> {
+  try {
+    const stats = await storage.getIpaStats();
+    return { ok: true, data: stats };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleSetIpaStats(stats: IpaStudyStats): Promise<Response<IpaStudyStats>> {
+  try {
+    const saved = await storage.saveIpaStats(stats);
     return { ok: true, data: saved };
   } catch (error) {
     return { ok: false, error: String(error) };

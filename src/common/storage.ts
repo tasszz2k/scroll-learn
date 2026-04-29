@@ -8,6 +8,7 @@ import type {
   ReviewRecord,
   ShadowScript,
   IpaProgress,
+  IpaStudyStats,
 } from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './types';
 
@@ -502,5 +503,15 @@ export async function getIpaProgress(): Promise<IpaProgress> {
 export async function saveIpaProgress(progress: IpaProgress): Promise<IpaProgress> {
   await set(STORAGE_KEYS.IPA_PROGRESS, progress);
   return progress;
+}
+
+// IPA study calendar (for streak)
+export async function getIpaStats(): Promise<IpaStudyStats> {
+  return get<IpaStudyStats>(STORAGE_KEYS.IPA_STATS, { practiceDates: [] });
+}
+
+export async function saveIpaStats(stats: IpaStudyStats): Promise<IpaStudyStats> {
+  await set(STORAGE_KEYS.IPA_STATS, stats);
+  return stats;
 }
 
