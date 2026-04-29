@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.14.0](https://github.com/tasszz2k/scroll-learn/compare/v1.13.1...v1.14.0) (2026-04-29)
+
+
+### Features
+
+* **shadow:** per-phoneme lab with mic-graded pronunciation, mastery, streak ([65dc1a1](https://github.com/tasszz2k/scroll-learn/commit/65dc1a1e310a2b31d72303b23243c31d1fe76779))
+
 ## [1.13.1](https://github.com/tasszz2k/scroll-learn/compare/v1.13.0...v1.13.1) (2026-04-29)
 
 
