@@ -90,6 +90,16 @@ export default function AiAssistTrigger({ subject, variant = 'card' }: AiAssistT
       ? { padding: '4px 10px', fontSize: 12 }
       : { padding: '6px 12px', fontSize: 12 };
 
+  // Soft clay-tinted ghost for the secondary "Ask" button -- highlighted
+  // enough to feel actionable next to the primary clay-filled "Explain",
+  // without competing with it.
+  const askButtonStyle = {
+    ...buttonStyle,
+    color: 'var(--clay-deep)',
+    borderColor: 'var(--clay-tint)',
+    background: 'var(--clay-wash)',
+  };
+
   const disabledTitle = otherBusy
     ? 'AI is busy with another request'
     : undefined;
@@ -141,7 +151,7 @@ export default function AiAssistTrigger({ subject, variant = 'card' }: AiAssistT
       >
         <button
           type="button"
-          className="btn btn-ghost"
+          className="btn btn-clay"
           style={buttonStyle}
           onClick={handleExplain}
           disabled={busy}
@@ -156,7 +166,7 @@ export default function AiAssistTrigger({ subject, variant = 'card' }: AiAssistT
           <button
             type="button"
             className="btn btn-ghost"
-            style={buttonStyle}
+            style={askButtonStyle}
             onClick={() => setAskMode(v => !v)}
             disabled={busy}
             title={disabledTitle}

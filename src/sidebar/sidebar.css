@@ -216,6 +216,32 @@ body {
   gap: 12px;
 }
 
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.chat-header-label {
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.chat-new-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .chat-history {
   flex: 1;
   min-height: 0;

@@ -42,23 +42,59 @@ export default function ChatPanel() {
     setQuestion('');
   }
 
-  function handleReset() {
-    if (state.kind === 'idle') return;
+  function handleNewChat() {
+    if (!isMine) return;
     if (busy) return;
     // dismiss() closes the Gemini window so the next question starts a fresh
     // conversation without inherited history.
     dismiss(CHAT_CONTEXT_KEY);
+    setQuestion('');
+    textareaRef.current?.focus();
   }
+
+  // Show the header whenever a conversation exists in this context, so a
+  // "New chat" affordance is always reachable from the top of the panel.
+  const showHeader = isMine;
 
   return (
     <div className="chat-panel">
+      {showHeader && (
+        <div className="chat-header">
+          <span className="mono chat-header-label">Conversation</span>
+          <button
+            type="button"
+            className="btn btn-ghost chat-new-btn"
+            onClick={handleNewChat}
+            disabled={busy}
+            title="Clear chat history and start a fresh conversation"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              style={{ marginRight: 6, verticalAlign: '-2px' }}
+            >
+              <path
+                d="M8 3v10M3 8h10"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+            New chat
+          </button>
+        </div>
+      )}
+
       <div className="chat-history">
         {!isMine && (
           <div className="chat-empty">
             <div className="eyebrow" style={{ marginBottom: 8 }}>Chat with the tutor</div>
             <p style={{ margin: 0, color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.5 }}>
               Ask a follow-up question while you study. The tutor remembers
-              earlier turns until you reset the chat or close the panel.
+              earlier turns until you start a new chat or close the panel.
             </p>
             {otherBusy && (
               <p
@@ -105,7 +141,9 @@ export default function ChatPanel() {
           rows={3}
           disabled={busy}
           onKeyDown={e => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            // Enter sends; Shift+Enter inserts a newline. Ignore IME composition
+            // so accented input on macOS / CJK input methods isn't swallowed.
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               void handleSend();
             }
@@ -113,29 +151,16 @@ export default function ChatPanel() {
         />
         <div className="chat-composer-row">
           <span className="mono chat-composer-hint">
-            Cmd/Ctrl + Enter to send
+            Enter to send, Shift + Enter for newline
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {isMine && !busy && (
-              <button
-                type="button"
-                className="btn btn-ghost"
-                style={{ padding: '6px 12px', fontSize: 12 }}
-                onClick={handleReset}
-                title="Clear chat history and close the Gemini window"
-              >
-                Reset
-              </button>
-            )}
-            <button
-              type="submit"
-              className="btn btn-clay"
-              style={{ padding: '8px 16px', fontSize: 13 }}
-              disabled={busy || !question.trim()}
-            >
-              {busy && isMine ? 'Sending...' : 'Send'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            className="btn btn-clay"
+            style={{ padding: '8px 16px', fontSize: 13 }}
+            disabled={busy || !question.trim()}
+          >
+            {busy && isMine ? 'Sending...' : 'Send'}
+          </button>
         </div>
       </form>
     </div>
