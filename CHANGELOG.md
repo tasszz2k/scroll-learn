@@ -4,6 +4,20 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.12.0](https://github.com/tasszz2k/scroll-learn/compare/v1.11.0...v1.12.0) (2026-04-29)
+
+
+### Features
+
+* **background:** kokoro-local relay and Shadow/IPA persistence handlers ([1ba0bb0](https://github.com/tasszz2k/scroll-learn/commit/1ba0bb0cdceb858b09dd151c7ad1723e1df43b4f))
+* **dashboard:** reusable Confirm dialog and Select primitives ([e90b9c0](https://github.com/tasszz2k/scroll-learn/commit/e90b9c0278c5b5d9e66043af195271a6fc2d31ee))
+* **dashboard:** wire Shadow tab, ConfirmProvider, and TTS token fields ([6a093b1](https://github.com/tasszz2k/scroll-learn/commit/6a093b1f0d49f4b40c1aef1a5130ec05434c6fe0))
+* **shadow:** IPA foundation drills and shadowing practice player ([69ddd4b](https://github.com/tasszz2k/scroll-learn/commit/69ddd4b3c1a67f6678c25add7c44b1033dcc33c1))
+* **shadow:** natural-delivery prompts + word-level karaoke for cloud TTS ([2fed7d4](https://github.com/tasszz2k/scroll-learn/commit/2fed7d42a0964057fb89d7a8345a4bba7da3b239))
+* **sidebar:** Enter to send, always-visible New chat, clay-tinted assist buttons ([0059d58](https://github.com/tasszz2k/scroll-learn/commit/0059d58a2bb32561f1049c8bc102a8f47026a8d1))
+* **tts:** pluggable TTS layer with ElevenLabs, Kokoro API, and kokoro-local engines ([e9d6f7f](https://github.com/tasszz2k/scroll-learn/commit/e9d6f7fbe9b81f412f5bb6fb19cecc65beadae35))
+* **types:** add Shadow, IPA, and TTS provider types and storage helpers ([7ddfe58](https://github.com/tasszz2k/scroll-learn/commit/7ddfe58851e2bbcdd574458e62f17e60bb010295))
+
 ## [Unreleased]
 
 ### Features
