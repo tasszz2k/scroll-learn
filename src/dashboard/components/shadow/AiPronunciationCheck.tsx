@@ -606,19 +606,23 @@ export default function AiPronunciationCheck({
             fontSize: 12.5,
             color: 'var(--clay-deep, #b1502d)',
             display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexWrap: 'wrap',
+            flexDirection: 'column',
+            gap: 6,
           }}
         >
-          <span className="mono" style={{ fontSize: 11, letterSpacing: '.08em' }}>
-            GEMINI · {jobState.stage.toUpperCase()}
-          </span>
-          <span>{describeStage(jobState.stage)}</span>
-          <span style={{ flex: 1 }} />
-          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
-            {Math.floor(elapsedMs / 1000)}s
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span className="mono" style={{ fontSize: 11, letterSpacing: '.08em' }}>
+              GEMINI · {jobState.stage.toUpperCase()}
+            </span>
+            <span>{describeStage(jobState.stage)}</span>
+            <span style={{ flex: 1 }} />
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+              {Math.floor(elapsedMs / 1000)}s
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-4)', lineHeight: 1.5 }}>
+            Keep the Gemini window visible. On macOS, Chrome throttles the tab when it's fully covered, so the run pulses focus back every ~25s as a safety net.
+          </div>
         </div>
       )}
 

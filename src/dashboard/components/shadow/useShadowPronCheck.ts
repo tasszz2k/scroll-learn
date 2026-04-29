@@ -49,6 +49,16 @@ function generateJobId(): string {
   return `pron-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function isMacPlatform(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  // navigator.platform is deprecated but still returns 'MacIntel' / 'Mac68K' /
+  // etc. in current Chromium. Fall back to the userAgent if the modern
+  // userAgentData is unavailable (still the case in Firefox-shaped UAs).
+  const platform = (navigator.platform || '').toLowerCase();
+  if (platform.includes('mac')) return true;
+  return /Macintosh|Mac OS X/.test(navigator.userAgent || '');
+}
+
 export function useShadowPronCheck({ onResult }: UseShadowPronCheckOptions = {}) {
   const [state, setState] = useState<ShadowPronCheckState>({ kind: 'idle' });
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -150,6 +160,28 @@ export function useShadowPronCheck({ onResult }: UseShadowPronCheckOptions = {})
     if (state.kind !== 'running') return;
     const compute = () => (startedAtRef.current != null ? Date.now() - startedAtRef.current : 0);
     const id = window.setInterval(() => setElapsedMs(compute()), 500);
+    return () => window.clearInterval(id);
+  }, [state.kind]);
+
+  // macOS keep-alive: Chrome's occlusion throttling on macOS pauses the
+  // Gemini tab the moment the user clicks back to the dashboard, even with
+  // App Nap disabled. Re-focusing the Gemini window every ~25s drags it
+  // back to the foreground so the streaming response can keep flowing. The
+  // pulse is a no-op when the window is already focused, and skipped on
+  // non-macOS platforms where Chrome doesn't throttle visible-but-occluded
+  // tabs as aggressively.
+  useEffect(() => {
+    if (state.kind !== 'running') return;
+    if (!isMacPlatform()) return;
+    const id = window.setInterval(() => {
+      const winId = handleRef.current?.windowId;
+      if (winId == null) return;
+      try {
+        void chrome.windows.update(winId, { focused: true }).catch(() => { /* ignore */ });
+      } catch {
+        /* extension context invalidated */
+      }
+    }, 25_000);
     return () => window.clearInterval(id);
   }, [state.kind]);
 
