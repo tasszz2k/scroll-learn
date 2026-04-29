@@ -541,7 +541,7 @@ const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(function RichEd
       }),
       SaveShortcut,
       SlashCommands.configure({
-        onState: (s) => setSlashState(s),
+        onState: (s: SlashPopupState) => setSlashState(s),
       }),
     ],
     content: body,
