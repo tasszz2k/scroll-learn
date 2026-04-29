@@ -82,6 +82,14 @@ export interface Settings {
   noteToastDurationSeconds: number;
   // Speak mode
   autoSpeakAnswer: boolean; // Default true. Auto-pronounce the correct answer on success/retry-success.
+  // Hugging Face access token used by the 'kokoro-api' TTS provider to call
+  // the hexgrad/Kokoro-TTS Space directly via its Gradio queue API.
+  kokoroApiToken: string;
+  // ElevenLabs API key used by the 'elevenlabs-api' TTS provider. Free
+  // tokens at elevenlabs.io/app/settings/api-keys include the same ~10k
+  // monthly credits as the browser-driven path; bypassing the page makes
+  // the round-trip a single POST instead of a tab-driven automation.
+  elevenLabsApiKey: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -120,6 +128,8 @@ export const DEFAULT_SETTINGS: Settings = {
   noteAutoTranslate: true,
   noteToastDurationSeconds: 10,
   autoSpeakAnswer: true,
+  kokoroApiToken: '',
+  elevenLabsApiKey: '',
 };
 
 export type TranslateLang = 'en' | 'vi';
@@ -350,6 +360,122 @@ export interface GeminiStreamChunkMessage {
   done: boolean;
 }
 
+// Shadow practice (English shadowing) types
+
+// Job protocol for cloud TTS providers (ElevenLabs, Kokoro). Mirrors the
+// Gemini job/result/status pattern but for audio output: the dashboard pushes
+// a TTSJob to chrome.storage, the provider's content script picks it up,
+// drives the page, and posts back a TTSJobStatus stream + a final TTSJobResult.
+export type TTSJobStage =
+  | 'opening'        // Window is being created
+  | 'navigating'     // Tab is loading the provider page
+  | 'configuring'    // Selecting model, voice, etc.
+  | 'submitting'     // Pasting text and clicking Generate
+  | 'queued'         // Cloud queued the job (Kokoro Space under load)
+  | 'capturing'      // Audio is being recorded / fetched
+  | 'done'
+  | 'error';
+
+export interface TTSJob {
+  jobId: string;
+  providerId: TTSProviderId;
+  voice: string;        // Provider-specific voice id (e.g. 'Rachel' for 11L, 'af_heart' for Kokoro)
+  text: string;
+  modelHint?: string;   // e.g. 'flash-v2.5' so the script can lock the model
+  createdAt: number;
+}
+
+export interface TTSJobStatusMessage {
+  type: 'tts_job_status';
+  jobId: string;
+  stage: TTSJobStage;
+  detail?: string;
+  // Gradio-style queue position when stage === 'queued'.
+  queuePosition?: number;
+}
+
+export interface TTSJobResultMessage {
+  type: 'tts_result';
+  jobId: string;
+  ok: boolean;
+  // Base64-encoded audio bytes, decoded on the dashboard side. Inline rather
+  // than a /file URL because the dashboard origin may not have the cookie/CORS
+  // grants the provider page does.
+  audioBase64?: string;
+  mime?: string;        // e.g. 'audio/mpeg' or 'audio/wav'
+  // Optional credit count scraped from the page. Dashboard shows it in a pill.
+  creditsRemaining?: number;
+  error?: string;
+}
+
+// Which TTS engine the shadowing player uses to render audio.
+//
+// - 'web-speech': browser's built-in Web Speech API. Always-on fallback,
+//   offline, no quota, voice quality varies by OS.
+// - 'elevenlabs-api': calls api.elevenlabs.io directly with a user-supplied
+//   API key. Same Flash v2.5 model and ~10k monthly credits as a logged-in
+//   browser session, but a single fetch round-trip with no automation.
+// - 'kokoro-api': calls the public hexgrad/Kokoro-TTS HuggingFace Space via
+//   its Gradio queue API, authenticated with a Hugging Face access token.
+//   Free tier shares the Space's daily ZeroGPU quota (~4 GPU-min/day).
+// - 'kokoro-local': runs the Kokoro-82M ONNX model 100% in-browser via
+//   kokoro-js (Transformers.js + WASM/WebGPU). One-time ~92 MB model
+//   download from the HF CDN, then no network. Offscreen-document hosted
+//   so the heavy inference doesn't block the dashboard tab and doesn't
+//   need a service-worker that supports WASM/WebGPU.
+export type TTSProviderId = 'web-speech' | 'elevenlabs-api' | 'kokoro-api' | 'kokoro-local';
+
+export interface ShadowLine {
+  speaker: string;            // 'A' | 'B' | 'C' | ...
+  text: string;
+  glossVi?: string;           // Optional Vietnamese gloss for the line (level <= B1)
+  ipaFocus?: string[];        // Phoneme symbols (without slashes) the model flagged for this line
+}
+
+export type ShadowLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+
+export interface ShadowScript {
+  id: string;
+  title: string;
+  level: ShadowLevel;
+  speakerCount: number;
+  durationSec: number;
+  rate: number;               // Default playback rate at the time of generation
+  targetWords: string[];
+  context: string;
+  lines: ShadowLine[];
+  createdAt: number;
+}
+
+// Per-phoneme reception accuracy from the IPA drill.
+export interface IpaProgressEntry {
+  correct: number;
+  total: number;
+  lastSeen: number;           // Unix ms
+}
+
+export type IpaProgress = Record<string, IpaProgressEntry>;
+
+// Messages for Shadow + IPA persistence
+export interface GetShadowScriptsMessage {
+  type: 'get_shadow_scripts';
+}
+export interface SaveShadowScriptMessage {
+  type: 'save_shadow_script';
+  script: ShadowScript;
+}
+export interface DeleteShadowScriptMessage {
+  type: 'delete_shadow_script';
+  scriptId: string;
+}
+export interface GetIpaProgressMessage {
+  type: 'get_ipa_progress';
+}
+export interface SetIpaProgressMessage {
+  type: 'set_ipa_progress';
+  progress: IpaProgress;
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -378,7 +504,14 @@ export type Message =
   | InstallUpdateMessage
   | GeminiJobStatusMessage
   | GeminiResultMessage
-  | GeminiStreamChunkMessage;
+  | GeminiStreamChunkMessage
+  | TTSJobStatusMessage
+  | TTSJobResultMessage
+  | GetShadowScriptsMessage
+  | SaveShadowScriptMessage
+  | DeleteShadowScriptMessage
+  | GetIpaProgressMessage
+  | SetIpaProgressMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {
@@ -433,6 +566,8 @@ export const STORAGE_KEYS = {
   DUE_QUEUE: 'scrolllearn_due_queue',
   NOTES: 'scrolllearn_notes',
   UPDATE_INFO: 'scrolllearn_update_info',
+  SHADOW_SCRIPTS: 'scrolllearn_shadow_scripts',
+  IPA_PROGRESS: 'scrolllearn_ipa_progress',
 } as const;
 
 // Update Info

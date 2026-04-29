@@ -1,4 +1,13 @@
-import type { Card, Deck, Note, Settings, Stats, ReviewRecord } from './types';
+import type {
+  Card,
+  Deck,
+  Note,
+  Settings,
+  Stats,
+  ReviewRecord,
+  ShadowScript,
+  IpaProgress,
+} from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './types';
 
 // Batch size for chunked operations
@@ -410,5 +419,37 @@ export async function importAllData(data: {
 // Clear all data
 export async function clearAllData(): Promise<void> {
   await chrome.storage.local.clear();
+}
+
+// Shadow Scripts
+export async function getShadowScripts(): Promise<ShadowScript[]> {
+  return get<ShadowScript[]>(STORAGE_KEYS.SHADOW_SCRIPTS, []);
+}
+
+export async function saveShadowScript(script: ShadowScript): Promise<ShadowScript> {
+  const scripts = await getShadowScripts();
+  const idx = scripts.findIndex(s => s.id === script.id);
+  if (idx >= 0) {
+    scripts[idx] = script;
+  } else {
+    scripts.unshift(script);
+  }
+  await set(STORAGE_KEYS.SHADOW_SCRIPTS, scripts);
+  return script;
+}
+
+export async function deleteShadowScript(scriptId: string): Promise<void> {
+  const scripts = await getShadowScripts();
+  await set(STORAGE_KEYS.SHADOW_SCRIPTS, scripts.filter(s => s.id !== scriptId));
+}
+
+// IPA reception progress
+export async function getIpaProgress(): Promise<IpaProgress> {
+  return get<IpaProgress>(STORAGE_KEYS.IPA_PROGRESS, {});
+}
+
+export async function saveIpaProgress(progress: IpaProgress): Promise<IpaProgress> {
+  await set(STORAGE_KEYS.IPA_PROGRESS, progress);
+  return progress;
 }
 
