@@ -3,6 +3,7 @@ import type { AiState } from '../hooks/useGeminiAutomation';
 
 const STAGE_LABELS: Record<GeminiJobStage, string> = {
   opening: 'Opening Gemini in the background...',
+  attaching: 'Uploading attachment...',
   pasting: 'Pasting your prompt...',
   submitting: 'Submitting to Gemini...',
   streaming: 'Gemini is generating cards (this can take a minute or two)...',
@@ -14,6 +15,7 @@ const STAGE_LABELS: Record<GeminiJobStage, string> = {
 
 const STAGE_PERCENT: Record<GeminiJobStage, number> = {
   opening: 8,
+  attaching: 14,
   pasting: 20,
   submitting: 32,
   streaming: 60,

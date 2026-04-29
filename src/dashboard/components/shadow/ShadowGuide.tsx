@@ -41,7 +41,7 @@ export default function ShadowGuide({ onGoToFoundation }: ShadowGuideProps) {
           <div className="eyebrow">How to shadow</div>
           {collapsed && (
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
-              Listen → Slow shadow → Full shadow → Blind shadow.
+              {SHADOW_STAGES.map((s, i) => `${i + 1}. ${s.label}`).join('  →  ')}
             </div>
           )}
         </div>
@@ -78,6 +78,7 @@ export default function ShadowGuide({ onGoToFoundation }: ShadowGuideProps) {
                 <li>Prioritise rhythm and stress over individual phonemes.</li>
                 <li>Keep moving even when you miss a word.</li>
                 <li>Record yourself once per session and listen back.</li>
+                <li>After a Full-shadow pass, hit <strong>Check pronunciation</strong> to read the script in one take and get an AI score.</li>
                 <li>Start with the IPA foundation so your ear knows the contrasts.</li>
               </ul>
             </div>

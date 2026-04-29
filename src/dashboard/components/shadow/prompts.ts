@@ -69,7 +69,7 @@ For each line, naturally include 1-3 words that feature one or more of these pho
     : `- Single speaker: keep one consistent voice across the monologue, but vary phrasing and rhythm so it does not sound recited.`;
 
   const naturalDeliveryBlock = `NATURAL DELIVERY (write each "text" as it would actually be SPOKEN, not as clean prose)
-- Filler intensity for this register (${register}): ${fillerIntensity}.
+- Filler intensity for this register (${register}): ${fillerIntensity}.image.png
 - Verbal fillers and discourse markers to draw from when appropriate: "Hmm,", "Well,", "Yeah,", "Right,", "You know,", "I mean,", "Look,", "Honestly,", "Oh,", "Actually,". Roughly 30-40 percent of lines should open with or contain one of these, then SCALED by the intensity above:
   - heavy: most casual lines carry a filler or discourse marker; aim near the top of the 30-40 percent band and let some lines stack two ("Well, I mean,").
   - moderate: about a third of lines carry one filler; keep them light and varied.
@@ -144,7 +144,7 @@ export type ParseShadowResult =
  * Strip ```...``` fences and surrounding chatter, then JSON.parse the largest
  * top-level object. Tolerant of leading "Here's the script:" etc.
  */
-function extractJsonBlock(raw: string): string | null {
+export function extractJsonBlock(raw: string): string | null {
   if (!raw) return null;
   let text = raw.trim();
 
@@ -198,7 +198,7 @@ function isStringArray(v: unknown): v is string[] {
 // are not part of a valid JSON escape (e.g. "axon-devices\InterviewRoom" or
 // "C:\Users\me") would otherwise break JSON.parse with "Bad escaped
 // character". We double those backslashes so the literal character survives.
-function sanitizeJsonEscapes(json: string): string {
+export function sanitizeJsonEscapes(json: string): string {
   let out = '';
   let inString = false;
   for (let i = 0; i < json.length; i++) {

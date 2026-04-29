@@ -326,6 +326,27 @@ export default function Stats({ stats, decks, cards, notes }: StatsProps) {
   const last7ShadowMax = Math.max(...last7.map(d => d.shadowSec ?? 0), 1);
   const last7ConvoMax = Math.max(...last7.map(d => d.conversationCount ?? 0), 1);
 
+  const pronCheckRunsTotal = stats.dailyStats.reduce((s, d) => s + (d.pronCheckRuns ?? 0), 0);
+  const pronCheckBestEver = stats.dailyStats.reduce(
+    (best, d) => Math.max(best, d.pronCheckBestScore ?? 0),
+    0,
+  );
+  // Lifetime average is a weighted mean across days (each day's running mean
+  // weighted by its run count).
+  const pronCheckAvgLifetime = (() => {
+    let runs = 0;
+    let weighted = 0;
+    for (const d of stats.dailyStats) {
+      const r = d.pronCheckRuns ?? 0;
+      if (r > 0 && typeof d.pronCheckAvgScore === 'number') {
+        runs += r;
+        weighted += d.pronCheckAvgScore * r;
+      }
+    }
+    return runs > 0 ? weighted / runs : 0;
+  })();
+  const last7PronMax = Math.max(...last7.map(d => d.pronCheckRuns ?? 0), 1);
+
   // ----- Render --------------------------------------------------------------
 
   const motivational = (() => {
@@ -723,7 +744,7 @@ export default function Stats({ stats, decks, cards, notes }: StatsProps) {
       </div>
 
       {/* 6 · Practice panels */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, marginTop: 40 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32, marginTop: 40 }}>
         <div>
           <div className="eyebrow">F · Shadow practice (English)</div>
           <div className="card-flat" style={{ padding: 24, marginTop: 12 }}>
@@ -769,6 +790,40 @@ export default function Stats({ stats, decks, cards, notes }: StatsProps) {
                   <Sparkline values={last7.map(d => d.conversationCount ?? 0)} max={last7ConvoMax} accent="var(--clay)" />
                 </div>
                 <div className="mono" style={{ marginTop: 12, fontSize: 11, color: 'var(--ink-4)' }}>
+                  LAST 7 DAYS
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="eyebrow">H · AI pronunciation check</div>
+          <div className="card-flat" style={{ padding: 24, marginTop: 12 }}>
+            {pronCheckRunsTotal === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '32px 0' }}>
+                No graded reads yet. The Shadow tab logs each saved AI pronunciation check here.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <div>
+                    <div className="stat-num">{numberFmt(pronCheckRunsTotal)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+                      graded run{pronCheckRunsTotal === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                  <Sparkline values={last7.map(d => d.pronCheckRuns ?? 0)} max={last7PronMax} accent="var(--clay)" />
+                </div>
+                <div style={{ display: 'flex', gap: 14, marginTop: 12, fontSize: 12, color: 'var(--ink-2)' }}>
+                  <span>
+                    avg <span className="mono" style={{ color: 'var(--clay-deep, #b1502d)', fontWeight: 600 }}>{Math.round(pronCheckAvgLifetime)}</span> / 100
+                  </span>
+                  <span>
+                    best <span className="mono" style={{ color: 'var(--clay-deep, #b1502d)', fontWeight: 600 }}>{Math.round(pronCheckBestEver)}</span> / 100
+                  </span>
+                </div>
+                <div className="mono" style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-4)' }}>
                   LAST 7 DAYS
                 </div>
               </>

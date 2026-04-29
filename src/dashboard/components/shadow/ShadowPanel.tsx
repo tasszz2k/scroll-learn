@@ -9,6 +9,7 @@ import { useIpaProgress } from './ipa/useIpaProgress';
 import ShadowComposer from './ShadowComposer';
 import ShadowGuide from './ShadowGuide';
 import ShadowPlayer from './ShadowPlayer';
+import ShadowPracticePlanSection from './ShadowPracticePlanSection';
 import ShadowScriptList from './ShadowScriptList';
 import { useConfirm } from '../../hooks/useConfirm';
 
@@ -27,17 +28,19 @@ interface ShadowPanelProps {
   notes: Note[];
 }
 
-type Section = 'foundation' | 'practice';
+type Section = 'foundation' | 'practice' | 'plan';
 
 const SECTION_HASHES: Record<Section, string> = {
   foundation: '#shadow:foundation',
   practice: '#shadow:practice',
+  plan: '#shadow:plan',
 };
 
 function readSectionFromHash(): Section | null {
   const h = window.location.hash;
   if (h === SECTION_HASHES.foundation) return 'foundation';
   if (h === SECTION_HASHES.practice) return 'practice';
+  if (h === SECTION_HASHES.plan) return 'plan';
   if (h === '#shadow') return null;            // Defer: caller will pick
   return null;
 }
@@ -213,9 +216,13 @@ export default function ShadowPanel({ notes }: ShadowPanelProps) {
     <div>
       {/* Section switcher */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
-        {(['foundation', 'practice'] as Section[]).map(id => {
+        {(['foundation', 'practice', 'plan'] as Section[]).map(id => {
           const active = section === id;
-          const label = id === 'foundation' ? 'Foundation · IPA' : 'Practice · Shadow';
+          const label = id === 'foundation'
+            ? 'Foundation · IPA'
+            : id === 'practice'
+              ? 'Practice · Shadow'
+              : 'Practice plan';
           return (
             <button
               key={id}
@@ -330,6 +337,10 @@ export default function ShadowPanel({ notes }: ShadowPanelProps) {
             </div>
           )}
         </div>
+      )}
+
+      {section === 'plan' && (
+        <ShadowPracticePlanSection onDrillPhoneme={handleDrillPhoneme} />
       )}
     </div>
   );

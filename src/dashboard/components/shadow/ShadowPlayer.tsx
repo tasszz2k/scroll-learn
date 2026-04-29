@@ -18,6 +18,7 @@ import {
   type KokoroVoice,
 } from '../../../common/tts/kokoroVoices';
 import type { ShadowScript, TTSJobStage, TTSProviderId } from '../../../common/types';
+import AiPronunciationCheck from './AiPronunciationCheck';
 import { SHADOW_STAGES, type ShadowStageId, getStage } from './stages';
 import { useConfirm } from '../../hooks/useConfirm';
 import Select, { type SelectOption } from '../Select';
@@ -354,6 +355,14 @@ export default function ShadowPlayer({
     else setLocalCacheBump(c => c + 1);
   }, [onCacheBump]);
   const [regenAll, setRegenAll] = useState<{ total: number } | null>(null);
+  const [aiCheckOpen, setAiCheckOpen] = useState(false);
+  // While the AI check panel is recording, a teleprompter sweeps through
+  // every word in the script at a rate-slider-controlled pace, giving the
+  // learner a karaoke pacing guide so they don't drift.
+  const [recordingGuideStartedAt, setRecordingGuideStartedAt] = useState<number | null>(null);
+  const [guideHighlight, setGuideHighlight] = useState<
+    { lineIdx: number; charIndex: number; charLength: number } | null
+  >(null);
 
   const lineIdxRef = useRef(lineIdx);
   const repeatRef = useRef(repeatMode);
@@ -374,6 +383,53 @@ export default function ShadowPlayer({
     script.lines.forEach(l => set.add(l.speaker));
     return Array.from(set);
   }, [script]);
+
+  // Flat list of every word in the script with its (lineIdx, charStart,
+  // charLength). The recording teleprompter walks this list one entry per
+  // tick.
+  const wordIndex = useMemo(() => {
+    const out: { lineIdx: number; charStart: number; charLength: number }[] = [];
+    for (let i = 0; i < script.lines.length; i++) {
+      const text = script.lines[i].text;
+      const re = /\S+/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        out.push({ lineIdx: i, charStart: m.index, charLength: m[0].length });
+      }
+    }
+    return out;
+  }, [script.lines]);
+
+  // While recording, advance the karaoke highlight word-by-word using the
+  // current Rate slider value. When recording stops, the highlight clears so
+  // the rest of the player goes back to its normal Web-Speech-driven mark.
+  useEffect(() => {
+    if (recordingGuideStartedAt == null) {
+      setGuideHighlight(null);
+      return;
+    }
+    if (wordIndex.length === 0) return;
+    const targetMs = Math.max(1000, script.durationSec * 1000);
+    let lastWordIdx = -1;
+    const tick = () => {
+      const elapsed = Date.now() - recordingGuideStartedAt;
+      const msPerWord = (targetMs / wordIndex.length) / Math.max(0.1, rateRef.current);
+      const w = Math.min(wordIndex.length - 1, Math.floor(elapsed / msPerWord));
+      if (w !== lastWordIdx) {
+        lastWordIdx = w;
+        const entry = wordIndex[w];
+        setGuideHighlight({
+          lineIdx: entry.lineIdx,
+          charIndex: entry.charStart,
+          charLength: entry.charLength,
+        });
+        setLineIdx(entry.lineIdx);
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 80);
+    return () => window.clearInterval(id);
+  }, [recordingGuideStartedAt, wordIndex, script.durationSec]);
 
   useEffect(() => {
     let cancelled = false;
@@ -813,7 +869,10 @@ export default function ShadowPlayer({
   }
 
   const stage = getStage(stageId);
-  const showText = stage.showText;
+  // The script should always be visible when the AI pronunciation check
+  // panel is open -- the per-line karaoke highlight + rate slider IS the
+  // practice mode there, so hiding the text (Blind shadow) makes no sense.
+  const showText = aiCheckOpen ? true : stage.showText;
   const voiceSelectOptions = buildGroupedVoiceOptions(availableVoices);
 
   return (
@@ -1130,19 +1189,26 @@ export default function ShadowPlayer({
       )}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-        {SHADOW_STAGES.map(s => {
+        {SHADOW_STAGES.map((s, idx) => {
           const active = s.id === stageId;
+          const step = String(idx + 1).padStart(2, '0');
           return (
             <button
               key={s.id}
               type="button"
               onClick={() => handleStageChange(s.id)}
               className={active ? 'btn btn-clay' : 'btn btn-ghost'}
-              style={{ padding: '6px 12px', fontSize: 12 }}
-              title={s.hint}
+              style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title={`Step ${idx + 1} of ${SHADOW_STAGES.length}: ${s.hint}`}
             >
-              {s.label}
-              <span className="mono" style={{ marginLeft: 6, fontSize: 10, opacity: 0.7 }}>
+              <span
+                className="mono"
+                style={{ fontSize: 10, opacity: active ? 0.85 : 0.55, letterSpacing: '.04em' }}
+              >
+                {step}
+              </span>
+              <span>{s.label}</span>
+              <span className="mono" style={{ fontSize: 10, opacity: 0.7 }}>
                 {s.rate.toFixed(1)}×
               </span>
             </button>
@@ -1195,9 +1261,30 @@ export default function ShadowPlayer({
             Reroll voices
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setAiCheckOpen(o => !o)}
+          className={aiCheckOpen ? 'btn btn-ghost' : 'btn btn-clay'}
+          style={{
+            padding: '6px 14px',
+            fontSize: 12,
+            fontWeight: aiCheckOpen ? 500 : 700,
+            // Halo when closed so the call-to-action stands out next to the
+            // ghost-styled Prev/Next/Repeat buttons. Drops to a normal ghost
+            // button once the panel is open and visible below.
+            boxShadow: aiCheckOpen ? 'none' : '0 0 0 3px rgba(201, 100, 66, 0.20)',
+          }}
+          disabled={playing}
+          title="Read the whole script aloud once and have Gemini grade pronunciation, naturalness, and fluency."
+        >
+          {aiCheckOpen ? 'Hide AI check' : '★ Check pronunciation'}
+        </button>
         <span style={{ flex: 1 }} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-3)' }}>
-          Rate
+        <label
+          style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-3)' }}
+          title="Speed of TTS playback and the AI-check karaoke teleprompter."
+        >
+          Speed
           <input
             type="range"
             min={0.5}
@@ -1205,11 +1292,23 @@ export default function ShadowPlayer({
             step={0.05}
             value={rate}
             onChange={e => handleRateChange(parseFloat(e.target.value))}
-            style={{ width: 120 }}
+            style={{ width: 120, accentColor: 'var(--clay, #C96442)' }}
           />
           <span className="mono" style={{ minWidth: 36, textAlign: 'right' }}>{rate.toFixed(2)}×</span>
         </label>
       </div>
+
+      <AiPronunciationCheck
+        script={script}
+        open={aiCheckOpen}
+        onClose={() => setAiCheckOpen(false)}
+        onDrillPhoneme={onDrillPhoneme}
+        onRecordingChange={(rec) => {
+          setRecordingGuideStartedAt(rec ? Date.now() : null);
+        }}
+        speed={rate}
+        onSpeedChange={handleRateChange}
+      />
 
       <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {script.lines.map((line, idx) => {
@@ -1303,27 +1402,39 @@ export default function ShadowPlayer({
                     }}
                   >
                     {showText ? (
-                      isActive && highlight ? (
-                        <>
-                          {line.text.slice(0, highlight.charIndex)}
-                          <mark
-                            style={{
-                              background: 'var(--clay-bg, #f9e3d6)',
-                              color: 'var(--ink)',
-                              padding: '0 2px',
-                              borderRadius: 3,
-                            }}
-                          >
-                            {line.text.slice(
-                              highlight.charIndex,
-                              highlight.charIndex + Math.max(1, highlight.charLength),
-                            )}
-                          </mark>
-                          {line.text.slice(highlight.charIndex + Math.max(1, highlight.charLength))}
-                        </>
-                      ) : (
-                        line.text
-                      )
+                      (() => {
+                        // Pick whichever highlight applies to this line: the
+                        // recording teleprompter wins over Web-Speech-driven
+                        // playback so the karaoke pace guide stays visible
+                        // even if TTS is also rendering somewhere.
+                        const guideOnThisLine = guideHighlight && guideHighlight.lineIdx === idx;
+                        const activeHL = guideOnThisLine
+                          ? { charIndex: guideHighlight.charIndex, charLength: guideHighlight.charLength }
+                          : (isActive && highlight ? highlight : null);
+                        if (!activeHL) return line.text;
+                        const isGuide = !!guideOnThisLine;
+                        return (
+                          <>
+                            {line.text.slice(0, activeHL.charIndex)}
+                            <mark
+                              style={{
+                                background: isGuide ? 'var(--clay, #C96442)' : 'var(--clay-bg, #f9e3d6)',
+                                color: isGuide ? '#fff' : 'var(--ink)',
+                                padding: '0 3px',
+                                borderRadius: 3,
+                                fontWeight: isGuide ? 700 : 'inherit',
+                                transition: 'background 80ms linear',
+                              }}
+                            >
+                              {line.text.slice(
+                                activeHL.charIndex,
+                                activeHL.charIndex + Math.max(1, activeHL.charLength),
+                              )}
+                            </mark>
+                            {line.text.slice(activeHL.charIndex + Math.max(1, activeHL.charLength))}
+                          </>
+                        );
+                      })()
                     ) : (
                       <span style={{ color: 'var(--ink-4)', letterSpacing: 2 }}>
                         {'•'.repeat(Math.min(60, Math.max(8, line.text.length)))}

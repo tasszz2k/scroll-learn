@@ -181,6 +181,11 @@ export interface DailyStats {
   shadowSec?: number;           // Total shadow-practice seconds.
   conversationCount?: number;   // Sidebar chat turns sent.
   notesAdded?: number;          // Notes captured today (post-dedupe).
+  // AI pronunciation check (Shadow tab) -- only saved runs (avg score >=
+  // LOW_SCORE_THRESHOLD) are counted, so this measures real attempts.
+  pronCheckRuns?: number;       // Count of saved pron-check runs today.
+  pronCheckAvgScore?: number;   // Running mean of (pronunciation+naturalness+fluency)/3 across today's runs.
+  pronCheckBestScore?: number;  // Highest single-run average score recorded today.
 }
 
 export interface Stats {
@@ -318,6 +323,7 @@ export interface InstallUpdateMessage {
 // AI provider automation (Gemini)
 export type GeminiJobStage =
   | 'opening'
+  | 'attaching'
   | 'pasting'
   | 'submitting'
   | 'streaming'
@@ -331,11 +337,21 @@ export type GeminiJobStage =
 // full text response back to the dashboard token-by-token.
 export type GeminiJobMode = 'cards' | 'explain';
 
+// Optional file attachment (e.g. an audio recording for pronunciation check).
+// The content script decodes this into a File and uploads it before pasting
+// the prompt.
+export interface GeminiJobAudio {
+  base64: string;       // raw base64 (no data: prefix)
+  mimeType: string;     // e.g. 'audio/webm'
+  filename: string;     // e.g. 'pronunciation-take.webm'
+}
+
 export interface GeminiJob {
   jobId: string;
   prompt: string;
   // Optional for back-compat with any older queued job; defaults to 'cards'.
   mode?: GeminiJobMode;
+  audio?: GeminiJobAudio;
   createdAt: number;
 }
 
@@ -475,6 +491,42 @@ export interface IpaStudyStats {
   practiceDates: string[];
 }
 
+// AI pronunciation check (Shadow practice). One run per recording.
+export interface PronCheckScores {
+  pronunciation: number;     // 0-100
+  naturalness: number;       // 0-100
+  fluency: number;           // 0-100
+}
+
+// problemWords carries the IPA tag(s) Gemini flagged for that miss, so
+// aggregation can roll up by phoneme as well as by word. Empty phonemes[]
+// is allowed (e.g. wrong word entirely, no specific phoneme blame).
+export interface PronCheckProblemWord {
+  word: string;
+  phonemes: string[];        // IPA symbols without slashes, e.g. ['θ']
+  reason?: string;           // optional one-liner
+}
+
+export interface PronCheckLineNote {
+  idx: number;               // line index in ShadowScript.lines
+  said: string;              // what the model heard
+  problemWords: PronCheckProblemWord[];
+  tip: string;               // short coaching tip
+}
+
+export interface PronCheckReport {
+  scores: PronCheckScores;
+  summary: string;           // markdown-lite paragraph
+  lines: PronCheckLineNote[];
+}
+
+export interface PronCheckRun {
+  id: string;                // generateId()
+  createdAt: number;         // Unix ms
+  durationSec: number;       // length of the recording
+  report: PronCheckReport;
+}
+
 // Messages for Shadow + IPA persistence
 export interface GetShadowScriptsMessage {
   type: 'get_shadow_scripts';
@@ -510,6 +562,12 @@ export interface RecordShadowPracticeMessage {
 
 export interface RecordConversationMessage {
   type: 'record_conversation';
+}
+
+export interface RecordPronCheckMessage {
+  type: 'record_pron_check';
+  // Average of the three axis scores (0-100) for the run that was just saved.
+  averageScore: number;
 }
 
 export type Message =
@@ -551,7 +609,8 @@ export type Message =
   | GetIpaStatsMessage
   | SetIpaStatsMessage
   | RecordShadowPracticeMessage
-  | RecordConversationMessage;
+  | RecordConversationMessage
+  | RecordPronCheckMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {
@@ -607,6 +666,7 @@ export const STORAGE_KEYS = {
   NOTES: 'scrolllearn_notes',
   UPDATE_INFO: 'scrolllearn_update_info',
   SHADOW_SCRIPTS: 'scrolllearn_shadow_scripts',
+  SHADOW_PRON_HISTORY: 'scrolllearn_shadow_pron_history',
   IPA_PROGRESS: 'scrolllearn_ipa_progress',
   IPA_STATS: 'scrolllearn_ipa_stats',
 } as const;

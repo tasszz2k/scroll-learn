@@ -263,6 +263,28 @@ export async function recordNoteAdded(): Promise<void> {
   await saveStats(stats);
 }
 
+// AI pronunciation-check completion. Tracks today's count + a running mean
+// of the run's average score so the Stats tab can show a daily rollup. Only
+// saved runs (above the LOW_SCORE_THRESHOLD) are passed in -- low-score
+// drafts are filtered upstream so this counter measures real attempts.
+export async function recordPronCheckRun(averageScore: number): Promise<void> {
+  if (!Number.isFinite(averageScore)) return;
+  const score = Math.max(0, Math.min(100, averageScore));
+  const stats = await getStats();
+  const today = todayKey();
+  const todayStats = ensureToday(stats, today);
+  const prevRuns = todayStats.pronCheckRuns ?? 0;
+  const prevAvg = todayStats.pronCheckAvgScore ?? 0;
+  const nextRuns = prevRuns + 1;
+  // Incremental running mean to avoid replaying every run on update.
+  todayStats.pronCheckAvgScore = (prevAvg * prevRuns + score) / nextRuns;
+  todayStats.pronCheckRuns = nextRuns;
+  const prevBest = todayStats.pronCheckBestScore ?? 0;
+  if (score > prevBest) todayStats.pronCheckBestScore = score;
+  stats.dailyStats = pruneDailyStats(stats.dailyStats);
+  await saveStats(stats);
+}
+
 // Due Queue Operations
 export async function getDueCards(limit: number = 100): Promise<Card[]> {
   const now = Date.now();

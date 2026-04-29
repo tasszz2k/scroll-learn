@@ -194,3 +194,131 @@ export function recognizeOnce(opts: RecognizeOnceOptions = {}): Promise<Recogniz
     }
   });
 }
+
+export interface ContinuousRecognizerOptions {
+  lang?: string;
+  onPartial?: (transcript: string) => void;       // running transcript including interim tail
+  onError?: (err: RecognizeError) => void;
+}
+
+export interface ContinuousRecognizer {
+  stop: () => Promise<string>;                    // Resolves with the final transcript
+  abort: () => void;
+}
+
+/**
+ * Continuous recognition for long-form recordings. Returns a handle whose
+ * stop() resolves with the accumulated final transcript. We auto-restart the
+ * recognizer if Chrome ends the session early (it caps continuous sessions at
+ * about 60 seconds even with continuous=true), so the caller sees a single
+ * uninterrupted transcript across the whole recording.
+ */
+export function startContinuousRecognition(
+  opts: ContinuousRecognizerOptions = {},
+): ContinuousRecognizer | null {
+  const Ctor = getCtor();
+  if (!Ctor) return null;
+
+  cancelRecognition();
+
+  let stopping = false;
+  let aborted = false;
+  let finalText = '';
+  let interimText = '';
+  let stopResolve: ((t: string) => void) | null = null;
+  let current: SpeechRecognitionInstance | null = null;
+
+  const wire = (rec: SpeechRecognitionInstance) => {
+    rec.lang = opts.lang ?? 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = (ev) => {
+      let interim = '';
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        const t = r[0]?.transcript ?? '';
+        if (r.isFinal) {
+          finalText += (finalText && !finalText.endsWith(' ') ? ' ' : '') + t.trim();
+        } else {
+          interim += t;
+        }
+      }
+      interimText = interim.trim();
+      if (opts.onPartial) {
+        const combined = (finalText + (interimText ? ' ' + interimText : '')).trim();
+        try { opts.onPartial(combined); } catch { /* ignore */ }
+      }
+    };
+
+    rec.onerror = (ev) => {
+      const code: RecognizeError['code'] =
+        ev.error === 'not-allowed' || ev.error === 'service-not-allowed' ? 'permission'
+        : ev.error === 'no-speech' ? 'no-speech'
+        : ev.error === 'aborted'   ? 'aborted'
+        : 'other';
+      // 'no-speech' fires when the user stays silent during a recognition
+      // window -- the auto-restart loop below will pick up the next utterance,
+      // so don't surface it as a hard error.
+      if (code === 'no-speech') return;
+      if (opts.onError) {
+        try { opts.onError(makeError(code, ev.message || ev.error || 'Speech recognition error.')); }
+        catch { /* ignore */ }
+      }
+    };
+
+    rec.onend = () => {
+      // If we asked to stop or to abort, finalize. Otherwise, restart so the
+      // continuous transcript spans the whole recording.
+      if (stopping || aborted) {
+        if (activeInstance === rec) activeInstance = null;
+        if (stopResolve) {
+          const tail = interimText ? (finalText ? finalText + ' ' + interimText : interimText) : finalText;
+          const out = tail.trim();
+          stopResolve(out);
+          stopResolve = null;
+        }
+        return;
+      }
+      // Restart with a fresh instance.
+      try {
+        const next = new Ctor();
+        wire(next);
+        current = next;
+        activeInstance = next;
+        next.start();
+      } catch {
+        if (activeInstance === rec) activeInstance = null;
+      }
+    };
+  };
+
+  const first = new Ctor();
+  wire(first);
+  current = first;
+  activeInstance = first;
+  try {
+    first.start();
+  } catch (err) {
+    if (opts.onError) {
+      try { opts.onError(makeError('other', err instanceof Error ? err.message : String(err))); }
+      catch { /* ignore */ }
+    }
+    return null;
+  }
+
+  return {
+    stop: () =>
+      new Promise<string>((resolve) => {
+        stopping = true;
+        stopResolve = resolve;
+        try { current?.stop(); } catch { /* ignore */ }
+      }),
+    abort: () => {
+      aborted = true;
+      try { current?.abort(); } catch { /* ignore */ }
+      activeInstance = null;
+    },
+  };
+}

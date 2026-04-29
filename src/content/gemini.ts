@@ -3,7 +3,7 @@
 // pastes the prompt into Gemini's input, submits, waits for the response to
 // finish streaming, extracts the CSV, and reports back via runtime messages.
 
-import type { GeminiJob, GeminiJobStage } from '../common/types';
+import type { GeminiJob, GeminiJobAudio, GeminiJobStage } from '../common/types';
 import { extractMarkdownLite } from './geminiMarkdown';
 
 const JOB_KEY = 'geminiJob';
@@ -274,6 +274,131 @@ async function pasteIntoEditor(editor: HTMLElement, text: string): Promise<void>
   editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
 }
 
+// Decode the base64 payload into a File ready to be attached to Gemini's
+// composer. Uses atob; the dashboard provides raw base64 (no data: prefix).
+function decodeAudioFile(audio: GeminiJobAudio): File {
+  const bin = atob(audio.base64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new File([u8], audio.filename, { type: audio.mimeType });
+}
+
+// Look for a freshly-rendered upload chip in the composer. We content-match
+// on the filename (or its extension) so we don't false-positive on the
+// "+ Attach files" button itself, which also has aria-label="upload".
+function findUploadChipFor(filename: string): HTMLElement | null {
+  const lowerName = filename.toLowerCase();
+  const dot = filename.lastIndexOf('.');
+  const ext = dot >= 0 ? filename.slice(dot + 1).toLowerCase() : '';
+  const candidates = document.querySelectorAll(
+    '[aria-label], [title], [data-tooltip], [class*="attachment"], [class*="upload"], file-chip, mat-chip, .uploaded-file, .file-preview-container, .upload-card'
+  );
+  for (const el of Array.from(candidates) as HTMLElement[]) {
+    if (!isVisible(el)) continue;
+    const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+    const title = (el.getAttribute('title') || '').toLowerCase();
+    const tooltip = (el.getAttribute('data-tooltip') || '').toLowerCase();
+    const text = (el.textContent || '').toLowerCase();
+    const haystack = `${aria} ${title} ${tooltip} ${text}`;
+    if (haystack.includes(lowerName)) return el;
+    if (ext && haystack.includes('.' + ext)) return el;
+  }
+  // As a softer signal, look for an <audio> element rendered inside the
+  // composer (Gemini renders attached audio with a player thumbnail).
+  const audios = Array.from(document.querySelectorAll('audio')) as HTMLAudioElement[];
+  for (const a of audios) {
+    if (isVisible(a)) return a;
+  }
+  return null;
+}
+
+async function waitForChip(filename: string, timeoutMs: number): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (findUploadChipFor(filename)) return true;
+    await sleep(250);
+  }
+  return false;
+}
+
+// Strategy 1: drop the file onto the composer with a synthetic drag/drop
+// sequence. This is the user-equivalent path for attaching files and is the
+// most likely to succeed because Gemini's drop handlers live on stable DOM.
+async function tryDrop(editor: HTMLElement, file: File, filename: string): Promise<boolean> {
+  try {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    // Dispatch on the closest plausible drop target -- the rich-textarea
+    // wrapper that contains the contenteditable, falling back to the
+    // contenteditable itself or its parent container.
+    const target = (editor.closest('rich-textarea') as HTMLElement | null)
+      || editor.parentElement
+      || editor;
+    target.dispatchEvent(new DragEvent('dragenter', {
+      dataTransfer: dt, bubbles: true, cancelable: true,
+    }));
+    target.dispatchEvent(new DragEvent('dragover', {
+      dataTransfer: dt, bubbles: true, cancelable: true,
+    }));
+    target.dispatchEvent(new DragEvent('drop', {
+      dataTransfer: dt, bubbles: true, cancelable: true,
+    }));
+  } catch {
+    return false;
+  }
+  return await waitForChip(filename, 12000);
+}
+
+// Strategy 2: paste the file into the contenteditable. Gemini's paste handler
+// accepts files the same way it accepts pasted images.
+async function tryPaste(editor: HTMLElement, file: File, filename: string): Promise<boolean> {
+  try {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    editor.focus();
+    await sleep(80);
+    editor.dispatchEvent(new ClipboardEvent('paste', {
+      clipboardData: dt, bubbles: true, cancelable: true,
+    }));
+  } catch {
+    return false;
+  }
+  return await waitForChip(filename, 12000);
+}
+
+// Strategy 3: try every <input type="file"> in the document. Some are stale
+// from earlier menu opens but setting .files + dispatching change is exactly
+// what the real upload pipeline does, so the right one will catch.
+async function tryFileInputs(file: File, filename: string): Promise<boolean> {
+  const inputs = Array.from(document.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+  for (const input of inputs) {
+    if (input.disabled) continue;
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch {
+      continue;
+    }
+    if (await waitForChip(filename, 6000)) return true;
+  }
+  return false;
+}
+
+// Attach an audio file to the Gemini composer. Returns true if an upload
+// chip surfaced (i.e. Gemini accepted the file); false if every strategy
+// failed and the prompt is being sent without an attachment.
+async function attachAudio(jobId: string, editor: HTMLElement, audio: GeminiJobAudio): Promise<boolean> {
+  postStatus(jobId, 'attaching');
+  const file = decodeAudioFile(audio);
+  if (await tryDrop(editor, file, audio.filename)) return true;
+  if (await tryPaste(editor, file, audio.filename)) return true;
+  if (await tryFileInputs(file, audio.filename)) return true;
+  postStatus(jobId, 'attaching', 'no upload chip detected');
+  return false;
+}
+
 function extractCSV(raw: string): string {
   // Pull the largest fenced code block if present — strip the fence.
   const fenceRe = /```[a-zA-Z]*\n([\s\S]*?)```/g;
@@ -370,6 +495,15 @@ async function processJob(job: GeminiJob): Promise<void> {
     const editor = await waitFor(findEditor, 20000);
     if (!editor) {
       throw new Error('Could not find Gemini input. Make sure you are signed in to gemini.google.com.');
+    }
+
+    if (job.audio) {
+      const ok = await attachAudio(jobId, editor, job.audio);
+      if (!ok) {
+        throw new Error(
+          'Could not attach the recording to Gemini. Drop, paste, and file-input paths all failed -- Gemini\'s composer DOM may have changed. Try again or paste the prompt manually.',
+        );
+      }
     }
 
     postStatus(jobId, 'pasting');

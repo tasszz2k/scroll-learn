@@ -16,6 +16,7 @@ import type {
 } from '../common/types';
 import { createCard, createDeck, createNote } from '../common/types';
 import * as storage from '../common/storage';
+import { deletePronCheckHistoryFor } from '../common/shadowPronHistory';
 import { detectVietnamese, isSingleWord, translate, translateWithDictionary } from '../common/translate';
 import { wordFamilyFor } from '../common/wordFamily';
 import { sm2Update, sortCardsForReview } from './scheduler';
@@ -394,6 +395,14 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
         return { ok: false, error: String(error) };
       }
 
+    case 'record_pron_check':
+      try {
+        await storage.recordPronCheckRun(message.averageScore);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: String(error) };
+      }
+
     default:
       return { ok: false, error: 'Unknown message type' };
   }
@@ -420,6 +429,9 @@ async function handleSaveShadowScript(script: ShadowScript): Promise<Response<Sh
 async function handleDeleteShadowScript(scriptId: string): Promise<Response<void>> {
   try {
     await storage.deleteShadowScript(scriptId);
+    // History is keyed off the script id, so it has no purpose once the script
+    // is gone -- clear it in the same step to keep storage tidy.
+    await deletePronCheckHistoryFor(scriptId);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };
