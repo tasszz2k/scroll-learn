@@ -11,15 +11,18 @@
 // cause spurious "Gemini response timed out after 4 minutes" errors even
 // though the model finished the response on the server side.
 //
-// Opening Gemini as the *active tab in a new unfocused window* sidesteps both
-// problems. Active tabs in unfocused windows stay `visible`, so timers and
-// Angular both run at full speed, while the user's existing window stays in
-// front and keeps focus.
+// We open Gemini in its own window. We previously used `focused: false` to
+// keep the user's dashboard in front, but on macOS (App Nap + window
+// occlusion) an unfocused window that's drawn behind the dashboard reports
+// `document.visibilityState === 'hidden'` and Chrome throttles it the same
+// way as a background tab -- so the run silently stalls until the user
+// clicks the Gemini window. Opening it focused costs a brief focus shift but
+// guarantees the window stays visible and the job actually progresses.
 
 const GEMINI_URL = 'https://gemini.google.com/app';
 
 // Sized so the Gemini conversation pane fits comfortably while still being
-// unobtrusive when it pops up behind the dashboard.
+// unobtrusive when it pops up over the dashboard.
 const WINDOW_WIDTH = 720;
 const WINDOW_HEIGHT = 900;
 
@@ -29,9 +32,15 @@ export interface GeminiWindowHandle {
 }
 
 export async function openGeminiWindow(): Promise<GeminiWindowHandle> {
+  // focused: true keeps the window foregrounded so its tab stays "visible" to
+  // Chrome's visibility API and Angular keeps running at full speed. On
+  // macOS specifically, focused: false reliably caused App Nap / occlusion
+  // throttling (the symptom: "the window opens but Gemini does nothing
+  // until I click it"). The window auto-closes once the job completes, so
+  // the focus interruption is brief.
   const win = await chrome.windows.create({
     url: GEMINI_URL,
-    focused: false,
+    focused: true,
     type: 'normal',
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
