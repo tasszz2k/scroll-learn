@@ -270,7 +270,46 @@ Capital of France? | Paris`}</Pre>
         </P>
       </Section>
 
-      <Section num="11" label="Updates">
+      <Section num="11" label="Shadowing (speaking practice)">
+        <H>Train production with the Shadow tab.</H>
+        <P>
+          The Shadow tab teaches the speaking leg of language learning. The flow has two halves: an <strong>IPA foundation</strong> (a 44-phoneme primer with a minimal-pair listening drill) and a <strong>shadowing player</strong> that turns target words into a short two-speaker dialogue you play back, repeat, and imitate at native pace.
+        </P>
+        <List>
+          <Bullet><strong>Foundation</strong> — click any IPA cell to hear an example word; run the minimal-pair drill to lock down contrasts your ear keeps mixing up. Your weakest sounds are tracked and surfaced as practice targets.</Bullet>
+          <Bullet><strong>Practice</strong> — type or pull words from Notes, set CEFR level / speaker count / duration, and Generate. Gemini returns a structured dialogue annotated with the IPA-tricky phonemes per line.</Bullet>
+          <Bullet><strong>Player</strong> — four stages (Listen / Slow shadow / Full shadow / Blind shadow) with karaoke-style word highlighting, click-to-jump, repeat-line, and a rate slider.</Bullet>
+        </List>
+        <P>
+          Direct links: <Code>#shadow:foundation</Code> opens the IPA primer + drill; <Code>#shadow:practice</Code> opens the composer + saved scripts + player.
+        </P>
+        <H>Voice engines.</H>
+        <P>
+          The player picks audio from one of three engines, all driven by direct API calls (no hidden browser tabs):
+        </P>
+        <List>
+          <Bullet><strong>ElevenLabs (API key)</strong> — best quality, locked to the half-priced Flash v2.5 model so the free tier's monthly credits cover roughly 20,000 characters of audio. Calls <Code>api.elevenlabs.io</Code> directly; requires a free API key.</Bullet>
+          <Bullet><strong>Kokoro TTS (API key)</strong> — free, decent quality, 50+ voices auto-assigned at random per speaker so each character has a distinct sound. Calls the public <Code>hexgrad/Kokoro-TTS</Code> HuggingFace Space via its Gradio queue API; requires a free Hugging Face access token. Public Space is shared, so requests may queue under load.</Bullet>
+          <Bullet><strong>Web Speech</strong> — your browser's built-in voices. Always-on fallback. Free, instant, robotic. Used automatically when the cloud engines aren't connected.</Bullet>
+        </List>
+        <P>
+          Generated audio is cached locally in IndexedDB (per <Code>provider × voice × text</Code> tuple), so replaying a saved script never re-spends credits or re-queues the Space. Cache eviction kicks in past 100 MB.
+        </P>
+        <H>Setting up the cloud engines.</H>
+        <P>
+          Both cloud engines need a free token pasted into Settings → <strong>B · Quiz behaviour</strong>. Settings auto-save when each field loses focus.
+        </P>
+        <List>
+          <Bullet><strong>ElevenLabs:</strong> open <Code>elevenlabs.io/app/settings/api-keys</Code>, click <strong>Create API key</strong>, copy the <Code>sk_…</Code> value, and paste it into <strong>ElevenLabs API key</strong>.</Bullet>
+          <Bullet><strong>Kokoro TTS:</strong> open <Code>huggingface.co/settings/tokens</Code> (sign in or sign up — both are free), click <strong>+ Create new token</strong>, choose type <strong>Read</strong>, copy the <Code>hf_…</Code> value, and paste it into <strong>Kokoro API token</strong>.</Bullet>
+          <Bullet>In the Shadow player, click the engine pill to switch. The "isn't connected yet" banner disappears once the matching token is set; if it lingers, click another engine and back — that re-runs the readiness check.</Bullet>
+        </List>
+        <P>
+          <strong>Quotas:</strong> ElevenLabs free keys ship with about 10k monthly credits (≈20k characters on Flash v2.5). Kokoro shares the Space's daily ZeroGPU pool — about 4 GPU-minutes/day on the free tier (roughly 80–240 fresh line generations, depending on length). Cached audio replays cost zero on either engine. Tokens are stored locally in <Code>chrome.storage.local</Code> — never sent anywhere except their respective providers.
+        </P>
+      </Section>
+
+      <Section num="12" label="Updates">
         <H>One-click in-place upgrade.</H>
         <P>
           When a new release is published, a banner appears at the top of the dashboard. Click <strong>Update now</strong> and a local helper downloads, unpacks, and reloads the extension automatically — no <Code>chrome://extensions</Code> trip needed.

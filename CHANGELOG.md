@@ -4,6 +4,26 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Features
+
+- **shadow:** new Shadow tab for English speaking practice — IPA foundation primer (44-phoneme grid, click-to-hear, minimal-pair drill with per-phoneme reception accuracy) plus a Practice composer that turns target words into a Gemini-generated multi-speaker dialogue.
+- **shadow:** four-stage shadowing player (Listen → Slow shadow → Full shadow → Blind shadow) with karaoke-style word highlighting, click-to-jump, repeat-line, and a rate slider; stages are declared once in `stages.ts` so docs and UI can't drift.
+- **shadow:** routes `#shadow:foundation` and `#shadow:practice`; saved scripts persist in `chrome.storage.local` under `STORAGE_KEYS.SHADOW_SCRIPTS` and IPA progress under `STORAGE_KEYS.IPA_PROGRESS`.
+- **tts:** pluggable TTS layer (`src/common/tts/`) with three engines — ElevenLabs (Flash v2.5 via `api.elevenlabs.io`), Kokoro (public `hexgrad/Kokoro-TTS` HuggingFace Space via Gradio queue), and kokoro-local (Kokoro-82M run 100% in-browser via kokoro-js + ONNX in an offscreen document). All engines fall back to Web Speech on failure.
+- **tts:** IndexedDB-backed audio cache keyed by `(providerId, voice, text)` with LRU eviction at 100 MB, so replaying a saved script never re-spends credits or re-queues the Space.
+- **settings:** Quiz behaviour section now hosts ElevenLabs API key and Kokoro (Hugging Face) token fields — masked by default with a SHOW/HIDE toggle, `autoComplete=off`, no spellcheck, no password-manager prompts. Tokens stay in `chrome.storage.local` and are sent only to their respective providers.
+- **dashboard:** reusable Confirm dialog and Select primitives; `window.confirm` calls in DeckList and Settings replaced with the styled in-app dialog (variant: danger, custom labels).
+- **sidebar:** Enter sends, Shift+Enter inserts a newline; "New chat" button is always visible at the top of the panel so a fresh conversation is one click away.
+- **ai-assist:** clay-tinted Explain (filled) and Ask (ghost-tinted) buttons so the primary action stands out in the card.
+
+### Notes
+
+- New host permission `https://hexgrad-kokoro-tts.hf.space/*` for the Kokoro API engine; new `offscreen` permission and `wasm-unsafe-eval` CSP entry for the kokoro-local engine.
+- `public/onnx/ort-wasm-simd-threaded.jsep.{mjs,wasm}` (~21 MB) ship with the extension so Transformers.js can resolve its ONNX runtime locally without a CDN fetch at runtime.
+- Sensitive tokens (API keys, HF tokens) are stored only in `chrome.storage.local` and never logged or transmitted anywhere except the provider's own endpoint.
+
 ## [1.11.0](https://github.com/tasszz2k/scroll-learn/compare/v1.10.1...v1.11.0) (2026-04-28)
 
 
@@ -24,15 +44,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Features
 
 * **ai-assist:** Gemini-powered Explain & Ask with chat-style follow-ups ([e4f8d8a](https://github.com/tasszz2k/scroll-learn/commit/e4f8d8ad96214e58c0307d8aad7fdbd1845fa046))
-
-## [Unreleased]
-
-### Features
-
-- **ai-assist:** chat-style Explain & Ask panel on cards and notes that streams Gemini responses with full markdown formatting (bold, bullets, paragraphs) recovered from the rendered DOM.
-- **ai-assist:** conversation history stays visible across follow-ups; the Gemini window is reused so the model retains chat context within the same subject.
-- **ai-assist:** always-on composer below the panel — Enter sends, Shift+Enter inserts a newline, Send disables only while a response is still streaming.
-- **ai-assist:** Copy grabs the full conversation (all turns) so it can be pasted into Back details or notes.
 
 ## [1.9.0](https://github.com/tasszz2k/scroll-learn/compare/v1.8.0...v1.9.0) (2026-04-28)
 
