@@ -14,6 +14,9 @@ interface ShadowScriptListProps {
   // Shared with the player so this table re-scans its AUDIO column when a
   // new line lands in the cache.
   cacheBump?: number;
+  // When false, the KL (Kokoro Local) mini pill is omitted from the AUDIO
+  // READY column so the table mirrors the engine picker in the player.
+  enableKokoroLocal: boolean;
 }
 
 interface MiniReadinessPillProps {
@@ -100,6 +103,7 @@ export default function ShadowScriptList({
   onDelete,
   onUpdate,
   cacheBump,
+  enableKokoroLocal,
 }: ShadowScriptListProps) {
   const confirm = useConfirm();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -241,11 +245,13 @@ export default function ShadowScriptList({
                     ready={readiness[s.id].kokoroApi.ready}
                     total={readiness[s.id].kokoroApi.total}
                   />
-                  <MiniReadinessPill
-                    label="KL"
-                    ready={readiness[s.id].kokoroLocal.ready}
-                    total={readiness[s.id].kokoroLocal.total}
-                  />
+                  {enableKokoroLocal && (
+                    <MiniReadinessPill
+                      label="KL"
+                      ready={readiness[s.id].kokoroLocal.ready}
+                      total={readiness[s.id].kokoroLocal.total}
+                    />
+                  )}
                 </>
               ) : (
                 <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>...</span>

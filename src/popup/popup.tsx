@@ -21,10 +21,60 @@ interface PopupState {
   updateInfo: UpdateInfo | null;
 }
 
-function ArrowRight({ size = 14 }: { size?: number }) {
+// Shared SVG attributes for every popup button icon: 14px box, no fill,
+// currentColor stroke so the icon inherits the button's text color (works
+// for both clay and ghost variants).
+const ICON_PROPS = {
+  width: 14,
+  height: 14,
+  viewBox: '0 0 18 18',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+};
+
+function IconStudy() {
+  // Stacked flashcards - speaks to "spaced repetition study".
   return (
-    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M3 9h12M10 4l5 5-5 5" />
+    <svg {...ICON_PROPS}>
+      <rect x="3" y="6.5" width="9" height="7" rx="1.2" />
+      <rect x="6" y="3.5" width="9" height="7" rx="1.2" />
+    </svg>
+  );
+}
+
+function IconNotebook() {
+  // Open page with lines + spine, evokes a notebook.
+  return (
+    <svg {...ICON_PROPS}>
+      <rect x="3.5" y="3" width="11" height="12" rx="1.2" />
+      <path d="M3.5 5h11" />
+      <path d="M6 8h6M6 11h6" />
+    </svg>
+  );
+}
+
+function IconDashboard() {
+  // 2x2 dashboard tiles.
+  return (
+    <svg {...ICON_PROPS}>
+      <rect x="3"  y="3"  width="5.5" height="5.5" rx="1" />
+      <rect x="9.5" y="3"  width="5.5" height="5.5" rx="1" />
+      <rect x="3"  y="9.5" width="5.5" height="5.5" rx="1" />
+      <rect x="9.5" y="9.5" width="5.5" height="5.5" rx="1" />
+    </svg>
+  );
+}
+
+function IconSidebar() {
+  // Frame with a divided right column - suggests a side panel.
+  return (
+    <svg {...ICON_PROPS}>
+      <rect x="3" y="3.5" width="12" height="11" rx="1.2" />
+      <path d="M11 3.5v11" />
     </svg>
   );
 }
@@ -205,6 +255,7 @@ function Popup() {
   function openDashboard() { chrome.runtime.openOptionsPage(); }
   function openStudy()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#study') }); }
   function openGuide()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#guide') }); }
+  function openNotebooks() { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#notebooks') }); }
 
   async function openSidebar() {
     // chrome.sidePanel.open() must be called from a user gesture. The popup's
@@ -330,19 +381,29 @@ function Popup() {
 
       {/* Quick actions — moved to the top */}
       <div className="actions-grid actions-grid-top">
-        <button className="btn btn-clay" type="button" onClick={openStudy}>Study now</button>
-        <button className="btn btn-ghost" type="button" onClick={openDashboard}>
-          Dashboard <ArrowRight />
+        <button className="btn btn-clay" type="button" onClick={openStudy}>
+          <IconStudy /> Study now
+        </button>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={openNotebooks}
+          title="Open the Notebooks tab in the dashboard"
+        >
+          <IconNotebook /> New notebook
         </button>
       </div>
       <div className="actions-grid actions-grid-secondary">
+        <button className="btn btn-ghost" type="button" onClick={openDashboard}>
+          <IconDashboard /> Dashboard
+        </button>
         <button
           className="btn btn-ghost"
           type="button"
           onClick={openSidebar}
-          title="Open quizzes, notes, and chat in a Chrome side panel"
+          title="Open quizzes, bookmarks, and chat in a Chrome side panel"
         >
-          Open sidebar <ArrowRight />
+          <IconSidebar /> Open sidebar
         </button>
       </div>
 
@@ -406,7 +467,7 @@ function Popup() {
         )}
         <div className="site-row">
           <div>
-            <div className="head">{noteCaptureOn ? 'Capturing notes' : 'Note capture off'}</div>
+            <div className="head">{noteCaptureOn ? 'Capturing bookmarks' : 'Bookmark capture off'}</div>
             <div className="sub">
               {noteCaptureLockedByRegex
                 ? 'Allowlisted by a regex pattern — manage in Settings.'
@@ -424,8 +485,8 @@ function Popup() {
             title={noteCaptureLockedByRegex
               ? 'Manage regex allowlist in the dashboard Settings'
               : noteCaptureOn
-                ? `Stop capturing notes on ${currentSite}`
-                : `Capture notes on ${currentSite}`}
+                ? `Stop capturing bookmarks on ${currentSite}`
+                : `Capture bookmarks on ${currentSite}`}
           />
         </div>
       </section>

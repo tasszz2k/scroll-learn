@@ -310,6 +310,294 @@ body {
 }
 
 /* ----------------------------------------------------------------
+ * Notebook paper-rule background.
+ * Three notebook surfaces (rich editor, preview, raw markdown textarea)
+ * share a ruled-notebook look: a 1px subtle horizontal line every
+ * --paper-line-h pixels. Background-origin is content-box so the rule
+ * grid starts at the content edge (under padding), and
+ * background-attachment: local makes the lines scroll with content
+ * rather than the viewport.
+ *
+ * Block typography (paragraphs, headings, lists, blockquote, etc.) is
+ * snapped to whole multiples of --paper-line-h so the grid stays
+ * continuous and text lines actually sit in their slots, instead of
+ * drifting away whenever a heading or list breaks the rhythm. The line
+ * color is a low-alpha ink so it reads as soft ruled paper rather than
+ * a section divider.
+ * ---------------------------------------------------------------- */
+.notebook-rich-editor .ProseMirror,
+.notebook-preview,
+.notebook-markdown-textarea {
+  --paper-line-h: 28px;
+  --paper-line-color: rgba(31, 27, 22, 0.06);
+  background-color: var(--paper);
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--paper-line-h) - 1px),
+    var(--paper-line-color) calc(var(--paper-line-h) - 1px),
+    var(--paper-line-color) var(--paper-line-h)
+  );
+  background-size: 100% var(--paper-line-h);
+  background-attachment: local;
+  background-origin: content-box;
+}
+.dark .notebook-rich-editor .ProseMirror,
+.dark .notebook-preview,
+.dark .notebook-markdown-textarea {
+  --paper-line-color: rgba(245, 241, 235, 0.07);
+}
+
+/* ----------------------------------------------------------------
+ * Notebook preview (marked + DOMPurify -> HTML).
+ * Scoped under .notebook-preview so global Tailwind reset + any other
+ * dashboard markdown surfaces stay untouched. Targets common GFM nodes:
+ * headings, lists, code, tables, blockquotes, images.
+ * ---------------------------------------------------------------- */
+.notebook-preview {
+  line-height: var(--paper-line-h);
+}
+.notebook-preview h1,
+.notebook-preview h2,
+.notebook-preview h3,
+.notebook-preview h4 {
+  font-family: var(--font-serif);
+  color: var(--ink);
+  margin: var(--paper-line-h) 0 0;
+  line-height: var(--paper-line-h);
+  font-weight: 700;
+}
+.notebook-preview h1 {
+  font-size: 26px;
+  line-height: calc(var(--paper-line-h) * 2);
+}
+.notebook-preview h2 { font-size: 22px; }
+.notebook-preview h3 { font-size: 18px; }
+.notebook-preview h4 { font-size: 16px; color: var(--ink-2); font-weight: 600; }
+.notebook-preview p { margin: 0; }
+.notebook-preview ul,
+.notebook-preview ol { margin: 0; padding-left: 1.4em; }
+.notebook-preview li { margin: 0; }
+.notebook-preview blockquote {
+  margin: var(--paper-line-h) 0;
+  padding: 0 14px;
+  border-left: 3px solid var(--clay);
+  color: var(--ink-2);
+  background: rgba(201, 100, 66, 0.05);
+}
+.notebook-preview code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: rgba(0,0,0,0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.notebook-preview pre {
+  background: var(--bg-block);
+  color: #FBF8F2;
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: var(--paper-line-h) 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.notebook-preview pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.notebook-preview a {
+  color: var(--clay-deep);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.notebook-preview table {
+  border-collapse: collapse;
+  margin: var(--paper-line-h) 0;
+  width: 100%;
+  font-size: 14px;
+}
+.notebook-preview th,
+.notebook-preview td {
+  border: 1px solid var(--rule);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.notebook-preview th {
+  background: rgba(0,0,0,0.03);
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+.notebook-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: var(--paper-line-h) 0;
+}
+.notebook-preview hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: var(--paper-line-h) 0;
+}
+.notebook-preview input[type="checkbox"] {
+  margin-right: 6px;
+}
+
+/* ----------------------------------------------------------------
+ * Notebook rich editor (TipTap WYSIWYG surface for the Format tab).
+ * Mirrors .notebook-preview typography so Format/Read render the same
+ * line height, fonts, and spacing -- the only visible difference is
+ * the editable cursor + selection highlight ProseMirror adds.
+ * ---------------------------------------------------------------- */
+.notebook-rich-editor {
+  background: var(--paper);
+}
+.notebook-rich-editor .ProseMirror {
+  flex: 1;
+  outline: none;
+  padding: 24px 28px;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: var(--paper-line-h);
+  color: var(--ink);
+  min-height: 100%;
+}
+.notebook-rich-editor .ProseMirror:focus {
+  outline: none;
+}
+.notebook-rich-editor .ProseMirror p {
+  margin: 0;
+}
+.notebook-rich-editor .ProseMirror h1,
+.notebook-rich-editor .ProseMirror h2,
+.notebook-rich-editor .ProseMirror h3,
+.notebook-rich-editor .ProseMirror h4 {
+  font-family: var(--font-serif);
+  color: var(--ink);
+  margin: var(--paper-line-h) 0 0;
+  line-height: var(--paper-line-h);
+  font-weight: 700;
+}
+.notebook-rich-editor .ProseMirror h1 {
+  font-size: 26px;
+  line-height: calc(var(--paper-line-h) * 2);
+}
+.notebook-rich-editor .ProseMirror h2 { font-size: 22px; }
+.notebook-rich-editor .ProseMirror h3 { font-size: 18px; }
+.notebook-rich-editor .ProseMirror h4 { font-size: 16px; color: var(--ink-2); font-weight: 600; }
+.notebook-rich-editor .ProseMirror ul,
+.notebook-rich-editor .ProseMirror ol {
+  margin: 0;
+  padding-left: 1.4em;
+}
+.notebook-rich-editor .ProseMirror li { margin: 0; }
+.notebook-rich-editor .ProseMirror blockquote {
+  margin: var(--paper-line-h) 0;
+  padding: 0 14px;
+  border-left: 3px solid var(--clay);
+  color: var(--ink-2);
+  background: rgba(201, 100, 66, 0.05);
+}
+.notebook-rich-editor .ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: rgba(0,0,0,0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.notebook-rich-editor .ProseMirror pre {
+  background: var(--bg-block);
+  color: #FBF8F2;
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow: auto;
+  margin: var(--paper-line-h) 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  font-family: var(--font-mono);
+}
+.notebook-rich-editor .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.notebook-rich-editor .ProseMirror a {
+  color: var(--clay-deep);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.notebook-rich-editor .ProseMirror table {
+  border-collapse: collapse;
+  margin: var(--paper-line-h) 0;
+  width: 100%;
+  font-size: 14px;
+  table-layout: fixed;
+}
+.notebook-rich-editor .ProseMirror th,
+.notebook-rich-editor .ProseMirror td {
+  border: 1px solid var(--rule);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  position: relative;
+}
+.notebook-rich-editor .ProseMirror th {
+  background: rgba(0,0,0,0.03);
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+.notebook-rich-editor .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: var(--paper-line-h) 0;
+}
+.notebook-rich-editor .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: var(--paper-line-h) 0;
+}
+.notebook-rich-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+.notebook-rich-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.notebook-rich-editor .ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.notebook-rich-editor .ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.notebook-rich-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+/* TipTap's Placeholder extension empties the first paragraph and uses a
+   ::before pseudo element to show the placeholder text. */
+.notebook-rich-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-4);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+/* Selected node outline: stay subtle so the editor still feels writable
+   rather than form-like. */
+.notebook-rich-editor .ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------------
  * Bridge: legacy color names (Tailwind classes that ship with the app)
  * The token retune above already remaps surface/primary/accent, so
  * `bg-primary-600`, `text-surface-500`, etc. become editorial.

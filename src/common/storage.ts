@@ -3,6 +3,7 @@ import type {
   DailyStats,
   Deck,
   Note,
+  Notebook,
   Settings,
   Stats,
   ReviewRecord,
@@ -445,6 +446,76 @@ export async function pruneNotesOlderThan(days: number): Promise<number> {
     await set(STORAGE_KEYS.NOTES, kept);
   }
   return removed;
+}
+
+// Notebooks Operations
+//
+// Only metadata lives here. Bodies + attachment Blobs live in IndexedDB via
+// notebookStore.ts so multi-MB markdown blobs do not fan through every
+// chrome.storage.onChanged event on every keystroke.
+export async function getNotebooks(): Promise<Notebook[]> {
+  return get<Notebook[]>(STORAGE_KEYS.NOTEBOOKS, []);
+}
+
+export async function saveNotebooks(notebooks: Notebook[]): Promise<void> {
+  await set(STORAGE_KEYS.NOTEBOOKS, notebooks);
+}
+
+export async function getNotebook(id: string): Promise<Notebook | undefined> {
+  const notebooks = await getNotebooks();
+  return notebooks.find(n => n.id === id);
+}
+
+export async function saveNotebook(notebook: Notebook): Promise<Notebook> {
+  const notebooks = await getNotebooks();
+  const index = notebooks.findIndex(n => n.id === notebook.id);
+  const updated = { ...notebook, updatedAt: Date.now() };
+  if (index >= 0) {
+    notebooks[index] = updated;
+  } else {
+    notebooks.push(updated);
+  }
+  await saveNotebooks(notebooks);
+  return updated;
+}
+
+export async function deleteNotebook(id: string): Promise<void> {
+  const notebooks = await getNotebooks();
+  await saveNotebooks(notebooks.filter(n => n.id !== id));
+}
+
+// One-shot seed flag, gating the bundled sample notebooks. The dashboard
+// reads this on mount; if it is false (and no user notebooks exist) it
+// seeds the samples and sets it. Deleting the samples afterwards does not
+// resurrect them because the flag stays true forever.
+export async function isNotebooksSeeded(): Promise<boolean> {
+  return get<boolean>(STORAGE_KEYS.NOTEBOOKS_SEEDED, false);
+}
+
+export async function markNotebooksSeeded(): Promise<void> {
+  await set(STORAGE_KEYS.NOTEBOOKS_SEEDED, true);
+}
+
+// Rewrite folderPath prefixes for every notebook under `fromPath` to `toPath`.
+// Used by FolderTree's rename and drag-move flows. Idempotent when fromPath
+// === toPath. Empty string means "root".
+export async function moveNotebookFolder(fromPath: string, toPath: string): Promise<number> {
+  if (fromPath === toPath) return 0;
+  const notebooks = await getNotebooks();
+  const now = Date.now();
+  let touched = 0;
+  const next = notebooks.map(nb => {
+    if (nb.folderPath === fromPath || nb.folderPath.startsWith(fromPath + '/')) {
+      const tail = nb.folderPath.slice(fromPath.length);
+      touched++;
+      return { ...nb, folderPath: toPath + tail, updatedAt: now };
+    }
+    return nb;
+  });
+  if (touched > 0) {
+    await saveNotebooks(next);
+  }
+  return touched;
 }
 
 // Export all cards as JSON

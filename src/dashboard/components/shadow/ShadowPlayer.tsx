@@ -299,6 +299,10 @@ interface ShadowPlayerProps {
   // produces (onCacheBump) bumps.
   cacheBump?: number;
   onCacheBump?: () => void;
+  // When false, the in-browser Kokoro Local engine is hidden from the
+  // engine picker, its readiness pill is omitted, and a previously-saved
+  // 'kokoro-local' provider selection falls back to Web Speech.
+  enableKokoroLocal: boolean;
 }
 
 type RepeatMode = 'off' | 'line' | 'all';
@@ -317,6 +321,7 @@ export default function ShadowPlayer({
   onDrillPhoneme,
   cacheBump: cacheBumpProp,
   onCacheBump,
+  enableKokoroLocal,
 }: ShadowPlayerProps) {
   const confirm = useConfirm();
   const [stageId, setStageId] = useState<ShadowStageId>('listen');
@@ -326,7 +331,20 @@ export default function ShadowPlayer({
   const [rate, setRate] = useState<number>(getStage('listen').rate);
   const [voiceMap, setVoiceMap] = useState<Record<string, SpeakerVoiceAssignment>>({});
   const [highlight, setHighlight] = useState<{ charIndex: number; charLength: number } | null>(null);
-  const [providerId, setProviderId] = useState<TTSProviderId>(loadProviderId);
+  const [providerId, setProviderId] = useState<TTSProviderId>(() => {
+    const saved = loadProviderId();
+    // If kokoro-local was previously selected but the engine has since been
+    // disabled in Settings, fall back to Web Speech rather than rendering an
+    // invisible engine selection.
+    if (saved === 'kokoro-local' && !enableKokoroLocal) return 'web-speech';
+    return saved;
+  });
+
+  useEffect(() => {
+    if (!enableKokoroLocal && providerId === 'kokoro-local') {
+      setProviderId('web-speech');
+    }
+  }, [enableKokoroLocal, providerId]);
   const [providerReady, setProviderReady] = useState<boolean>(true);
   const [activeStatus, setActiveStatus] = useState<{
     stage: TTSJobStage;
@@ -660,25 +678,33 @@ export default function ShadowPlayer({
           const voice = kokoroApiVoices.get(line.speaker)?.id;
           if (!voice) continue;
           // kokoro-api and kokoro-local share KOKORO_VOICES, so the same voice
-          // map can be checked against both caches in a single pass.
-          const [apiHit, localHit] = await Promise.all([
-            getCached({ providerId: 'kokoro-api', voice, text: line.text }),
-            getCached({ providerId: 'kokoro-local', voice, text: line.text }),
-          ]);
-          if (cancelled) return;
-          if (apiHit) kokApiReady++;
-          if (localHit) kokLocalReady++;
+          // map can be checked against both caches in a single pass. Skip the
+          // kokoro-local lookup entirely when the engine is disabled in
+          // Settings -- its pill is hidden so the count is never read.
+          if (enableKokoroLocal) {
+            const [apiHit, localHit] = await Promise.all([
+              getCached({ providerId: 'kokoro-api', voice, text: line.text }),
+              getCached({ providerId: 'kokoro-local', voice, text: line.text }),
+            ]);
+            if (cancelled) return;
+            if (apiHit) kokApiReady++;
+            if (localHit) kokLocalReady++;
+          } else {
+            const apiHit = await getCached({ providerId: 'kokoro-api', voice, text: line.text });
+            if (cancelled) return;
+            if (apiHit) kokApiReady++;
+          }
         }
       }
       if (cancelled) return;
       setReadiness({
         elevenlabsApi: { ready: elApiReady, total: script.lines.length },
         kokoroApi: { ready: kokApiReady, total: script.lines.length },
-        kokoroLocal: { ready: kokLocalReady, total: script.lines.length },
+        kokoroLocal: enableKokoroLocal ? { ready: kokLocalReady, total: script.lines.length } : null,
       });
     })();
     return () => { cancelled = true; };
-  }, [script.id, script.lines, elevenlabsApiVoices, kokoroApiVoices, cacheBump]);
+  }, [script.id, script.lines, elevenlabsApiVoices, kokoroApiVoices, cacheBump, enableKokoroLocal]);
 
   async function handleRegenerateAll() {
     if (!getTTSProvider(providerId).cacheable) return;
@@ -971,13 +997,15 @@ export default function ShadowPlayer({
               active={providerId === 'kokoro-api'}
               onClick={() => setProviderId('kokoro-api')}
             />
-            <ReadinessPill
-              label="Kokoro Local"
-              ready={readiness.kokoroLocal?.ready ?? null}
-              total={readiness.kokoroLocal?.total ?? script.lines.length}
-              active={providerId === 'kokoro-local'}
-              onClick={() => setProviderId('kokoro-local')}
-            />
+            {enableKokoroLocal && (
+              <ReadinessPill
+                label="Kokoro Local"
+                ready={readiness.kokoroLocal?.ready ?? null}
+                total={readiness.kokoroLocal?.total ?? script.lines.length}
+                active={providerId === 'kokoro-local'}
+                onClick={() => setProviderId('kokoro-local')}
+              />
+            )}
             <button
               type="button"
               onClick={() => setProviderId('web-speech')}

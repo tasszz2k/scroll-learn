@@ -563,7 +563,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
 
       {/* === B · QUIZ BEHAVIOUR === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="B" label="Quiz behaviour" count="7 SETTINGS" />
+        <SectionHead num="B" label="Quiz behaviour" count="8 SETTINGS" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Show after N posts" hint="Cards appear once you have scrolled past this many feed items.">
             <Stepper value={localSettings.showAfterNPosts} unit="posts" min={1} max={50} onChange={n => update('showAfterNPosts', n)} />
@@ -582,6 +582,20 @@ export default function Settings({ settings, onSave }: SettingsProps) {
           </Row>
           <Row label="Show keyboard hints" hint="Display a small hint row beneath each quiz card.">
             <ToggleControl on={localSettings.showKeyboardHints} onClick={() => toggle('showKeyboardHints')} ariaLabel="Keyboard hints" />
+          </Row>
+          <Row
+            label="Kokoro Local engine"
+            hint={
+              <>
+                Expose the in-browser <span className="mono">Kokoro Local</span> engine in the Shadow player. Carries a one-time ~92 MB model download and runs best on WebGPU-capable browsers. Off by default; <span className="mono">Kokoro API</span> and <span className="mono">ElevenLabs API</span> remain available regardless.
+              </>
+            }
+          >
+            <ToggleControl
+              on={localSettings.enableKokoroLocal}
+              onClick={() => toggle('enableKokoroLocal')}
+              ariaLabel="Enable Kokoro Local engine"
+            />
           </Row>
           <Row
             label="Kokoro API token"

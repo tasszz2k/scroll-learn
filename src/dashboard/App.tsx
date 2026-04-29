@@ -1,21 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import DeckList from './components/DeckList';
 import Guide from './components/Guide';
 import ImportPanel, { type PendingImport } from './components/ImportPanel';
+// Lazy-load the Notebooks tab so its TipTap + marked + DOMPurify dependencies
+// (~250 kB raw) don't ship in the dashboard's initial chunk. The import only
+// fires the first time the user opens the Notebooks tab.
+const NotebooksPanel = lazy(() => import('./components/notebooks/NotebooksPanel'));
 import NotesPanel from './components/NotesPanel';
 import Settings from './components/Settings';
 import Stats from './components/Stats';
 import ShadowPanel from './components/shadow/ShadowPanel';
 import StudySession from './components/study/StudySession';
 import UpdateBanner from './components/UpdateBanner';
-import type { Deck, Card, Note, Settings as SettingsType, Stats as StatsType } from '../common/types';
+import type { Deck, Card, Note, Notebook, Settings as SettingsType, Stats as StatsType } from '../common/types';
 import { STORAGE_KEYS } from '../common/types';
+import { isNotebooksSeeded, markNotebooksSeeded } from '../common/storage';
+import { saveBody as saveNotebookBody } from '../common/notebookStore';
+import {
+  restoreSampleNotebooks,
+  seedSampleNotebooks,
+  type SampleSeedDeps,
+} from '../common/notebookSamples';
 import { uniqueDeckName } from './utils/deckNames';
 
-type Tab = 'decks' | 'notes' | 'import' | 'settings' | 'stats' | 'study' | 'shadow' | 'guide';
+type Tab = 'decks' | 'notebooks' | 'notes' | 'import' | 'settings' | 'stats' | 'study' | 'shadow' | 'guide';
 
 const HASH_TO_TAB: Record<string, Tab> = {
   '#decks': 'decks',
+  '#notebooks': 'notebooks',
   '#notes': 'notes',
   '#import': 'import',
   '#settings': 'settings',
@@ -29,9 +41,24 @@ function getTabFromHash(): Tab {
   // Shadow uses sub-routes (#shadow:foundation, #shadow:practice). Treat any
   // hash that starts with '#shadow' as the shadow tab; ShadowPanel reads the
   // suffix internally.
+  // Notebooks supports a deep link: '#notebooks/<id>' opens the dashboard
+  // already focused on that notebook. The id is consumed by NotebooksPanel
+  // via getNotebookIdFromHash() below.
   const h = window.location.hash;
   if (h.startsWith('#shadow')) return 'shadow';
+  if (h.startsWith('#notebooks/') || h === '#notebooks') return 'notebooks';
   return HASH_TO_TAB[h] || 'decks';
+}
+
+// Parse the optional notebook id from a '#notebooks/<id>' deep link. Returns
+// null when the hash has no id (e.g. plain '#notebooks' or another tab) so
+// NotebooksPanel can fall back to its default "first notebook" behaviour.
+function getNotebookIdFromHash(): string | null {
+  const h = window.location.hash;
+  const prefix = '#notebooks/';
+  if (!h.startsWith(prefix)) return null;
+  const id = h.slice(prefix.length).trim();
+  return id || null;
 }
 
 export default function App() {
@@ -39,6 +66,7 @@ export default function App() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
   const [settings, setSettings] = useState<SettingsType | null>(null);
   const [stats, setStats] = useState<StatsType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +83,16 @@ export default function App() {
     if (tab === 'shadow') {
       if (!window.location.hash.startsWith('#shadow')) {
         window.location.hash = '#shadow';
+      }
+      return;
+    }
+    // Same idea for Notebooks: a deep link '#notebooks/<id>' should not be
+    // collapsed back to bare '#notebooks' when the tab is re-set (e.g. after
+    // a pending-import round trip). Only overwrite if we're not already on
+    // a notebooks-sub hash.
+    if (tab === 'notebooks') {
+      if (!window.location.hash.startsWith('#notebooks')) {
+        window.location.hash = '#notebooks';
       }
       return;
     }
@@ -78,12 +116,13 @@ export default function App() {
   const loadData = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const [decksRes, cardsRes, settingsRes, statsRes, notesRes] = await Promise.all([
+      const [decksRes, cardsRes, settingsRes, statsRes, notesRes, notebooksRes] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_decks' }),
         chrome.runtime.sendMessage({ type: 'get_cards' }),
         chrome.runtime.sendMessage({ type: 'get_settings' }),
         chrome.runtime.sendMessage({ type: 'get_stats' }),
         chrome.runtime.sendMessage({ type: 'get_notes' }),
+        chrome.runtime.sendMessage({ type: 'get_notebooks' }),
       ]);
 
       if (decksRes.ok) setDecks(decksRes.data || []);
@@ -91,6 +130,7 @@ export default function App() {
       if (settingsRes.ok) setSettings(settingsRes.data);
       if (statsRes.ok) setStats(statsRes.data);
       if (notesRes.ok) setNotes(notesRes.data || []);
+      if (notebooksRes.ok) setNotebooks(notebooksRes.data || []);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -98,9 +138,57 @@ export default function App() {
     }
   }, []);
 
+  // Persistence wiring shared by the auto-seed path (one-shot, runs on
+  // mount) and the manual "Restore samples" path (FolderTree menu). Both
+  // need the same chrome.runtime + IndexedDB plumbing; we factor it once
+  // here so the two flows can never drift.
+  const buildSampleSeedDeps = useCallback((): SampleSeedDeps => ({
+    isSeeded: () => isNotebooksSeeded(),
+    markSeeded: () => markNotebooksSeeded(),
+    listNotebooks: async () => {
+      const r = await chrome.runtime.sendMessage({ type: 'get_notebooks' });
+      return r?.ok ? (r.data ?? []) : [];
+    },
+    saveNotebook: async (nb) => {
+      const r = await chrome.runtime.sendMessage({ type: 'save_notebook', notebook: nb });
+      if (!r?.ok) throw new Error(r?.error || 'save_notebook failed');
+      return r.data as Notebook;
+    },
+    saveBody: (id, md) => saveNotebookBody(id, md),
+  }), []);
+
+  // One-shot bundled-content seeder. The first time the dashboard mounts on
+  // a fresh install (notebooks list empty + no seed flag) we drop a few
+  // English-learning samples in so the Notebooks tab is not a blank slate.
+  // Any subsequent mount short-circuits inside seedSampleNotebooks().
+  const maybeSeedNotebookSamples = useCallback(async () => {
+    try {
+      const result = await seedSampleNotebooks(buildSampleSeedDeps());
+      if (result.seeded > 0) {
+        await loadData(false);
+      }
+    } catch (err) {
+      console.warn('[ScrollLearn] notebook sample seeding skipped:', err);
+    }
+  }, [buildSampleSeedDeps, loadData]);
+
+  // User-triggered restore from the FolderTree menu. Bypasses both gates
+  // and skips collisions so re-running never duplicates an existing
+  // sample. Returns the per-call counts so the caller can report them.
+  const handleRestoreNotebookSamples = useCallback(async (): Promise<{ added: number; skippedCollisions: number }> => {
+    const result = await restoreSampleNotebooks(buildSampleSeedDeps());
+    if (result.added > 0) {
+      await loadData(false);
+    }
+    return result;
+  }, [buildSampleSeedDeps, loadData]);
+
   // Load initial data
   useEffect(() => {
-    void loadData();
+    void (async () => {
+      await loadData();
+      await maybeSeedNotebookSamples();
+    })();
 
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     setDarkMode(prefersDark);
@@ -116,7 +204,7 @@ export default function App() {
     }
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, [checkEditCardRequest, loadData]);
+  }, [checkEditCardRequest, loadData, maybeSeedNotebookSamples]);
 
   // Live-sync: when the background writes new notes (or other tracked stores)
   // to chrome.storage, re-fetch silently so the dashboard reflects captures
@@ -124,6 +212,7 @@ export default function App() {
   useEffect(() => {
     const watched: string[] = [
       STORAGE_KEYS.NOTES,
+      STORAGE_KEYS.NOTEBOOKS,
       STORAGE_KEYS.CARDS,
       STORAGE_KEYS.DECKS,
       STORAGE_KEYS.STATS,
@@ -206,15 +295,53 @@ export default function App() {
     return response;
   }
 
+  async function handleSaveNotebook(notebook: Notebook): Promise<Notebook> {
+    const response = await chrome.runtime.sendMessage({
+      type: 'save_notebook',
+      notebook,
+    });
+    if (response.ok) {
+      await loadData(false);
+      return response.data as Notebook;
+    }
+    throw new Error(response.error || 'Failed to save notebook');
+  }
+
+  async function handleDeleteNotebook(notebookId: string): Promise<void> {
+    const response = await chrome.runtime.sendMessage({
+      type: 'delete_notebook',
+      notebookId,
+    });
+    if (response.ok) {
+      await loadData(false);
+      return;
+    }
+    throw new Error(response.error || 'Failed to delete notebook');
+  }
+
+  async function handleMoveNotebookFolder(fromPath: string, toPath: string): Promise<void> {
+    const response = await chrome.runtime.sendMessage({
+      type: 'move_notebook_folder',
+      fromPath,
+      toPath,
+    });
+    if (response.ok) {
+      await loadData(false);
+      return;
+    }
+    throw new Error(response.error || 'Failed to move folder');
+  }
+
   const tabs: { id: Tab; label: string; num: string }[] = [
-    { id: 'study',    label: 'Study',      num: '01' },
-    { id: 'shadow',   label: 'Practice speaking', num: '02' },
-    { id: 'decks',    label: 'Decks',      num: '03' },
-    { id: 'notes',    label: 'Notes',      num: '04' },
-    { id: 'import',   label: 'Import',     num: '05' },
-    { id: 'settings', label: 'Settings',   num: '06' },
-    { id: 'stats',    label: 'Statistics', num: '07' },
-    { id: 'guide',    label: 'Guide',      num: '08' },
+    { id: 'study',     label: 'Study',             num: '01' },
+    { id: 'shadow',    label: 'Practice speaking', num: '02' },
+    { id: 'decks',     label: 'Decks',             num: '03' },
+    { id: 'notebooks', label: 'Notebooks',         num: '04' },
+    { id: 'notes',     label: 'Bookmarks',         num: '05' },
+    { id: 'import',    label: 'Import',            num: '06' },
+    { id: 'settings',  label: 'Settings',          num: '07' },
+    { id: 'stats',     label: 'Statistics',        num: '08' },
+    { id: 'guide',     label: 'Guide',             num: '09' },
   ];
 
   const totalDue = cards.filter(c => c.due <= Date.now()).length;
@@ -366,6 +493,33 @@ export default function App() {
           />
         )}
         
+        {activeTab === 'notebooks' && (
+          <Suspense
+            fallback={
+              <div className="eyebrow animate-pulse" style={{ padding: '40px 0', textAlign: 'center' }}>
+                Loading notebooks...
+              </div>
+            }
+          >
+            <NotebooksPanel
+              notebooks={notebooks}
+              initialNotebookId={getNotebookIdFromHash()}
+              onSaveNotebook={handleSaveNotebook}
+              onDeleteNotebook={handleDeleteNotebook}
+              onMoveFolder={handleMoveNotebookFolder}
+              onRestoreSamples={handleRestoreNotebookSamples}
+              onPendingImport={(payload) => {
+                const existing = new Set(decks.map(d => d.name));
+                setPendingImport({
+                  ...payload,
+                  deckName: uniqueDeckName(payload.deckName, existing),
+                });
+                setActiveTab('import');
+              }}
+            />
+          </Suspense>
+        )}
+
         {activeTab === 'notes' && settings && (
           <NotesPanel
             notes={notes}
@@ -409,7 +563,12 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'shadow' && <ShadowPanel notes={notes} />}
+        {activeTab === 'shadow' && (
+          <ShadowPanel
+            notes={notes}
+            enableKokoroLocal={settings?.enableKokoroLocal ?? false}
+          />
+        )}
 
         {activeTab === 'guide' && <Guide />}
       </main>

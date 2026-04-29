@@ -26,6 +26,7 @@ function formatBytes(n: number): string {
 
 interface ShadowPanelProps {
   notes: Note[];
+  enableKokoroLocal: boolean;
 }
 
 type Section = 'foundation' | 'practice' | 'plan';
@@ -51,7 +52,7 @@ function setSectionInHash(section: Section): void {
   }
 }
 
-export default function ShadowPanel({ notes }: ShadowPanelProps) {
+export default function ShadowPanel({ notes, enableKokoroLocal }: ShadowPanelProps) {
   const confirm = useConfirm();
   const [scripts, setScripts] = useState<ShadowScript[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -281,6 +282,7 @@ export default function ShadowPanel({ notes }: ShadowPanelProps) {
               onDelete={handleDelete}
               onUpdate={handleUpdate}
               cacheBump={cacheBump}
+              enableKokoroLocal={enableKokoroLocal}
             />
           </div>
 
@@ -290,6 +292,7 @@ export default function ShadowPanel({ notes }: ShadowPanelProps) {
               onDrillPhoneme={handleDrillPhoneme}
               cacheBump={cacheBump}
               onCacheBump={bumpCache}
+              enableKokoroLocal={enableKokoroLocal}
             />
           ) : (
             <div

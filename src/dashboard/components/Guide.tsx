@@ -117,7 +117,7 @@ export default function Guide() {
       <EditorialHeader
         kicker="Guide"
         title={<>Everything ScrollLearn does.</>}
-        sub="Quizzes in your feed, pluck-mode notes, decks, importing, scheduling, blocking. One page; skim or read end to end."
+        sub="Quizzes in your feed, notebooks, bookmarks (pluck mode), decks, importing, scheduling, blocking. One page; skim or read end to end."
       />
 
       <Section num="01" label="The idea">
@@ -126,7 +126,7 @@ export default function Guide() {
           ScrollLearn injects spaced-repetition flashcards into Facebook, YouTube, and Instagram. Every few posts you scroll, a card appears. Answer it; the feed continues. Cards you struggle with come back sooner; cards you know recede.
         </P>
         <P>
-          Outside of feeds, ScrollLearn also lets you <strong>pluck</strong> text from any allowlisted site straight into a Notes tab while you read.
+          Outside of feeds, ScrollLearn also lets you <strong>pluck</strong> text from any allowlisted site straight into the Bookmarks tab while you read, and gives you a separate <strong>Notebooks</strong> surface for long-form, manually authored markdown notes.
         </P>
       </Section>
 
@@ -188,7 +188,7 @@ Capital of France? | Paris`}</Pre>
         </List>
       </Section>
 
-      <Section num="06" label="Notes capture (pluck mode)">
+      <Section num="06" label="Bookmarks capture (pluck mode)">
         <H>Hold <Kbd>Option</Kbd> / <Kbd>Alt</Kbd> and pluck.</H>
         <P>
           On any allowlisted site, hold the modifier and hover. Whatever you point at gets a green outline as a preview. Nothing is saved yet.
@@ -205,6 +205,30 @@ Capital of France? | Paris`}</Pre>
         </P>
         <P>
           Manage which sites pluck mode runs on under <strong>Settings → Note capture allowlist</strong>. Plain hostnames like <Code>en.wikipedia.org</Code> work; regex entries like <Code>/^.*\.zim\.vn$/</Code> work too. The popup's per-site toggle only flips plain hostnames — regex-allowlisted sites must be edited in Settings.
+        </P>
+      </Section>
+
+      <Section num="06b" label="Notebooks (manual authoring)">
+        <H>Bookmarks vs. Notebooks.</H>
+        <P>
+          <strong>Bookmarks</strong> (<Code>#notes</Code>) is the web-capture buffer described above — short, plucked snippets from sites you read. <strong>Notebooks</strong> (<Code>#notebooks</Code>) is the opposite: long-form markdown documents you write yourself, organised into folders, with autosave, full-text search, and AI assistance.
+        </P>
+        <H>What's in a notebook.</H>
+        <List>
+          <Bullet>Title + folder path + tags + freeform key/value properties (Obsidian-style front-matter).</Bullet>
+          <Bullet>A markdown body with toolbar buttons, keyboard shortcuts (<Kbd>Cmd</Kbd>+<Kbd>B</Kbd>, <Kbd>Cmd</Kbd>+<Kbd>K</Kbd>, etc.), and a <Code>/</Code> slash menu for headings, lists, tables, code blocks, and AI commands.</Bullet>
+          <Bullet>Pasted or dragged images become embedded attachments served from a local IndexedDB blob store.</Bullet>
+          <Bullet>Edit / Preview / Live toggles — the preview is rendered with <Code>marked</Code> + DOMPurify (sanitised) and is independent of the in-feed quiz markdown.</Bullet>
+        </List>
+        <H>Search, export, AI.</H>
+        <List>
+          <Bullet><Kbd>Cmd</Kbd>+<Kbd>P</Kbd> opens a quick-open over titles and tags; <Kbd>Cmd</Kbd>+<Kbd>Shift</Kbd>+<Kbd>F</Kbd> runs a full-text scan across every notebook body.</Bullet>
+          <Bullet>Per-notebook <Code>.md</Code> export (with YAML front-matter for properties) or whole-tree <Code>.zip</Code> export that mirrors your folder layout.</Bullet>
+          <Bullet>The AI panel ("AI" toggle next to Edit/Preview) reuses the same Gemini plumbing as Explain/Ask: <strong>Summarize</strong>, free-form <strong>Ask</strong>, and <strong>Generate quiz</strong> (which routes a CSV deck into the Import tab).</Bullet>
+          <Bullet>Five starter templates from the new-notebook picker: Blank, Daily learning log, Concept note, Book/article note, Lecture/talk note.</Bullet>
+        </List>
+        <P>
+          Bodies and image blobs live in IndexedDB so very long notes don't swamp <Code>chrome.storage</Code>; only the metadata (title, tags, folderPath, properties, timestamps) is mirrored to <Code>chrome.storage.local</Code>, which is what powers the live-sync between the dashboard and the side panel.
         </P>
       </Section>
 
@@ -232,7 +256,7 @@ Capital of France? | Paris`}</Pre>
           <Bullet><strong>Note allowlist</strong> — which sites pluck mode is armed on.</Bullet>
           <Bullet><strong>Note minimum length</strong> — drop captures below this many characters.</Bullet>
           <Bullet><strong>Toast duration</strong> — 1–30 seconds for the save confirmation.</Bullet>
-          <Bullet><strong>Translation direction</strong> — auto-translate captured notes (e.g. EN → VI).</Bullet>
+          <Bullet><strong>Translation direction</strong> — auto-translate captured bookmarks (e.g. EN → VI).</Bullet>
           <Bullet><strong>Per-platform block toggles</strong> — Reels, Shorts, Sponsored, Suggested, Strangers.</Bullet>
           <Bullet><strong>Theme</strong> — light or dark; remembered across sessions.</Bullet>
         </List>
@@ -252,7 +276,7 @@ Capital of France? | Paris`}</Pre>
       <Section num="10" label="AI assist (Explain &amp; Ask)">
         <H>A tutor next to every card and note.</H>
         <P>
-          Each card in study mode and each note in the Notes tab carries an <strong>Explain</strong> and an <strong>Ask</strong> button. Click either to fire a tutor-style prompt at Gemini in the background — the response streams back into a chat-style panel underneath, with bold, bullets, and paragraph breaks preserved from Gemini's output.
+          Each card in study mode and each bookmark in the Bookmarks tab carries an <strong>Explain</strong> and an <strong>Ask</strong> button. Click either to fire a tutor-style prompt at Gemini in the background — the response streams back into a chat-style panel underneath, with bold, bullets, and paragraph breaks preserved from Gemini's output. The Notebooks tab has its own AI menu with Summarize / Ask / Generate quiz running on the same plumbing.
         </P>
         <List>
           <Bullet><strong>Explain</strong> — runs a pre-written prompt that summarises meaning, examples, word family, and common pitfalls (or, for grammar cards, the rule plus contrasts).</Bullet>
@@ -277,7 +301,7 @@ Capital of France? | Paris`}</Pre>
         </P>
         <List>
           <Bullet><strong>Foundation</strong> — click any IPA cell to hear an example word; run the minimal-pair drill to lock down contrasts your ear keeps mixing up. Your weakest sounds are tracked and surfaced as practice targets.</Bullet>
-          <Bullet><strong>Practice</strong> — type or pull words from Notes, set CEFR level / speaker count / duration, and Generate. Gemini returns a structured dialogue annotated with the IPA-tricky phonemes per line.</Bullet>
+          <Bullet><strong>Practice</strong> — type or pull words from Bookmarks, set CEFR level / speaker count / duration, and Generate. Gemini returns a structured dialogue annotated with the IPA-tricky phonemes per line.</Bullet>
           <Bullet><strong>Player</strong> — four stages (Listen / Slow shadow / Full shadow / Blind shadow) with karaoke-style word highlighting, click-to-jump, repeat-line, and a rate slider.</Bullet>
         </List>
         <P>

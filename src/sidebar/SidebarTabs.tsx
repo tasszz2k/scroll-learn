@@ -7,9 +7,10 @@ interface SidebarTabsProps {
 }
 
 const TABS: { id: SidebarTab; label: string; num: string }[] = [
-  { id: 'quizzes', label: 'Quizzes', num: '01' },
-  { id: 'notes',   label: 'Notes',   num: '02' },
-  { id: 'chat',    label: 'Chat',    num: '03' },
+  { id: 'quizzes',   label: 'Quizzes',   num: '01' },
+  { id: 'notebooks', label: 'Notebooks', num: '02' },
+  { id: 'notes',     label: 'Bookmarks', num: '03' },
+  { id: 'chat',      label: 'Chat',      num: '04' },
 ];
 
 export default function SidebarTabs({ active, onChange, badges }: SidebarTabsProps) {

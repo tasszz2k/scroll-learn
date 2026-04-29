@@ -40,6 +40,21 @@ body {
   flex-shrink: 0;
 }
 
+.sidebar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.sidebar-icon-btn:hover {
+  color: var(--ink);
+}
+
 .sidebar-title {
   flex: 1;
   min-width: 0;

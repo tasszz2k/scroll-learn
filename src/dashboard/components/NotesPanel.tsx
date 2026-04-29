@@ -217,7 +217,7 @@ export default function NotesPanel({ notes, settings, onRefresh, onPendingImport
   return (
     <div className="space-y-6">
       <EditorialHeader
-        kicker="03 · Notes"
+        kicker="05 · Bookmarks"
         title={
           <>
             Selections, <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>captured</span> from the wild.

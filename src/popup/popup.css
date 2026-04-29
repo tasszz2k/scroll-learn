@@ -458,7 +458,6 @@ button.popup-version {
   padding: 14px 16px 8px;
 }
 .actions-grid-secondary {
-  grid-template-columns: 1fr;
   padding: 0 16px 14px;
   border-bottom: 1px solid var(--rule);
 }

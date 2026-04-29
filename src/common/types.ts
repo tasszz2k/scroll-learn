@@ -90,6 +90,13 @@ export interface Settings {
   // monthly credits as the browser-driven path; bypassing the page makes
   // the round-trip a single POST instead of a tab-driven automation.
   elevenLabsApiKey: string;
+  // Whether the Shadow player exposes the in-browser 'kokoro-local' engine.
+  // Disabled by default because it carries a one-time ~92 MB model download
+  // and only WebGPU/WASM-capable browsers run it smoothly. When false, the
+  // engine pill is hidden from the player, the per-script readiness column
+  // omits the KL badge, and a previously-saved 'kokoro-local' selection
+  // falls back to Web Speech.
+  enableKokoroLocal: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -130,6 +137,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoSpeakAnswer: true,
   kokoroApiToken: '',
   elevenLabsApiKey: '',
+  enableKokoroLocal: false,
 };
 
 export type TranslateLang = 'en' | 'vi';
@@ -159,6 +167,26 @@ export interface Note {
 }
 
 export type NewNote = Omit<Note, 'id' | 'createdAt'>;
+
+// Notebooks feature: manually-authored Obsidian-style markdown documents.
+// Metadata lives in chrome.storage.local (so onChanged live-sync stays cheap);
+// the markdown body and image attachments live in IndexedDB via notebookStore.
+export interface Notebook {
+  id: string;
+  title: string;
+  // '/Demo/Subfolder' style flat path. '' (empty string) means root. Folders
+  // are inferred from these strings; there is no separate folder entity.
+  folderPath: string;
+  tags: string[];
+  // Free-form key/value rows shown in the editor's Properties block. Keys are
+  // arbitrary strings (e.g. 'type', 'author', 'source'); values are plain
+  // strings rendered as YAML front-matter on .md export.
+  properties: Record<string, string>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type NewNotebook = Omit<Notebook, 'id' | 'createdAt' | 'updatedAt'>;
 
 // Review Statistics
 export interface ReviewRecord {
@@ -306,6 +334,33 @@ export interface DeleteNoteMessage {
 
 export interface ClearNotesMessage {
   type: 'clear_notes';
+}
+
+// Notebook metadata + body messages. Body and attachment storage stays on the
+// dashboard side (IndexedDB) so the body never travels through the message
+// channel; the background only owns the metadata list.
+export interface GetNotebooksMessage {
+  type: 'get_notebooks';
+}
+
+export interface SaveNotebookMessage {
+  type: 'save_notebook';
+  // Either an existing Notebook (update) or a NewNotebook (create).
+  notebook: NewNotebook | Notebook;
+}
+
+export interface DeleteNotebookMessage {
+  type: 'delete_notebook';
+  notebookId: string;
+}
+
+// Folder rename / drag-move: every notebook whose folderPath starts with
+// `fromPath` is rewritten to start with `toPath`. Use empty 'fromPath' to
+// move every root-level notebook into a folder.
+export interface MoveNotebookFolderMessage {
+  type: 'move_notebook_folder';
+  fromPath: string;
+  toPath: string;
 }
 
 export interface CheckForUpdateMessage {
@@ -593,6 +648,10 @@ export type Message =
   | GetNotesMessage
   | DeleteNoteMessage
   | ClearNotesMessage
+  | GetNotebooksMessage
+  | SaveNotebookMessage
+  | DeleteNotebookMessage
+  | MoveNotebookFolderMessage
   | CheckForUpdateMessage
   | GetUpdateInfoMessage
   | InstallUpdateMessage
@@ -664,11 +723,17 @@ export const STORAGE_KEYS = {
   PAUSED_SITES: 'scrolllearn_paused_sites',
   DUE_QUEUE: 'scrolllearn_due_queue',
   NOTES: 'scrolllearn_notes',
+  NOTEBOOKS: 'scrolllearn_notebooks',
+  // One-shot flag set by the dashboard after the bundled sample
+  // notebooks are seeded on first install. Once true we never seed again
+  // even if the user empties the Notebooks tab.
+  NOTEBOOKS_SEEDED: 'scrolllearn_notebooks_seeded',
   UPDATE_INFO: 'scrolllearn_update_info',
   SHADOW_SCRIPTS: 'scrolllearn_shadow_scripts',
   SHADOW_PRON_HISTORY: 'scrolllearn_shadow_pron_history',
   IPA_PROGRESS: 'scrolllearn_ipa_progress',
   IPA_STATS: 'scrolllearn_ipa_stats',
+  NOTEBOOK_VIEW_MODE: 'scrolllearn_notebook_view_mode',
 } as const;
 
 // Update Info
@@ -721,5 +786,17 @@ export function createNote(data: NewNote): Note {
     ...data,
     id: generateId(),
     createdAt: Date.now(),
+  };
+}
+
+// Create new notebook metadata with defaults. Body lives separately in
+// IndexedDB and is empty until the user starts typing.
+export function createNotebook(data: NewNotebook): Notebook {
+  const now = Date.now();
+  return {
+    ...data,
+    id: generateId(),
+    createdAt: now,
+    updatedAt: now,
   };
 }

@@ -5,6 +5,8 @@ import type {
   Deck,
   Note,
   NewNote,
+  Notebook,
+  NewNotebook,
   Settings,
   Stats,
   Grade,
@@ -14,7 +16,7 @@ import type {
   IpaProgress,
   IpaStudyStats,
 } from '../common/types';
-import { createCard, createDeck, createNote } from '../common/types';
+import { createCard, createDeck, createNote, createNotebook } from '../common/types';
 import * as storage from '../common/storage';
 import { deletePronCheckHistoryFor } from '../common/shadowPronHistory';
 import { detectVietnamese, isSingleWord, translate, translateWithDictionary } from '../common/translate';
@@ -348,6 +350,18 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
 
     case 'clear_notes':
       return handleClearNotes();
+
+    case 'get_notebooks':
+      return handleGetNotebooks();
+
+    case 'save_notebook':
+      return handleSaveNotebook(message.notebook);
+
+    case 'delete_notebook':
+      return handleDeleteNotebook(message.notebookId);
+
+    case 'move_notebook_folder':
+      return handleMoveNotebookFolder(message.fromPath, message.toPath);
 
     case 'check_for_update':
       return handleCheckForUpdate();
@@ -1014,6 +1028,56 @@ async function handleClearNotes(): Promise<Response<void>> {
   try {
     await storage.clearNotes();
     return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleGetNotebooks(): Promise<Response<Notebook[]>> {
+  try {
+    const notebooks = await storage.getNotebooks();
+    return { ok: true, data: notebooks };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleSaveNotebook(
+  data: NewNotebook | Notebook,
+): Promise<Response<Notebook>> {
+  try {
+    let notebook: Notebook;
+    if ('id' in data && data.id) {
+      notebook = await storage.saveNotebook(data as Notebook);
+    } else {
+      notebook = createNotebook(data as NewNotebook);
+      notebook = await storage.saveNotebook(notebook);
+    }
+    return { ok: true, data: notebook };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+// Body and attachment cleanup must happen on the dashboard side because the
+// service worker lacks IndexedDB access in MV3. The dashboard removes the
+// body + attachments first, then sends 'delete_notebook' for the metadata.
+async function handleDeleteNotebook(notebookId: string): Promise<Response<void>> {
+  try {
+    await storage.deleteNotebook(notebookId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+async function handleMoveNotebookFolder(
+  fromPath: string,
+  toPath: string,
+): Promise<Response<{ moved: number }>> {
+  try {
+    const moved = await storage.moveNotebookFolder(fromPath, toPath);
+    return { ok: true, data: { moved } };
   } catch (error) {
     return { ok: false, error: String(error) };
   }
