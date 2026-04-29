@@ -1,0 +1,506 @@
+// Hand-curated IPA phoneme reference for English (GA-leaning, with RP variants
+// when they meaningfully diverge). Source: standard English IPA charts.
+// Do NOT regenerate this from a model -- the example words and minimal pairs
+// are picked to be unambiguous and beginner-friendly.
+
+export type PhonemeType = 'vowel' | 'consonant';
+
+export interface Phoneme {
+  // The IPA symbol without slashes (e.g. 'iː', 'θ', 'ʃ'). Used as the storage
+  // key in IPA progress; do not change a symbol once it has shipped.
+  symbol: string;
+  // Plain-English name for screen reader / hover.
+  name: string;
+  type: PhonemeType;
+  // Sub-grouping for the explorer layout (vowels by tongue position, consonants
+  // by manner of articulation).
+  group: string;
+  // 1-3 example words in which this phoneme is the dominant sound.
+  exampleWords: string[];
+  // Minimal pairs that contrast THIS phoneme with a confusable neighbour.
+  // The drill picks one pair and randomly speaks one of its members.
+  minimalPairs: [string, string][];
+  // Short description of how the sound is articulated.
+  description: string;
+  // Mouth-shape hint shown on hover.
+  mouthHint: string;
+}
+
+export const PHONEMES: Phoneme[] = [
+  // ===== VOWELS - front =====
+  {
+    symbol: 'iː',
+    name: 'long e',
+    type: 'vowel',
+    group: 'front',
+    exampleWords: ['sheep', 'tree', 'feet'],
+    minimalPairs: [['ship', 'sheep'], ['fit', 'feet'], ['bit', 'beat']],
+    description: 'Tense front vowel; held longer than /ɪ/.',
+    mouthHint: 'Lips spread, tongue high and forward, jaw nearly closed.',
+  },
+  {
+    symbol: 'ɪ',
+    name: 'short i',
+    type: 'vowel',
+    group: 'front',
+    exampleWords: ['ship', 'bit', 'live'],
+    minimalPairs: [['ship', 'sheep'], ['fit', 'feet'], ['bit', 'beat']],
+    description: 'Lax front vowel; shorter and looser than /iː/.',
+    mouthHint: 'Lips relaxed, tongue slightly lower than /iː/.',
+  },
+  {
+    symbol: 'e',
+    name: 'short e',
+    type: 'vowel',
+    group: 'front',
+    exampleWords: ['bed', 'red', 'head'],
+    minimalPairs: [['bed', 'bad'], ['pen', 'pan'], ['said', 'sad']],
+    description: 'Mid front vowel.',
+    mouthHint: 'Lips slightly open, tongue mid-height and forward.',
+  },
+  {
+    symbol: 'æ',
+    name: 'short a',
+    type: 'vowel',
+    group: 'front',
+    exampleWords: ['cat', 'bad', 'man'],
+    minimalPairs: [['bed', 'bad'], ['pen', 'pan'], ['set', 'sat']],
+    description: 'Open front vowel.',
+    mouthHint: 'Mouth open wider than /e/, tongue low and forward.',
+  },
+
+  // ===== VOWELS - central =====
+  {
+    symbol: 'ʌ',
+    name: 'open o (cup)',
+    type: 'vowel',
+    group: 'central',
+    exampleWords: ['cup', 'love', 'son'],
+    minimalPairs: [['cup', 'cap'], ['luck', 'lock'], ['nut', 'not']],
+    description: 'Open-mid central vowel; the "uh" of stressed syllables.',
+    mouthHint: 'Mouth slightly open, tongue centred and slightly low.',
+  },
+  {
+    symbol: 'ə',
+    name: 'schwa',
+    type: 'vowel',
+    group: 'central',
+    exampleWords: ['about', 'sofa', 'banana'],
+    minimalPairs: [['about', 'a boat'], ['sofa', 'so far']],
+    description: 'Reduced unstressed vowel. Most common vowel in English.',
+    mouthHint: 'Lips relaxed, tongue centred. Almost no effort.',
+  },
+  {
+    symbol: 'ɜː',
+    name: 'long er',
+    type: 'vowel',
+    group: 'central',
+    exampleWords: ['bird', 'word', 'her'],
+    minimalPairs: [['bird', 'bared'], ['her', 'hair'], ['word', 'ward']],
+    description: 'Long central vowel, often r-coloured in GA (/ɝ/).',
+    mouthHint: 'Lips slightly rounded, tongue mid-central, longer hold.',
+  },
+
+  // ===== VOWELS - back =====
+  {
+    symbol: 'uː',
+    name: 'long oo',
+    type: 'vowel',
+    group: 'back',
+    exampleWords: ['food', 'blue', 'shoe'],
+    minimalPairs: [['fool', 'full'], ['pool', 'pull'], ['suit', 'soot']],
+    description: 'Tense back rounded vowel.',
+    mouthHint: 'Lips tightly rounded, tongue high and back.',
+  },
+  {
+    symbol: 'ʊ',
+    name: 'short oo',
+    type: 'vowel',
+    group: 'back',
+    exampleWords: ['book', 'put', 'good'],
+    minimalPairs: [['fool', 'full'], ['pool', 'pull'], ['suit', 'soot']],
+    description: 'Lax back rounded vowel.',
+    mouthHint: 'Lips loosely rounded, tongue slightly lower than /uː/.',
+  },
+  {
+    symbol: 'ɔː',
+    name: 'long aw',
+    type: 'vowel',
+    group: 'back',
+    exampleWords: ['thought', 'door', 'caught'],
+    minimalPairs: [['caught', 'cot'], ['fall', 'full'], ['ball', 'bull']],
+    description: 'Open-mid back rounded vowel; merged with /ɑː/ in many GA dialects.',
+    mouthHint: 'Lips rounded, tongue low-mid and back.',
+  },
+  {
+    symbol: 'ɒ',
+    name: 'short o (RP)',
+    type: 'vowel',
+    group: 'back',
+    exampleWords: ['hot', 'lot', 'dog'],
+    minimalPairs: [['hot', 'hat'], ['lock', 'luck'], ['cot', 'caught']],
+    description: 'Open back rounded vowel (RP). Often realised as /ɑː/ in GA.',
+    mouthHint: 'Mouth open, lips slightly rounded, tongue low and back.',
+  },
+  {
+    symbol: 'ɑː',
+    name: 'long ah',
+    type: 'vowel',
+    group: 'back',
+    exampleWords: ['father', 'car', 'park'],
+    minimalPairs: [['cart', 'cat'], ['heart', 'hat'], ['park', 'pack']],
+    description: 'Open back unrounded vowel.',
+    mouthHint: 'Mouth wide open, tongue low and back, lips relaxed.',
+  },
+
+  // ===== DIPHTHONGS =====
+  {
+    symbol: 'eɪ',
+    name: 'long a',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['day', 'face', 'name'],
+    minimalPairs: [['pen', 'pain'], ['let', 'late'], ['test', 'taste']],
+    description: 'Glides from /e/ to /ɪ/.',
+    mouthHint: 'Start mid, glide upward toward /ɪ/.',
+  },
+  {
+    symbol: 'aɪ',
+    name: 'long i',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['my', 'time', 'high'],
+    minimalPairs: [['bit', 'bite'], ['hid', 'hide'], ['rid', 'ride']],
+    description: 'Glides from /a/ to /ɪ/.',
+    mouthHint: 'Start with mouth wide open, glide up to /ɪ/.',
+  },
+  {
+    symbol: 'ɔɪ',
+    name: 'oy',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['boy', 'coin', 'noise'],
+    minimalPairs: [['boy', 'buy'], ['toy', 'tie'], ['coin', 'kine']],
+    description: 'Glides from /ɔ/ to /ɪ/.',
+    mouthHint: 'Start rounded, glide forward to /ɪ/.',
+  },
+  {
+    symbol: 'aʊ',
+    name: 'ow',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['now', 'house', 'cow'],
+    minimalPairs: [['now', 'no'], ['cow', 'co'], ['town', 'tone']],
+    description: 'Glides from /a/ to /ʊ/.',
+    mouthHint: 'Open jaw, then glide to lip-rounded /ʊ/.',
+  },
+  {
+    symbol: 'oʊ',
+    name: 'long o',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['go', 'home', 'note'],
+    minimalPairs: [['cot', 'coat'], ['not', 'note'], ['so', 'saw']],
+    description: 'Glides from /o/ to /ʊ/. RP uses /əʊ/.',
+    mouthHint: 'Lips slightly rounded, glide backward and tighten.',
+  },
+  {
+    symbol: 'ɪə',
+    name: 'ear',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['ear', 'here', 'beer'],
+    minimalPairs: [['ear', 'air'], ['here', 'hair'], ['beer', 'bear']],
+    description: 'RP centring diphthong. GA realises as /ɪr/.',
+    mouthHint: 'Start at /ɪ/, glide to neutral schwa.',
+  },
+  {
+    symbol: 'eə',
+    name: 'air',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['air', 'where', 'hair'],
+    minimalPairs: [['ear', 'air'], ['here', 'hair'], ['beer', 'bear']],
+    description: 'RP centring diphthong. GA realises as /er/.',
+    mouthHint: 'Start at /e/, glide to neutral schwa.',
+  },
+  {
+    symbol: 'ʊə',
+    name: 'oor',
+    type: 'vowel',
+    group: 'diphthong',
+    exampleWords: ['tour', 'pure', 'sure'],
+    minimalPairs: [['tour', 'tore'], ['pure', 'poor']],
+    description: 'RP centring diphthong; rare in GA (often merged with /ɔr/).',
+    mouthHint: 'Start at /ʊ/, glide to neutral schwa.',
+  },
+
+  // ===== CONSONANTS - stops =====
+  {
+    symbol: 'p',
+    name: 'p',
+    type: 'consonant',
+    group: 'stop',
+    exampleWords: ['pen', 'top', 'happy'],
+    minimalPairs: [['pen', 'ben'], ['pat', 'bat'], ['cap', 'cab']],
+    description: 'Voiceless bilabial stop. Aspirated at the start of stressed syllables.',
+    mouthHint: 'Lips closed, build pressure, release with a puff of air.',
+  },
+  {
+    symbol: 'b',
+    name: 'b',
+    type: 'consonant',
+    group: 'stop',
+    exampleWords: ['bad', 'baby', 'cab'],
+    minimalPairs: [['pen', 'ben'], ['pat', 'bat'], ['cap', 'cab']],
+    description: 'Voiced bilabial stop.',
+    mouthHint: 'Lips closed, voicing on, release without aspiration.',
+  },
+  {
+    symbol: 't',
+    name: 't',
+    type: 'consonant',
+    group: 'stop',
+    exampleWords: ['ten', 'cat', 'water'],
+    minimalPairs: [['ten', 'den'], ['cat', 'cad'], ['town', 'down']],
+    description: 'Voiceless alveolar stop.',
+    mouthHint: 'Tongue tip touches alveolar ridge, release with a small puff.',
+  },
+  {
+    symbol: 'd',
+    name: 'd',
+    type: 'consonant',
+    group: 'stop',
+    exampleWords: ['day', 'red', 'doll'],
+    minimalPairs: [['ten', 'den'], ['cat', 'cad'], ['town', 'down']],
+    description: 'Voiced alveolar stop.',
+    mouthHint: 'Tongue tip on alveolar ridge with voicing on.',
+  },
+  {
+    symbol: 'k',
+    name: 'k',
+    type: 'consonant',
+    group: 'stop',
+    exampleWords: ['cat', 'key', 'back'],
+    minimalPairs: [['cap', 'gap'], ['back', 'bag'], ['coat', 'goat']],
+    description: 'Voiceless velar stop.',
+    mouthHint: 'Back of tongue touches soft palate, release with aspiration.',
+  },
+  {
+    symbol: 'ɡ',
+    name: 'g',
+    type: 'consonant',
+    group: 'stop',
+    exampleWords: ['go', 'big', 'good'],
+    minimalPairs: [['cap', 'gap'], ['back', 'bag'], ['coat', 'goat']],
+    description: 'Voiced velar stop.',
+    mouthHint: 'Back of tongue on soft palate, voicing on.',
+  },
+
+  // ===== CONSONANTS - fricatives =====
+  {
+    symbol: 'f',
+    name: 'f',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['fish', 'phone', 'leaf'],
+    minimalPairs: [['fan', 'van'], ['leaf', 'leave'], ['fine', 'vine']],
+    description: 'Voiceless labiodental fricative.',
+    mouthHint: 'Top teeth on bottom lip, blow air through.',
+  },
+  {
+    symbol: 'v',
+    name: 'v',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['van', 'love', 'live'],
+    minimalPairs: [['fan', 'van'], ['leaf', 'leave'], ['fine', 'vine']],
+    description: 'Voiced labiodental fricative.',
+    mouthHint: 'Top teeth on bottom lip, voicing on.',
+  },
+  {
+    symbol: 'θ',
+    name: 'voiceless th',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['think', 'thanks', 'math'],
+    minimalPairs: [['thin', 'sin'], ['thank', 'sank'], ['thigh', 'sigh']],
+    description: 'Voiceless dental fricative.',
+    mouthHint: 'Tongue tip between teeth, blow air through, no voice.',
+  },
+  {
+    symbol: 'ð',
+    name: 'voiced th',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['this', 'that', 'mother'],
+    minimalPairs: [['then', 'den'], ['breathe', 'breed'], ['this', 'dis']],
+    description: 'Voiced dental fricative.',
+    mouthHint: 'Tongue tip between teeth, voicing on.',
+  },
+  {
+    symbol: 's',
+    name: 's',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['sun', 'kiss', 'ice'],
+    minimalPairs: [['sip', 'zip'], ['bus', 'buzz'], ['sue', 'zoo']],
+    description: 'Voiceless alveolar fricative.',
+    mouthHint: 'Tongue near alveolar ridge, narrow channel for air.',
+  },
+  {
+    symbol: 'z',
+    name: 'z',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['zoo', 'buzz', 'rose'],
+    minimalPairs: [['sip', 'zip'], ['bus', 'buzz'], ['sue', 'zoo']],
+    description: 'Voiced alveolar fricative.',
+    mouthHint: 'Tongue near alveolar ridge with voicing on.',
+  },
+  {
+    symbol: 'ʃ',
+    name: 'sh',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['ship', 'fish', 'wash'],
+    minimalPairs: [['ship', 'sip'], ['shoe', 'sue'], ['wash', 'was']],
+    description: 'Voiceless postalveolar fricative.',
+    mouthHint: 'Tongue retracted, lips slightly rounded, hush sound.',
+  },
+  {
+    symbol: 'ʒ',
+    name: 'zh',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['measure', 'vision', 'beige'],
+    minimalPairs: [['measure', 'mesher'], ['Asian', 'ashen']],
+    description: 'Voiced postalveolar fricative.',
+    mouthHint: 'Tongue retracted with voicing on, lips slightly rounded.',
+  },
+  {
+    symbol: 'h',
+    name: 'h',
+    type: 'consonant',
+    group: 'fricative',
+    exampleWords: ['hat', 'who', 'hello'],
+    minimalPairs: [['hat', 'at'], ['hill', 'ill'], ['heat', 'eat']],
+    description: 'Voiceless glottal fricative.',
+    mouthHint: 'Open vocal tract, breathy onset.',
+  },
+
+  // ===== CONSONANTS - affricates =====
+  {
+    symbol: 'tʃ',
+    name: 'ch',
+    type: 'consonant',
+    group: 'affricate',
+    exampleWords: ['chair', 'much', 'catch'],
+    minimalPairs: [['chair', 'share'], ['cheat', 'sheet'], ['chip', 'ship']],
+    description: 'Voiceless postalveolar affricate.',
+    mouthHint: 'Stop like /t/, then release into /ʃ/.',
+  },
+  {
+    symbol: 'dʒ',
+    name: 'j',
+    type: 'consonant',
+    group: 'affricate',
+    exampleWords: ['judge', 'gym', 'edge'],
+    minimalPairs: [['jeer', 'cheer'], ['ridge', 'rich'], ['joke', 'choke']],
+    description: 'Voiced postalveolar affricate.',
+    mouthHint: 'Stop like /d/, then release into /ʒ/, voicing on.',
+  },
+
+  // ===== CONSONANTS - nasals =====
+  {
+    symbol: 'm',
+    name: 'm',
+    type: 'consonant',
+    group: 'nasal',
+    exampleWords: ['man', 'sum', 'home'],
+    minimalPairs: [['man', 'ban'], ['sum', 'sun'], ['rim', 'rib']],
+    description: 'Voiced bilabial nasal.',
+    mouthHint: 'Lips closed, air through nose, voicing on.',
+  },
+  {
+    symbol: 'n',
+    name: 'n',
+    type: 'consonant',
+    group: 'nasal',
+    exampleWords: ['now', 'sun', 'tin'],
+    minimalPairs: [['sum', 'sun'], ['ran', 'rang'], ['kin', 'king']],
+    description: 'Voiced alveolar nasal.',
+    mouthHint: 'Tongue tip on alveolar ridge, air through nose.',
+  },
+  {
+    symbol: 'ŋ',
+    name: 'ng',
+    type: 'consonant',
+    group: 'nasal',
+    exampleWords: ['sing', 'long', 'thing'],
+    minimalPairs: [['ran', 'rang'], ['kin', 'king'], ['sin', 'sing']],
+    description: 'Voiced velar nasal.',
+    mouthHint: 'Back of tongue on soft palate, air through nose.',
+  },
+
+  // ===== CONSONANTS - approximants =====
+  {
+    symbol: 'l',
+    name: 'l',
+    type: 'consonant',
+    group: 'approximant',
+    exampleWords: ['leg', 'fall', 'love'],
+    minimalPairs: [['light', 'right'], ['lead', 'read'], ['lock', 'rock']],
+    description: 'Voiced alveolar lateral approximant.',
+    mouthHint: 'Tongue tip on alveolar ridge, air flows on the sides.',
+  },
+  {
+    symbol: 'r',
+    name: 'r',
+    type: 'consonant',
+    group: 'approximant',
+    exampleWords: ['red', 'right', 'very'],
+    minimalPairs: [['light', 'right'], ['lead', 'read'], ['lock', 'rock']],
+    description: 'Voiced alveolar approximant.',
+    mouthHint: 'Tongue tip near alveolar ridge but not touching, lips slightly rounded.',
+  },
+  {
+    symbol: 'j',
+    name: 'y (consonant)',
+    type: 'consonant',
+    group: 'approximant',
+    exampleWords: ['yes', 'yellow', 'you'],
+    minimalPairs: [['yes', 'less'], ['yet', 'wet'], ['yam', 'jam']],
+    description: 'Voiced palatal approximant.',
+    mouthHint: 'Tongue near hard palate, brief glide into the next vowel.',
+  },
+  {
+    symbol: 'w',
+    name: 'w',
+    type: 'consonant',
+    group: 'approximant',
+    exampleWords: ['win', 'water', 'away'],
+    minimalPairs: [['wet', 'vet'], ['went', 'vent'], ['wine', 'vine']],
+    description: 'Voiced labio-velar approximant.',
+    mouthHint: 'Lips strongly rounded, then quickly relax into the next vowel.',
+  },
+];
+
+export const PHONEME_BY_SYMBOL: Record<string, Phoneme> = Object.fromEntries(
+  PHONEMES.map(p => [p.symbol, p]),
+);
+
+export const VOWEL_GROUPS: { id: string; label: string }[] = [
+  { id: 'front', label: 'Front' },
+  { id: 'central', label: 'Central' },
+  { id: 'back', label: 'Back' },
+  { id: 'diphthong', label: 'Diphthongs' },
+];
+
+export const CONSONANT_GROUPS: { id: string; label: string }[] = [
+  { id: 'stop', label: 'Stops' },
+  { id: 'fricative', label: 'Fricatives' },
+  { id: 'affricate', label: 'Affricates' },
+  { id: 'nasal', label: 'Nasals' },
+  { id: 'approximant', label: 'Approximants' },
+];
