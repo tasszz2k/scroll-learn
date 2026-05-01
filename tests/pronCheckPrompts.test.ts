@@ -42,29 +42,22 @@ describe('buildPronCheckPrompt', () => {
     expect(buildPronCheckPrompt(baseParams)).toContain('without slashes');
   });
 
-  it('does NOT embed the local transcript verbatim (audio is ground truth)', () => {
+  it('embeds the local transcript verbatim as a noisy second opinion', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).not.toContain('i thought you said this was open today right but they close on tuesdays');
+    expect(prompt).toContain('i thought you said this was open today right but they close on tuesdays');
   });
 
-  it('declares the audio as the ground truth and the recognizer as a noisy hint only', () => {
-    const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('AUDIO FILE');
-    expect(prompt).toContain('GROUND TRUTH');
-    expect(prompt).toContain('intentionally NOT included');
-    expect(prompt).toContain('webkitSpeechRecognition');
-  });
-
-  it('forwards a recognizer coverage count as a sanity-check hint', () => {
-    const prompt = buildPronCheckPrompt(baseParams);
-    // baseParams transcript has 14 words across a 14-word script (100% coverage).
-    expect(prompt).toMatch(/Browser-recognizer coverage hint: caught roughly 14 words/);
-    expect(prompt).toMatch(/~100%/);
-  });
-
-  it('zeroes the coverage hint when the recognizer caught nothing', () => {
+  it('marks the transcript block as empty when the recognizer caught nothing', () => {
     const prompt = buildPronCheckPrompt({ ...baseParams, localTranscript: '' });
-    expect(prompt).toMatch(/caught roughly 0 words/);
+    expect(prompt).toContain('the local recognizer caught no audible speech');
+  });
+
+  it('frames the transcript as a competing hypothesis, not ground truth', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('noisy second opinion');
+    expect(prompt).toContain('competing hypothesis');
+    expect(prompt).toContain('NOT as ground truth');
+    expect(prompt).toContain('webkitSpeechRecognition');
   });
 
   it('reports recording duration and target duration', () => {
@@ -75,8 +68,16 @@ describe('buildPronCheckPrompt', () => {
 
   it('forbids hallucinating "said" content from the script', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('"said" MUST come from what you HEAR in the audio');
-    expect(prompt).toContain('Do NOT recover script text into "said" out of charity');
+    expect(prompt).toContain('"said" MUST come from EITHER the local transcript span');
+    expect(prompt).toContain('NEVER from the script');
+    expect(prompt).toContain('that is almost always a hallucination');
+  });
+
+  it('declares cross-check rules for resolving transcript-vs-audio disagreements', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('CROSS-CHECK RULES');
+    expect(prompt).toContain('When transcript and audio AGREE');
+    expect(prompt).toContain('typical failure on uncommon/technical vocabulary');
   });
 
   it('demands thorough problem-word flagging with a multi-substitution example', () => {
@@ -85,12 +86,6 @@ describe('buildPronCheckPrompt', () => {
     expect(prompt).toContain('"viable"');
     expect(prompt).toContain('"helm"');
     expect(prompt).toContain('"modifying"');
-  });
-
-  it('drives problem-word flags from the audio, not the recognizer transcript', () => {
-    const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('audio-driven');
-    expect(prompt).toContain('Decide entirely from the audio');
   });
 
   it('forbids emitting the full IPA transcription of a word in phonemes', () => {
@@ -103,6 +98,11 @@ describe('buildPronCheckPrompt', () => {
     const prompt = buildPronCheckPrompt(baseParams);
     expect(prompt).toContain('DISTINGUISH SUBSTITUTED FROM SKIPPED');
     expect(prompt).toContain('Skipped words get NO entry in problemWords');
+  });
+
+  it('warns that a perfect-script "said" indicates confabulation', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('A perfect-script "said" on every line means you confabulated');
   });
 });
 
