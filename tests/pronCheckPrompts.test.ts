@@ -64,6 +64,34 @@ describe('buildPronCheckPrompt', () => {
     expect(prompt).toContain('"said" field MUST be a substring of the LOCAL TRANSCRIPT');
     expect(prompt).toContain('DO NOT copy script text into "said"');
   });
+
+  it('demands thorough problem-word flagging with a multi-substitution example', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('BE THOROUGH WITH PROBLEM WORDS');
+    expect(prompt).toContain('"viable"');
+    expect(prompt).toContain('"helm"');
+    expect(prompt).toContain('"modifying"');
+  });
+
+  it('caps pronunciation by substitution divergence, not just by skipped words', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('SUBSTITUTION DIVERGENCE');
+    expect(prompt).toContain('30%');
+    expect(prompt).toContain('50%');
+    expect(prompt).toContain('70%');
+  });
+
+  it('forbids emitting the full IPA transcription of a word in phonemes', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('NEVER emit the full IPA transcription');
+    expect(prompt).toContain('one to three IPA phoneme SYMBOLS');
+  });
+
+  it('distinguishes substituted words (flag) from skipped words (do not flag)', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('DISTINGUISH SUBSTITUTED FROM SKIPPED');
+    expect(prompt).toContain('Skipped words get NO entry in problemWords');
+  });
 });
 
 describe('parsePronCheckJSON', () => {

@@ -64,10 +64,12 @@ ANTI-HALLUCINATION RULES (READ THESE FIRST)
 - The per-line "said" field MUST be a substring of the LOCAL TRANSCRIPT. If a script line has NO matching fragment in the local transcript, "said" MUST be the empty string "" and the learner gets no credit for that line.
 - DO NOT copy script text into "said". DO NOT paraphrase the script. If the learner skipped a line, leave "said" empty.
 - If the local transcript is empty or only a couple of words while the script has many lines, the learner skipped most of the script. Set "pronunciation" near 0 and explain in "summary".
-- "problemWords" only flags words that ARE in the transcript but came out wrong (substituted, slurred). If the word is missing from the transcript entirely, do NOT list it as a problemWord -- the line just gets empty "said" and a tip telling them to actually read it.
+- "problemWords" flags words that came out wrong (substituted by the recognizer for a different word, or audibly slurred/mispronounced). A SUBSTITUTION COUNTS even if the substituted word doesn't appear elsewhere in the transcript -- e.g. script "viable" heard as "available", script "the helm chart's" heard as "they have track", script "for us" heard as "first" are ALL substitutions and ALL must be flagged.
+- DISTINGUISH SUBSTITUTED FROM SKIPPED. A word is SUBSTITUTED only when the transcript span at its position contains a different word taking its slot. A word is SKIPPED when the transcript jumps from an earlier script word straight to a later one with nothing occupying the gap. Skipped words get NO entry in problemWords -- the line just gets a tip telling the learner to read it next time. Example: script "will those be enough for the AX Week demo" heard as "will tell me enough about that I asked quick demo" -- "those be" is substituted by "tell me" (flag both), but "for the AX Week" is skipped over to reach "demo" (do NOT flag those four; the line tip should call out the skip).
+- BE THOROUGH WITH PROBLEM WORDS. Walk every script line word by word, align each script word against the corresponding transcript span, and flag every SUBSTITUTED misalignment. Do not stop after one or two examples per line. If five words in a line came out as different words, the problemWords array for that line has five entries. Under-flagging substitutions deprives the learner of feedback on words they actually need to work on; over-flagging skips drowns the real misses in noise.
 
 GRADING AXES (each 0-100)
-- "pronunciation" — segmental accuracy of words that DID make it to the transcript. Use the audio for phoneme judgement (consonant pairs /θ vs s/, /v vs w/, voiced vs unvoiced th, /r vs l/, vowel length ship vs sheep, final-consonant voicing). Heavily penalise SCRIPT COVERAGE: if only 1 of 50 script words made it to the transcript, pronunciation cannot exceed ~10.
+- "pronunciation" — segmental accuracy of words that DID make it to the transcript. Use the audio for phoneme judgement (consonant pairs /θ vs s/, /v vs w/, voiced vs unvoiced th, /r vs l/, vowel length ship vs sheep, final-consonant voicing). Heavily penalise SCRIPT COVERAGE: if only 1 of 50 script words made it to the transcript, pronunciation cannot exceed ~10. Heavily penalise SUBSTITUTION DIVERGENCE: when the local transcript shows the recognizer heard a different word than the script (e.g. script says "viable" but transcript shows "available", script says "the helm chart's" but transcript shows "they have track"), that is direct evidence the learner mispronounced those words. Treat each substituted word as a pronunciation miss of equal weight to a skipped word. Rough guide: if more than ~30% of script words are substituted in the transcript, pronunciation cannot exceed ~60; more than ~50% substituted caps it at ~40; more than ~70% substituted caps it at ~20. Match-rate must dominate this score — a recording where most script words came back as different words in the transcript is a low-pronunciation recording, full stop.
 - "naturalness" — prosody on the words that were read. Stress placement, intonation contour, sentence-level rhythm. Lower when every syllable carries equal weight, when stress lands on the wrong word, or when intonation is flat. Also lower when most lines were skipped (you can't sound natural reading nothing).
 - "fluency" — flow. Pace, hesitation, restarts, audible reading-aloud tone. Use the duration ratio (recording vs target) and the number of script lines actually attempted. Skipping lines is the worst kind of disfluency -- score near 0 if most lines are missing.
 
@@ -76,10 +78,10 @@ Emit one entry in "lines" for every line in the script:
 - "idx": the 1-based line number from the script above.
 - "said": substring of the LOCAL TRANSCRIPT corresponding to this line, or "" if not attempted. NEVER copied from the script.
 - "tip": one specific actionable tip for that line. If the line was skipped, the tip is something like "Read this line next time; it was skipped entirely." Lead with the fix, no praise.
-- "problemWords": objects for words actually in the transcript that came out wrong. Empty array [] if the line was skipped or clean. EACH ENTRY MUST HAVE:
-    - "word": the misread word (lowercase, plain orthography).
-    - "phonemes": IPA phoneme SYMBOLS (without slashes) from the standard 44-phoneme English set, naming the specific sounds missed. e.g. ["θ"] for "thought", ["ð"] for "this". Empty array if you can't pin a specific phoneme.
-    - "reason": optional one-liner ("voiced th instead of voiceless", "primary stress on second syllable", "dropped the final /t/").
+- "problemWords": one entry for EVERY script word on this line that came out wrong in the transcript -- substitutions, slurs, dropped endings, wrong vowels. Walk through the line word by word; do not stop after one example. If the script line has four wrong words, this array has four entries. Empty array [] only when the line was skipped or read cleanly. EACH ENTRY MUST HAVE:
+    - "word": the script word that was misread (lowercase, plain orthography). Use the SCRIPT spelling, not what the recognizer heard.
+    - "phonemes": one to three IPA phoneme SYMBOLS (without slashes) naming ONLY the specific sound(s) that diverged on this word. Pick the minimum set that explains the miss. NEVER emit the full IPA transcription of the word -- e.g. for misread "understand" pinpoint the bad sound (["d"] if the final /d/ dropped, ["æ"] if the stressed vowel was wrong); do NOT emit ["ʌ","n","d","ə","s","t","æ","n","d"]. For "viable" → "available" the phonemes are ["v"] (the /v/ at the start was lost), not the whole IPA of "viable". Empty array [] if you genuinely cannot pin a specific phoneme; do NOT use that as a fallback for "I would have written all of them".
+    - "reason": optional one-liner ("voiced th instead of voiceless", "primary stress on second syllable", "dropped the final /t/", "heard as 'available' -- /v/ flattened to /b/").
 
 OUTPUT
 Emit ONE JSON object exactly matching this schema and NOTHING ELSE -- no prose, no markdown fences, no commentary:
@@ -97,7 +99,10 @@ Emit ONE JSON object exactly matching this schema and NOTHING ELSE -- no prose, 
       "said": "(substring of local transcript, or empty)",
       "tip": "...",
       "problemWords": [
-        { "word": "thought", "phonemes": ["θ"], "reason": "voiced th instead of voiceless" }
+        { "word": "modifying",  "phonemes": ["ŋ"], "reason": "dropped final -ing, heard as 'modified'" },
+        { "word": "helm",       "phonemes": ["h"], "reason": "heard as 'they', /h/ and /l/ collapsed" },
+        { "word": "viable",     "phonemes": ["v"], "reason": "heard as 'available', /v/ flattened to /b/" },
+        { "word": "us",         "phonemes": ["s"], "reason": "heard as 'first', final /s/ unclear" }
       ]
     }
   ]
