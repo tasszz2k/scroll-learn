@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.17.1](https://github.com/tasszz2k/scroll-learn/compare/v1.17.0...v1.17.1) (2026-05-01)
+
+
+### Bug Fixes
+
+* **shadow:** flag every substituted word in pron check, not just one ([3d5eae3](https://github.com/tasszz2k/scroll-learn/commit/3d5eae355aa36b86f504815af2dff4d93068fb0c))
+
 ## [1.17.0](https://github.com/tasszz2k/scroll-learn/compare/v1.16.1...v1.17.0) (2026-05-01)
 
 
