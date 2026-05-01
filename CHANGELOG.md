@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.17.3](https://github.com/tasszz2k/scroll-learn/compare/v1.17.2...v1.17.3) (2026-05-01)
+
+
+### Bug Fixes
+
+* **shadow:** use recognizer transcript as honesty anchor for pron check ([9be8801](https://github.com/tasszz2k/scroll-learn/commit/9be880159be8dfb0a03f2ce487f737f88eccd53d))
+
 ## [1.17.2](https://github.com/tasszz2k/scroll-learn/compare/v1.17.1...v1.17.2) (2026-05-01)
 
 
