@@ -4,6 +4,18 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.17.0](https://github.com/tasszz2k/scroll-learn/compare/v1.16.1...v1.17.0) (2026-05-01)
+
+
+### Features
+
+* **allowlist:** implicitly allow the extension's own pages for note capture ([66ef4a9](https://github.com/tasszz2k/scroll-learn/commit/66ef4a9955436cce21caa46c64e89228b3323efb))
+
+
+### Bug Fixes
+
+* **notebooks:** pin formatting toolbar and persist active notebook in side panel ([3fb1ac1](https://github.com/tasszz2k/scroll-learn/commit/3fb1ac12a558c8fca7452128b521b82f19f7b0c8))
+
 ## [1.16.1](https://github.com/tasszz2k/scroll-learn/compare/v1.16.0...v1.16.1) (2026-04-29)
 
 
