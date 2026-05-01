@@ -16,11 +16,11 @@ export interface PronCheckPromptParams {
   // Wall-clock recording length in seconds. Used as a fluency signal so the
   // model can compare actual pace to the script's target pace.
   durationSec: number;
-  // Authoritative ground-truth transcript captured by the browser's local
-  // SpeechRecognition during the recording. The chat UI's audio analysis is
-  // unreliable -- it tends to confabulate "Heard:" content from the script
-  // text in the prompt rather than from the audio. Including this transcript
-  // and forcing per-line `said` to be drawn from it stops that hallucination.
+  // The browser's webkitSpeechRecognition transcript. NOT sent to Gemini --
+  // the recognizer is unreliable on uncommon/technical vocabulary (e.g. it
+  // hears "helm" as "hand", "larges" as "latches") so feeding it as input
+  // poisons the per-word grade. Only its word count is forwarded as a
+  // coverage hint. The full text stays in the UI for the user's reference.
   localTranscript: string;
 }
 
@@ -32,13 +32,16 @@ export function buildPronCheckPrompt(params: PronCheckPromptParams): string {
   const totalWords = script.lines.reduce((sum, l) => sum + l.text.split(/\s+/).filter(Boolean).length, 0);
   const targetSeconds = script.durationSec;
   const transcript = (localTranscript ?? '').trim();
-  const transcriptBlock = transcript || '(empty -- the local recognizer caught no audible speech)';
+  const transcriptWordCount = transcript ? transcript.split(/\s+/).filter(Boolean).length : 0;
+  const coveragePct = totalWords > 0 ? Math.round((transcriptWordCount / totalWords) * 100) : 0;
 
   return `You are an English pronunciation coach. The learner read a shadowing-practice script aloud and you are grading their delivery.
 
-YOU HAVE TWO INPUTS:
+YOUR INPUTS
 1. The original SCRIPT below (what they were supposed to read).
-2. A LOCAL TRANSCRIPT below, captured live by the browser's speech recognizer during the recording. This is the AUTHORITATIVE GROUND TRUTH for what words were actually spoken. The audio file attached to this message is for phoneme/prosody quality only -- DO NOT invent words that aren't in the local transcript.
+2. The AUDIO FILE attached to this message. THIS IS THE GROUND TRUTH for what was said and how it was pronounced. Listen to it carefully end-to-end. Every grade and every per-word call you make MUST come from what you actually hear in the audio.
+
+A noisy second-hand transcript from the browser's webkitSpeechRecognition is intentionally NOT included in this prompt. That recognizer mis-hears uncommon and technical English words (e.g. "helm" as "hand", "Iris" as "arrest", "larges" as "latches", "DevX" as "devastated") so feeding it to you would penalise the learner for the recognizer's errors instead of their actual pronunciation. The only thing forwarded from the recognizer is a coverage count below; treat it as a sanity check, not as content.
 
 LEARNER CONTEXT
 - The learner is reading a shadowing-practice script aloud, ALL speaker turns delivered by ONE voice (their own). Do NOT grade character-voice consistency, accent matching, or impersonation.
@@ -50,38 +53,35 @@ SCRIPT (line index. SPEAKER: text)
 ${numbered}
 """
 
-LOCAL TRANSCRIPT (ground truth -- what was actually said)
-"""
-${transcriptBlock}
-"""
-
 RECORDING METADATA
 - Wall-clock recording length: ${durationSec} seconds.
 - Script's target duration at natural pace: ${targetSeconds} seconds (~${totalWords} words total).
-- A recording much longer than target suggests stalls, restarts, or word-by-word reading; much shorter suggests rushing or skipping lines.
+- Browser-recognizer coverage hint: caught roughly ${transcriptWordCount} word${transcriptWordCount === 1 ? '' : 's'} (~${coveragePct}% of script). This is a NOISY hint -- a low number can mean the learner skipped lines OR that the recognizer just didn't catch them; resolve the ambiguity by listening to the audio. Recording length much shorter than target ALSO suggests skipped lines.
 
 ANTI-HALLUCINATION RULES (READ THESE FIRST)
-- The per-line "said" field MUST be a substring of the LOCAL TRANSCRIPT. If a script line has NO matching fragment in the local transcript, "said" MUST be the empty string "" and the learner gets no credit for that line.
-- DO NOT copy script text into "said". DO NOT paraphrase the script. If the learner skipped a line, leave "said" empty.
-- If the local transcript is empty or only a couple of words while the script has many lines, the learner skipped most of the script. Set "pronunciation" near 0 and explain in "summary".
-- "problemWords" flags words that came out wrong (substituted by the recognizer for a different word, or audibly slurred/mispronounced). A SUBSTITUTION COUNTS even if the substituted word doesn't appear elsewhere in the transcript -- e.g. script "viable" heard as "available", script "the helm chart's" heard as "they have track", script "for us" heard as "first" are ALL substitutions and ALL must be flagged.
-- DISTINGUISH SUBSTITUTED FROM SKIPPED. A word is SUBSTITUTED only when the transcript span at its position contains a different word taking its slot. A word is SKIPPED when the transcript jumps from an earlier script word straight to a later one with nothing occupying the gap. Skipped words get NO entry in problemWords -- the line just gets a tip telling the learner to read it next time. Example: script "will those be enough for the AX Week demo" heard as "will tell me enough about that I asked quick demo" -- "those be" is substituted by "tell me" (flag both), but "for the AX Week" is skipped over to reach "demo" (do NOT flag those four; the line tip should call out the skip).
-- BE THOROUGH WITH PROBLEM WORDS. Walk every script line word by word, align each script word against the corresponding transcript span, and flag every SUBSTITUTED misalignment. Do not stop after one or two examples per line. If five words in a line came out as different words, the problemWords array for that line has five entries. Under-flagging substitutions deprives the learner of feedback on words they actually need to work on; over-flagging skips drowns the real misses in noise.
+- "said" MUST come from what you HEAR in the audio for that line. Quote the script word(s) when the audio matches them; quote what the learner actually said when they substituted; leave "" when the line is silent or unattempted in the audio.
+- If you do not hear a line attempted in the audio (silence, pause, or jump straight to a later line), "said" is "" and the line gets a "skipped" tip. Do NOT recover script text into "said" out of charity. Do NOT paraphrase the script.
+- If the audio contains very little speech relative to the script length (use the duration ratio and the recognizer coverage hint as a cross-check), set "pronunciation" near 0 and explain in "summary".
+
+PROBLEM WORDS (audio-driven, walk every line)
+- "problemWords" flags words the AUDIO shows came out wrong: mispronounced phonemes, the wrong word entirely, slurred, or with dropped endings. Decide entirely from the audio. The browser recognizer's notion of what was said is not available to you and is not the basis for these flags.
+- DISTINGUISH SUBSTITUTED FROM SKIPPED. A word is SUBSTITUTED when the audio shows the learner attempted that slot but produced a different/wrong word (or so distorted that you can't recognise it). A word is SKIPPED when the audio is silent at that slot, or jumps from an earlier word straight to a later one. Skipped words get NO entry in problemWords -- the line just gets a tip telling the learner to read it next time.
+- BE THOROUGH. Walk every script line word by word; for each script word, listen to its slot in the audio and decide: correct / substituted / skipped. Flag every SUBSTITUTED case. If five words in a line are substituted, the problemWords array has five entries. Do not stop after one or two examples. Under-flagging deprives the learner of feedback on words they actually need to work on.
 
 GRADING AXES (each 0-100)
-- "pronunciation" — segmental accuracy of words that DID make it to the transcript. Use the audio for phoneme judgement (consonant pairs /θ vs s/, /v vs w/, voiced vs unvoiced th, /r vs l/, vowel length ship vs sheep, final-consonant voicing). Heavily penalise SCRIPT COVERAGE: if only 1 of 50 script words made it to the transcript, pronunciation cannot exceed ~10. Heavily penalise SUBSTITUTION DIVERGENCE: when the local transcript shows the recognizer heard a different word than the script (e.g. script says "viable" but transcript shows "available", script says "the helm chart's" but transcript shows "they have track"), that is direct evidence the learner mispronounced those words. Treat each substituted word as a pronunciation miss of equal weight to a skipped word. Rough guide: if more than ~30% of script words are substituted in the transcript, pronunciation cannot exceed ~60; more than ~50% substituted caps it at ~40; more than ~70% substituted caps it at ~20. Match-rate must dominate this score — a recording where most script words came back as different words in the transcript is a low-pronunciation recording, full stop.
+- "pronunciation" — segmental accuracy of what you hear in the audio. Use phoneme cues (consonant pairs /θ vs s/, /v vs w/, voiced vs unvoiced th, /r vs l/, vowel length ship vs sheep, final-consonant voicing). Score should reflect what the audio sounds like, not the noisy recognizer. If the audio is clean and accurate, score high even if the recognizer would have mis-heard technical words. The dominant penalty is SKIP COVERAGE: lines/words that are silent or unattempted in the audio drag the score down proportionally. The secondary penalty is audio-confirmed mispronunciation.
 - "naturalness" — prosody on the words that were read. Stress placement, intonation contour, sentence-level rhythm. Lower when every syllable carries equal weight, when stress lands on the wrong word, or when intonation is flat. Also lower when most lines were skipped (you can't sound natural reading nothing).
 - "fluency" — flow. Pace, hesitation, restarts, audible reading-aloud tone. Use the duration ratio (recording vs target) and the number of script lines actually attempted. Skipping lines is the worst kind of disfluency -- score near 0 if most lines are missing.
 
 PER-LINE NOTES
 Emit one entry in "lines" for every line in the script:
 - "idx": the 1-based line number from the script above.
-- "said": substring of the LOCAL TRANSCRIPT corresponding to this line, or "" if not attempted. NEVER copied from the script.
-- "tip": one specific actionable tip for that line. If the line was skipped, the tip is something like "Read this line next time; it was skipped entirely." Lead with the fix, no praise.
-- "problemWords": one entry for EVERY script word on this line that came out wrong in the transcript -- substitutions, slurs, dropped endings, wrong vowels. Walk through the line word by word; do not stop after one example. If the script line has four wrong words, this array has four entries. Empty array [] only when the line was skipped or read cleanly. EACH ENTRY MUST HAVE:
-    - "word": the script word that was misread (lowercase, plain orthography). Use the SCRIPT spelling, not what the recognizer heard.
-    - "phonemes": one to three IPA phoneme SYMBOLS (without slashes) naming ONLY the specific sound(s) that diverged on this word. Pick the minimum set that explains the miss. NEVER emit the full IPA transcription of the word -- e.g. for misread "understand" pinpoint the bad sound (["d"] if the final /d/ dropped, ["æ"] if the stressed vowel was wrong); do NOT emit ["ʌ","n","d","ə","s","t","æ","n","d"]. For "viable" → "available" the phonemes are ["v"] (the /v/ at the start was lost), not the whole IPA of "viable". Empty array [] if you genuinely cannot pin a specific phoneme; do NOT use that as a fallback for "I would have written all of them".
-    - "reason": optional one-liner ("voiced th instead of voiceless", "primary stress on second syllable", "dropped the final /t/", "heard as 'available' -- /v/ flattened to /b/").
+- "said": what you HEAR the learner say for this line in the audio, or "" if not attempted. Quote the script wording when the audio matches; quote what was actually said when it was substituted. Never invented from the script.
+- "tip": one specific actionable tip for that line. If the line was skipped, the tip is something like "Read this line next time; it was skipped in the recording." Lead with the fix, no praise.
+- "problemWords": one entry for EVERY script word on this line that the AUDIO shows came out wrong -- substitutions, slurs, dropped endings, wrong vowels. Walk word by word, do not stop after one example. Empty array [] only when the line was skipped or read cleanly. EACH ENTRY MUST HAVE:
+    - "word": the script word that was misread (lowercase, plain orthography). Use the SCRIPT spelling.
+    - "phonemes": one to three IPA phoneme SYMBOLS (without slashes) naming ONLY the specific sound(s) that diverged on this word in the audio. Pick the minimum set that explains the miss. NEVER emit the full IPA transcription of the word -- e.g. for a mispronounced "understand" pinpoint the bad sound (["d"] if the final /d/ dropped, ["æ"] if the stressed vowel was wrong); do NOT emit ["ʌ","n","d","ə","s","t","æ","n","d"]. For "viable" produced as "available" the phonemes are ["v"] (the /v/ at the start was lost), not the whole IPA of "viable". Empty array [] if you genuinely cannot pin a specific phoneme; do NOT use that as a fallback for "I would have written all of them".
+    - "reason": optional one-liner ("voiced th instead of voiceless", "primary stress on second syllable", "dropped the final /t/", "/v/ flattened to /b/, sounded like 'available'").
 
 OUTPUT
 Emit ONE JSON object exactly matching this schema and NOTHING ELSE -- no prose, no markdown fences, no commentary:
@@ -96,13 +96,13 @@ Emit ONE JSON object exactly matching this schema and NOTHING ELSE -- no prose, 
   "lines": [
     {
       "idx": 1,
-      "said": "(substring of local transcript, or empty)",
+      "said": "(what you heard the learner say, or empty)",
       "tip": "...",
       "problemWords": [
-        { "word": "modifying",  "phonemes": ["ŋ"], "reason": "dropped final -ing, heard as 'modified'" },
-        { "word": "helm",       "phonemes": ["h"], "reason": "heard as 'they', /h/ and /l/ collapsed" },
-        { "word": "viable",     "phonemes": ["v"], "reason": "heard as 'available', /v/ flattened to /b/" },
-        { "word": "us",         "phonemes": ["s"], "reason": "heard as 'first', final /s/ unclear" }
+        { "word": "modifying",  "phonemes": ["ŋ"], "reason": "dropped final -ing" },
+        { "word": "helm",       "phonemes": ["h"], "reason": "/h/ and /l/ collapsed, came out closer to 'them'" },
+        { "word": "viable",     "phonemes": ["v"], "reason": "/v/ flattened to /b/" },
+        { "word": "us",         "phonemes": ["s"], "reason": "final /s/ unclear" }
       ]
     }
   ]
@@ -111,11 +111,11 @@ Emit ONE JSON object exactly matching this schema and NOTHING ELSE -- no prose, 
 CRITICAL CONSTRAINTS
 - Output the JSON object as the entire response. Do NOT wrap it in code fences.
 - Phoneme symbols MUST be IPA without slashes (e.g. "θ" not "/θ/").
-- "said" comes from the LOCAL TRANSCRIPT, never from the script. Empty when no match.
-- If the local transcript is empty, set every score to 0 and say so in "summary".
-- Be honest. A short, incomplete read should score low; a clean, complete read should score high.
+- Decide everything from the audio. The recognizer coverage count is a hint, not a content source.
+- If the audio is silent or contains no recognisable speech, set every score to 0 and say so in "summary".
+- Be honest. A short, incomplete, or mispronounced read should score low; a clean, complete read should score high even if the recognizer would have mis-heard technical words.
 
-Now grade and emit the JSON.`;
+Now listen to the audio and emit the JSON.`;
 }
 
 export type PronCheckParseResult =

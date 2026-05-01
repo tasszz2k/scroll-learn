@@ -42,15 +42,29 @@ describe('buildPronCheckPrompt', () => {
     expect(buildPronCheckPrompt(baseParams)).toContain('without slashes');
   });
 
-  it('embeds the local transcript verbatim as ground truth', () => {
+  it('does NOT embed the local transcript verbatim (audio is ground truth)', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('AUTHORITATIVE GROUND TRUTH');
-    expect(prompt).toContain('i thought you said this was open today right but they close on tuesdays');
+    expect(prompt).not.toContain('i thought you said this was open today right but they close on tuesdays');
   });
 
-  it('marks the transcript as empty when nothing was heard', () => {
+  it('declares the audio as the ground truth and the recognizer as a noisy hint only', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('AUDIO FILE');
+    expect(prompt).toContain('GROUND TRUTH');
+    expect(prompt).toContain('intentionally NOT included');
+    expect(prompt).toContain('webkitSpeechRecognition');
+  });
+
+  it('forwards a recognizer coverage count as a sanity-check hint', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    // baseParams transcript has 14 words across a 14-word script (100% coverage).
+    expect(prompt).toMatch(/Browser-recognizer coverage hint: caught roughly 14 words/);
+    expect(prompt).toMatch(/~100%/);
+  });
+
+  it('zeroes the coverage hint when the recognizer caught nothing', () => {
     const prompt = buildPronCheckPrompt({ ...baseParams, localTranscript: '' });
-    expect(prompt).toContain('the local recognizer caught no audible speech');
+    expect(prompt).toMatch(/caught roughly 0 words/);
   });
 
   it('reports recording duration and target duration', () => {
@@ -59,26 +73,24 @@ describe('buildPronCheckPrompt', () => {
     expect(prompt).toContain("Script's target duration at natural pace: 40 seconds");
   });
 
-  it('forbids hallucination of "said" content from the script', () => {
+  it('forbids hallucinating "said" content from the script', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('"said" field MUST be a substring of the LOCAL TRANSCRIPT');
-    expect(prompt).toContain('DO NOT copy script text into "said"');
+    expect(prompt).toContain('"said" MUST come from what you HEAR in the audio');
+    expect(prompt).toContain('Do NOT recover script text into "said" out of charity');
   });
 
   it('demands thorough problem-word flagging with a multi-substitution example', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('BE THOROUGH WITH PROBLEM WORDS');
+    expect(prompt).toContain('BE THOROUGH');
     expect(prompt).toContain('"viable"');
     expect(prompt).toContain('"helm"');
     expect(prompt).toContain('"modifying"');
   });
 
-  it('caps pronunciation by substitution divergence, not just by skipped words', () => {
+  it('drives problem-word flags from the audio, not the recognizer transcript', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('SUBSTITUTION DIVERGENCE');
-    expect(prompt).toContain('30%');
-    expect(prompt).toContain('50%');
-    expect(prompt).toContain('70%');
+    expect(prompt).toContain('audio-driven');
+    expect(prompt).toContain('Decide entirely from the audio');
   });
 
   it('forbids emitting the full IPA transcription of a word in phonemes', () => {
