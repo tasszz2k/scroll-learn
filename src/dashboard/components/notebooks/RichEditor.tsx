@@ -757,8 +757,6 @@ const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(function RichEd
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,
-        minHeight: 0,
-        overflow: 'auto',
       }}
     >
       <EditorContent editor={editor} className="notebook-rich-editor-host" />

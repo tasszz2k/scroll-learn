@@ -101,6 +101,22 @@ async function persistNotebookMetadata(
   return onSaveNotebook(metadata);
 }
 
+// localStorage key used in `embedded` mode (the side panel) to remember the
+// last-active notebook id across reloads. The dashboard uses the URL hash
+// (history.replaceState) for the same purpose; the side-panel document has
+// no addressable hash, so we fall back to localStorage. Mirrors the
+// `scrolllearn:sidebar:tab` convention from sidebar.tsx.
+const EMBEDDED_NOTEBOOK_STORAGE_KEY = 'scrolllearn:sidebar:notebook_id';
+
+function readEmbeddedNotebookId(): string | null {
+  try {
+    const stored = window.localStorage.getItem(EMBEDDED_NOTEBOOK_STORAGE_KEY);
+    return stored && stored.trim() ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function NotebooksPanel({
   notebooks,
   onSaveNotebook,
@@ -111,7 +127,18 @@ export default function NotebooksPanel({
   onPendingImport,
   initialNotebookId = null,
 }: NotebooksPanelProps) {
-  const [activeId, setActiveId] = useState<string | null>(initialNotebookId);
+  // Initial selection precedence:
+  //   1. Explicit deep link from the parent (`initialNotebookId`)
+  //   2. Embedded mode: the last id we persisted to localStorage on this
+  //      surface. The dashboard never falls into this branch; its parent
+  //      always feeds a non-null `initialNotebookId` derived from the URL
+  //      hash.
+  //   3. null -> the auto-select effect below picks `notebooks[0]`.
+  const [activeId, setActiveId] = useState<string | null>(() => {
+    if (initialNotebookId) return initialNotebookId;
+    if (embedded) return readEmbeddedNotebookId();
+    return null;
+  });
   // Dashboard-only "focus mode": hides the FolderTree side panel so the
   // editor uses the full available width. Toggled from the editor toolbar.
   // Embedded mode handles wide layout via a new tab instead.
@@ -172,6 +199,23 @@ export default function NotebooksPanel({
       } catch {
         /* SecurityError in some sandboxed iframes -- ignore */
       }
+    }
+  }, [activeId, embedded]);
+
+  // Embedded counterpart of the URL-hash sync above: the side panel has no
+  // addressable hash, so we mirror the active notebook id into localStorage
+  // instead. On reload the useState initializer reads the same key, so the
+  // side panel reopens on the notebook the user was last editing.
+  useEffect(() => {
+    if (!embedded) return;
+    try {
+      if (activeId) {
+        window.localStorage.setItem(EMBEDDED_NOTEBOOK_STORAGE_KEY, activeId);
+      } else {
+        window.localStorage.removeItem(EMBEDDED_NOTEBOOK_STORAGE_KEY);
+      }
+    } catch {
+      /* localStorage unavailable (privacy mode / quota) -- accept the loss */
     }
   }, [activeId, embedded]);
 
@@ -634,7 +678,7 @@ export default function NotebooksPanel({
             />
           </div>
         )}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
           {embedded && (
             <div
               style={{

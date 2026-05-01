@@ -115,8 +115,10 @@ export default function NotebookPreview({ body }: NotebookPreviewProps) {
       ref={containerRef}
       className="notebook-preview"
       style={{
-        flex: 1,
-        overflowY: 'auto',
+        // Size to content so the parent column scroll drives scrolling
+        // for long notebooks. The CSS class adds a min-height so empty
+        // previews still feel like a full canvas.
+        flex: '1 0 auto',
         padding: '24px 28px',
         fontFamily: "'Source Serif Pro', Georgia, serif",
         fontSize: 15,

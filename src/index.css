@@ -356,6 +356,11 @@ body {
  * ---------------------------------------------------------------- */
 .notebook-preview {
   line-height: var(--paper-line-h);
+  /* Match the rich-editor empty-state min-height so Read mode feels like
+     a full page even when the notebook is short. The parent column owns
+     scrolling; this just sets the floor. */
+  min-height: 60vh;
+  box-sizing: border-box;
 }
 .notebook-preview h1,
 .notebook-preview h2,
@@ -453,16 +458,23 @@ body {
  * ---------------------------------------------------------------- */
 .notebook-rich-editor {
   background: var(--paper);
+  /* Empty notebooks should still have a comfortable click target. The
+     editor body otherwise sizes to its content because the parent column
+     handles scrolling now (overflow lives on `.notebook-editor-scroll`,
+     not here). */
+  min-height: 60vh;
 }
 .notebook-rich-editor .ProseMirror {
-  flex: 1;
   outline: none;
   padding: 24px 28px;
   font-family: var(--font-serif);
   font-size: 15px;
   line-height: var(--paper-line-h);
   color: var(--ink);
+  /* Fill the wrapper at minimum so clicking anywhere lands focus, but
+     grow with content so the parent scroll container drives scrolling. */
   min-height: 100%;
+  box-sizing: border-box;
 }
 .notebook-rich-editor .ProseMirror:focus {
   outline: none;

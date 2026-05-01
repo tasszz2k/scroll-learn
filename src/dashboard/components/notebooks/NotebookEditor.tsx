@@ -528,7 +528,45 @@ function NotebookEditorImpl(
 
   return (
     <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+        {/* The whole editor column body (title, properties, sticky toolbar,
+            tip banner, and the rendered editor) lives inside a single
+            overflow-y: auto container so that:
+              1. The formatting toolbar (`notebook-sticky-bar` below) uses
+                 `position: sticky; top: 0` to stay pinned while the user
+                 scrolls long content. For sticky to actually engage, the
+                 toolbar must live inside the same scroll context as the
+                 content.
+              2. Title and properties scroll away with the content,
+                 reclaiming vertical space in the narrow side panel.
+            The footer stays outside this container so save status and
+            delete remain accessible at the bottom regardless of scroll
+            position.
+
+            CRITICAL: the side panel uses `min-height: 100%` on its shell
+            so the document itself can scroll for tabs like Chat. If we
+            sized the scroll container with plain flex, its height would
+            grow with the document and the inner overflow-y would never
+            engage; everything would scroll together at the document
+            level instead, leaving the toolbar to scroll out of view.
+            We pin the scroll container to the column with absolute
+            positioning inside a relatively-positioned flex slot. The
+            slot has flex: 1 + min-height: 0 so it gets a definite,
+            flex-resolved height; the absolute child fills that exact
+            box and creates a true inner scroll context that is
+            independent of document scroll. */}
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        <div
+          className="notebook-editor-scroll"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
         {/* Title row */}
         <div style={{ padding: '8px 18px 4px' }}>
           <input
@@ -575,92 +613,107 @@ function NotebookEditorImpl(
             buttons can scroll horizontally without dragging the tab row
             with them. The toolbar uses overflowX:auto + nowrap so even
             very narrow viewports show a single, scannable row instead
-            of wrapping into multiple lines. */}
+            of wrapping into multiple lines.
+
+            Both rows are wrapped in a single position:sticky container so
+            they stay pinned to the top of the scrollable editor column
+            while the user scrolls through long notebooks. The wrapper
+            has a paper background so scrolling content underneath does
+            not bleed through. */}
         <div
+          className="notebook-sticky-bar"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 12px 4px',
-            borderBottom: showToolbar ? 'none' : '1px solid var(--rule)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 5,
+            background: 'var(--paper)',
+            borderBottom: '1px solid var(--rule)',
           }}
         >
-          <div role="tablist" aria-label="View mode" style={{ display: 'flex', gap: 4 }}>
-            {VIEW_MODES.map((mode) => {
-              const active = viewMode === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => onViewModeChange(mode)}
-                  className={active ? 'btn btn-clay' : 'btn btn-ghost'}
-                  title={VIEW_MODE_TOOLTIPS[mode]}
-                  style={{ padding: '2px 12px', fontSize: 11 }}
-                >
-                  {VIEW_MODE_LABELS[mode]}
-                </button>
-              );
-            })}
-          </div>
-          {!showToolbar && extraToolbar && (
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-              {extraToolbar}
-            </div>
-          )}
-        </div>
-        {showToolbar && (
           <div
-            className="notebook-toolbar"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '0 12px 6px',
-              borderBottom: '1px solid var(--rule)',
-              overflowX: 'auto',
-              whiteSpace: 'nowrap',
+              gap: 8,
+              padding: '6px 12px 4px',
             }}
           >
-            {toolbarButtons.map((btn) => {
-              const active = isToolbarActive(btn);
-              return (
-                <button
-                  key={btn.id}
-                  type="button"
-                  title={btn.title}
-                  aria-label={btn.title}
-                  aria-pressed={active}
-                  onClick={() => dispatchToolbar(btn.id)}
-                  className={active ? 'btn btn-clay' : 'btn btn-ghost'}
+            <div role="tablist" aria-label="View mode" style={{ display: 'flex', gap: 4 }}>
+              {VIEW_MODES.map((mode) => {
+                const active = viewMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => onViewModeChange(mode)}
+                    className={active ? 'btn btn-clay' : 'btn btn-ghost'}
+                    title={VIEW_MODE_TOOLTIPS[mode]}
+                    style={{ padding: '2px 12px', fontSize: 11 }}
+                  >
+                    {VIEW_MODE_LABELS[mode]}
+                  </button>
+                );
+              })}
+            </div>
+            {!showToolbar && extraToolbar && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                {extraToolbar}
+              </div>
+            )}
+          </div>
+          {showToolbar && (
+            <div
+              className="notebook-toolbar"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '0 12px 6px',
+                overflowX: 'auto',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {toolbarButtons.map((btn) => {
+                const active = isToolbarActive(btn);
+                return (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    title={btn.title}
+                    aria-label={btn.title}
+                    aria-pressed={active}
+                    onClick={() => dispatchToolbar(btn.id)}
+                    className={active ? 'btn btn-clay' : 'btn btn-ghost'}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: 11,
+                      minWidth: 24,
+                      flex: '0 0 auto',
+                    }}
+                  >
+                    <span style={btn.labelStyle}>{btn.label}</span>
+                  </button>
+                );
+              })}
+              {extraToolbar && (
+                <span
                   style={{
-                    padding: '2px 6px',
-                    fontSize: 11,
-                    minWidth: 24,
+                    display: 'inline-flex',
+                    gap: 6,
+                    marginLeft: 10,
+                    paddingLeft: 10,
+                    borderLeft: '1px solid var(--rule)',
                     flex: '0 0 auto',
                   }}
                 >
-                  <span style={btn.labelStyle}>{btn.label}</span>
-                </button>
-              );
-            })}
-            {extraToolbar && (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  gap: 6,
-                  marginLeft: 10,
-                  paddingLeft: 10,
-                  borderLeft: '1px solid var(--rule)',
-                  flex: '0 0 auto',
-                }}
-              >
-                {extraToolbar}
-              </span>
-            )}
-          </div>
-        )}
+                  {extraToolbar}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* First-time tip banner for non-tech users */}
         {viewMode === 'format' && !hintDismissed && (
@@ -694,8 +747,19 @@ function NotebookEditorImpl(
           </div>
         )}
 
-        {/* Editor body / preview */}
-        <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
+        {/* Editor body / preview.
+            Lives inside the column scroll container above. The body
+            grows with its content (no internal overflow on RichEditor
+            or NotebookPreview anymore -- that scroll has moved up to
+            the column). `flex: '1 0 auto'` makes the body fill any
+            remaining vertical space when the notebook is short, so the
+            click target for empty notebooks is still tall, while
+            allowing the body to grow past the viewport when content is
+            long, which is what triggers the column scroll. The
+            markdown <textarea> keeps its native scroll because
+            <textarea> elements cannot grow to fit content; the
+            CSS-styled min-height ensures it still feels writable. */}
+        <div style={{ flex: '1 0 auto', display: 'flex', minHeight: 0, position: 'relative' }}>
           {viewMode === 'format' && (
             <RichEditor
               ref={richRef}
@@ -720,6 +784,7 @@ function NotebookEditorImpl(
               style={{
                 flex: 1,
                 minWidth: 0,
+                minHeight: '60vh',
                 border: 'none',
                 outline: 'none',
                 resize: 'none',
@@ -731,7 +796,7 @@ function NotebookEditorImpl(
             />
           )}
           {viewMode === 'read' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <NotebookPreview body={body} />
             </div>
           )}
@@ -744,6 +809,8 @@ function NotebookEditorImpl(
               onDismiss={closeSlashMenu}
             />
           )}
+        </div>
+        </div>
         </div>
 
         <footer
