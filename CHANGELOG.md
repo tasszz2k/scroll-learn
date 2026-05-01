@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.17.2](https://github.com/tasszz2k/scroll-learn/compare/v1.17.1...v1.17.2) (2026-05-01)
+
+
+### Bug Fixes
+
+* **shadow:** grade pron check from audio, not the noisy recognizer ([fe58507](https://github.com/tasszz2k/scroll-learn/commit/fe585077f92c302558a7f98bd6f61bf7d3827efa))
+
 ## [1.17.1](https://github.com/tasszz2k/scroll-learn/compare/v1.17.0...v1.17.1) (2026-05-01)
 
 
