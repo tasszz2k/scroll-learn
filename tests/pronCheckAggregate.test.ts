@@ -3,11 +3,20 @@ import {
   aggregateProblemPhonemes,
   aggregateProblemWords,
 } from '../src/dashboard/components/shadow/pronCheckAggregate';
-import type { PronCheckRun } from '../src/common/types';
+import type {
+  PronCheckConfidence,
+  PronCheckIssueType,
+  PronCheckRun,
+} from '../src/common/types';
 
 function makeRun(
   id: string,
-  problems: Array<{ word: string; phonemes: string[] }>,
+  problems: Array<{
+    word: string;
+    phonemes: string[];
+    confidence?: PronCheckConfidence;
+    issueType?: PronCheckIssueType;
+  }>,
 ): PronCheckRun {
   return {
     id,
@@ -21,7 +30,12 @@ function makeRun(
           idx: 0,
           said: '',
           tip: '',
-          problemWords: problems.map(p => ({ word: p.word, phonemes: p.phonemes })),
+          problemWords: problems.map(p => ({
+            word: p.word,
+            phonemes: p.phonemes,
+            ...(p.confidence ? { confidence: p.confidence } : {}),
+            ...(p.issueType ? { issueType: p.issueType } : {}),
+          })),
         },
       ],
     },
@@ -84,6 +98,27 @@ describe('aggregateProblemWords', () => {
     expect(out[0].count).toBe(3);
     expect([...out[0].phonemes].sort()).toEqual(['ɜː', 'θ'].sort());
   });
+
+  it('excludes low-confidence (uncertain ASR mismatch) entries from the practice plan', () => {
+    const runs = [
+      makeRun('r1', [
+        { word: 'thought', phonemes: ['θ'], confidence: 'high', issueType: 'pronunciation' },
+        { word: 'helm', phonemes: [], confidence: 'low', issueType: 'uncertain_asr_mismatch' },
+        { word: 'devx', phonemes: [], confidence: 'low', issueType: 'uncertain_asr_mismatch' },
+      ]),
+    ];
+    const out = aggregateProblemWords(runs);
+    expect(out.map(t => t.word)).toEqual(['thought']);
+  });
+
+  it('treats missing confidence/issueType as high-confidence (back-compat)', () => {
+    const runs = [
+      makeRun('r1', [{ word: 'thought', phonemes: ['θ'] }]), // legacy entry, no fields
+    ];
+    const out = aggregateProblemWords(runs);
+    expect(out).toHaveLength(1);
+    expect(out[0].word).toBe('thought');
+  });
 });
 
 describe('aggregateProblemPhonemes', () => {
@@ -105,6 +140,17 @@ describe('aggregateProblemPhonemes', () => {
     const out = aggregateProblemPhonemes(runs);
     // both count=1; lastRunIndex y=1 > x=0
     expect(out.map(t => t.symbol)).toEqual(['y', 'x']);
+  });
+
+  it('excludes low-confidence entries from the phoneme tally', () => {
+    const runs = [
+      makeRun('r1', [
+        { word: 'thought', phonemes: ['θ'], confidence: 'high' },
+        { word: 'helm', phonemes: ['h'], confidence: 'low', issueType: 'uncertain_asr_mismatch' },
+      ]),
+    ];
+    const out = aggregateProblemPhonemes(runs);
+    expect(out.map(t => t.symbol)).toEqual(['θ']);
   });
 
   it('returns [] for runs with no problemWords', () => {

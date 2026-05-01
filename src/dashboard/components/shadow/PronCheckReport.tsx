@@ -104,45 +104,70 @@ export default function PronCheckReportView({ script, report, onDrillPhoneme }: 
 
                 {note.problemWords.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
-                    {note.problemWords.map((pw, j) => (
-                      <span
-                        key={j}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          padding: '2px 8px',
-                          fontSize: 12,
-                          background: 'rgba(201, 100, 66, 0.08)',
-                          border: '1px solid var(--clay, #C96442)',
-                          borderRadius: 999,
-                          color: 'var(--clay-deep, #b1502d)',
-                        }}
-                        title={pw.reason || undefined}
-                      >
-                        <span style={{ fontWeight: 600 }}>{pw.word}</span>
-                        {pw.phonemes.map(sym => (
-                          <button
-                            key={sym}
-                            type="button"
-                            onClick={() => onDrillPhoneme?.(sym)}
-                            className="mono"
-                            title={onDrillPhoneme ? `Drill /${sym}/ in the Foundation tab` : `/${sym}/`}
-                            style={{
-                              padding: '0 4px',
-                              fontSize: 11,
-                              background: 'transparent',
-                              border: '1px solid var(--clay, #C96442)',
-                              borderRadius: 999,
-                              color: 'var(--clay-deep, #b1502d)',
-                              cursor: onDrillPhoneme ? 'pointer' : 'default',
-                            }}
-                          >
-                            /{sym}/
-                          </button>
-                        ))}
-                      </span>
-                    ))}
+                    {note.problemWords.map((pw, j) => {
+                      const isUncertain = pw.confidence === 'low' || pw.issueType === 'uncertain_asr_mismatch';
+                      const borderColor = isUncertain ? 'var(--ink-4, #8a7e6c)' : 'var(--clay, #C96442)';
+                      const textColor = isUncertain ? 'var(--ink-2)' : 'var(--clay-deep, #b1502d)';
+                      const bg = isUncertain ? 'rgba(138, 126, 108, 0.08)' : 'rgba(201, 100, 66, 0.08)';
+                      const tooltip = pw.reason
+                        ? (isUncertain && pw.asrHeard
+                          ? `Recognizer heard "${pw.asrHeard}" -- possibly an ASR slip. ${pw.reason}`
+                          : pw.reason)
+                        : undefined;
+                      return (
+                        <span
+                          key={j}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '2px 8px',
+                            fontSize: 12,
+                            background: bg,
+                            border: `1px ${isUncertain ? 'dashed' : 'solid'} ${borderColor}`,
+                            borderRadius: 999,
+                            color: textColor,
+                            opacity: isUncertain ? 0.85 : 1,
+                          }}
+                          title={tooltip}
+                        >
+                          <span style={{ fontWeight: 600 }}>{pw.word}</span>
+                          {pw.phonemes.map(sym => (
+                            <button
+                              key={sym}
+                              type="button"
+                              onClick={() => onDrillPhoneme?.(sym)}
+                              className="mono"
+                              title={onDrillPhoneme ? `Drill /${sym}/ in the Foundation tab` : `/${sym}/`}
+                              style={{
+                                padding: '0 4px',
+                                fontSize: 11,
+                                background: 'transparent',
+                                border: `1px ${isUncertain ? 'dashed' : 'solid'} ${borderColor}`,
+                                borderRadius: 999,
+                                color: textColor,
+                                cursor: onDrillPhoneme ? 'pointer' : 'default',
+                              }}
+                            >
+                              /{sym}/
+                            </button>
+                          ))}
+                          {isUncertain && (
+                            <span
+                              className="mono"
+                              style={{
+                                fontSize: 10,
+                                opacity: 0.75,
+                                fontStyle: 'italic',
+                              }}
+                              title="The browser recognizer heard a different word, but the audio may be fine. Treat as a soft hint, not a confirmed miss."
+                            >
+                              maybe
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 

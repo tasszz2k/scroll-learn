@@ -73,16 +73,37 @@ describe('buildPronCheckPrompt', () => {
     expect(prompt).toContain('that is almost always a hallucination');
   });
 
-  it('declares cross-check rules for resolving transcript-vs-audio disagreements', () => {
+  it('classifies problem words into three buckets', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('CROSS-CHECK RULES');
-    expect(prompt).toContain('When transcript and audio AGREE');
-    expect(prompt).toContain('typical failure on uncommon/technical vocabulary');
+    expect(prompt).toContain('BUCKET 1');
+    expect(prompt).toContain('BUCKET 2');
+    expect(prompt).toContain('BUCKET 3');
+    expect(prompt).toContain('HIGH-CONFIDENCE PRONUNCIATION ISSUE');
+    expect(prompt).toContain('UNCERTAIN ASR MISMATCH');
+    expect(prompt).toContain('TRANSCRIPT-ONLY MISMATCH ON A REGULAR WORD');
   });
 
-  it('demands thorough problem-word flagging with a multi-substitution example', () => {
+  it('lists known ASR-failure categories and forbids transcript-only flags for them', () => {
     const prompt = buildPronCheckPrompt(baseParams);
-    expect(prompt).toContain('BE THOROUGH');
+    expect(prompt).toContain('KNOWN ASR-FAILURE CATEGORIES');
+    expect(prompt).toContain('Iris');
+    expect(prompt).toContain('DevX');
+    expect(prompt).toContain('helm');
+  });
+
+  it('forbids reverse-engineering phonemes from the substitute word', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('DO NOT reverse-engineer phonemes from the substitute');
+  });
+
+  it('weights bucket-2 entries softly in the score', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('do NOT count strongly against the score');
+  });
+
+  it('demands a per-line walk and embeds a multi-entry example', () => {
+    const prompt = buildPronCheckPrompt(baseParams);
+    expect(prompt).toContain('WALK EVERY LINE');
     expect(prompt).toContain('"viable"');
     expect(prompt).toContain('"helm"');
     expect(prompt).toContain('"modifying"');
@@ -97,7 +118,8 @@ describe('buildPronCheckPrompt', () => {
   it('distinguishes substituted words (flag) from skipped words (do not flag)', () => {
     const prompt = buildPronCheckPrompt(baseParams);
     expect(prompt).toContain('DISTINGUISH SUBSTITUTED FROM SKIPPED');
-    expect(prompt).toContain('Skipped words get NO entry in problemWords');
+    expect(prompt).toContain('SKIPPED word');
+    expect(prompt).toContain('gets NO entry');
   });
 
   it('warns that a perfect-script "said" indicates confabulation', () => {
@@ -157,6 +179,53 @@ describe('parsePronCheckJSON', () => {
   it('rejects when scores are missing entirely', () => {
     const r = parsePronCheckJSON(JSON.stringify({ summary: 'x', lines: [] }));
     expect(r.ok).toBe(false);
+  });
+
+  it('preserves confidence/issueType/asrHeard fields when present', () => {
+    const raw = JSON.stringify({
+      scores: { pronunciation: 70, naturalness: 70, fluency: 70 },
+      summary: '',
+      lines: [
+        {
+          idx: 1, said: 'honestly modifying the ham chance', tip: '',
+          problemWords: [
+            { word: 'modifying', phonemes: ['ŋ'], reason: 'dropped final -ing', confidence: 'high', issueType: 'pronunciation' },
+            { word: 'helm', phonemes: [], reason: 'recognizer heard ham', confidence: 'low', issueType: 'uncertain_asr_mismatch', asrHeard: 'ham' },
+          ],
+        },
+      ],
+    });
+    const r = parsePronCheckJSON(raw);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const [hi, lo] = r.report.lines[0].problemWords;
+    expect(hi.confidence).toBe('high');
+    expect(hi.issueType).toBe('pronunciation');
+    expect(hi.asrHeard).toBeUndefined();
+    expect(lo.confidence).toBe('low');
+    expect(lo.issueType).toBe('uncertain_asr_mismatch');
+    expect(lo.asrHeard).toBe('ham');
+  });
+
+  it('drops invalid confidence/issueType values silently (back-compat default)', () => {
+    const raw = JSON.stringify({
+      scores: { pronunciation: 70, naturalness: 70, fluency: 70 },
+      summary: '',
+      lines: [
+        {
+          idx: 1, said: '', tip: '',
+          problemWords: [
+            { word: 'thought', phonemes: ['θ'], confidence: 'medium', issueType: 'something_else' },
+          ],
+        },
+      ],
+    });
+    const r = parsePronCheckJSON(raw);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const pw = r.report.lines[0].problemWords[0];
+    expect(pw.confidence).toBeUndefined();
+    expect(pw.issueType).toBeUndefined();
   });
 
   it('coerces a plain-string problemWord to an object with empty phonemes', () => {

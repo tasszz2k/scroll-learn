@@ -556,10 +556,27 @@ export interface PronCheckScores {
 // problemWords carries the IPA tag(s) Gemini flagged for that miss, so
 // aggregation can roll up by phoneme as well as by word. Empty phonemes[]
 // is allowed (e.g. wrong word entirely, no specific phoneme blame).
+//
+// Each flag falls into one of two buckets:
+//   - 'pronunciation' (confidence 'high'): audio-confirmed phoneme-level error.
+//   - 'uncertain_asr_mismatch' (confidence 'low'): the recognizer heard a
+//     substitute but the audio didn't clearly show a mispronunciation; common
+//     on proper nouns, acronyms, and technical vocab where the browser's ASR
+//     fails on its own. These are surfaced to the learner with a softer label
+//     and excluded from the practice-plan tallies.
+// All bucket fields are optional for back-compat with older stored runs;
+// renderers and aggregators default to confidence 'high' / type 'pronunciation'
+// when missing.
+export type PronCheckConfidence = 'high' | 'low';
+export type PronCheckIssueType = 'pronunciation' | 'uncertain_asr_mismatch';
+
 export interface PronCheckProblemWord {
   word: string;
   phonemes: string[];        // IPA symbols without slashes, e.g. ['θ']
   reason?: string;           // optional one-liner
+  confidence?: PronCheckConfidence;
+  issueType?: PronCheckIssueType;
+  asrHeard?: string;         // what the browser recognizer caught here, if applicable
 }
 
 export interface PronCheckLineNote {

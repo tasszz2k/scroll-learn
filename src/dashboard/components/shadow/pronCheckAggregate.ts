@@ -25,6 +25,15 @@ function normalizePhoneme(s: string): string {
   return s.replace(/^\/|\/$/g, '').trim();
 }
 
+// Practice plan should focus on confirmed pronunciation issues, not on words
+// the recognizer just mis-heard. Treat missing confidence as 'high' for
+// back-compat with stored runs from before the three-bucket schema landed.
+function isCountableForPlan(pw: { confidence?: string; issueType?: string }): boolean {
+  if (pw.confidence === 'low') return false;
+  if (pw.issueType === 'uncertain_asr_mismatch') return false;
+  return true;
+}
+
 export function aggregateProblemWords(runs: PronCheckRun[]): ProblemWordTally[] {
   const map = new Map<string, ProblemWordTally>();
   for (let runIdx = 0; runIdx < runs.length; runIdx++) {
@@ -33,6 +42,7 @@ export function aggregateProblemWords(runs: PronCheckRun[]): ProblemWordTally[] 
     for (const line of run.report.lines) {
       if (!Array.isArray(line.problemWords)) continue;
       for (const pw of line.problemWords) {
+        if (!isCountableForPlan(pw)) continue;
         const word = normalizeWord(pw.word ?? '');
         if (!word) continue;
         const phs = (Array.isArray(pw.phonemes) ? pw.phonemes : [])
@@ -70,6 +80,7 @@ export function aggregateProblemPhonemes(runs: PronCheckRun[]): ProblemPhonemeTa
     for (const line of run.report.lines) {
       if (!Array.isArray(line.problemWords)) continue;
       for (const pw of line.problemWords) {
+        if (!isCountableForPlan(pw)) continue;
         const phs = (Array.isArray(pw.phonemes) ? pw.phonemes : [])
           .map(normalizePhoneme)
           .filter(Boolean);

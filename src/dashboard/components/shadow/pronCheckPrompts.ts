@@ -70,20 +70,45 @@ ANTI-HALLUCINATION RULES (READ THESE FIRST)
 - If the local transcript shows no fragment for a line and the audio at that timestamp is silent/skipped, "said" is "" and the line gets a "skipped" tip. Do NOT recover script text into "said" out of charity.
 - If the local transcript is empty or only a couple of words while the script has many lines, the learner skipped most of the script. Set "pronunciation" near 0 and explain in "summary".
 
-CROSS-CHECK RULES (transcript vs audio)
-- When transcript and audio AGREE that a word matches the script: clean read, no flag.
-- When transcript and audio AGREE that a word was substituted/wrong: clear miss, flag it.
-- When transcript shows a substitution but the audio sounds correct to you: this is the recognizer's typical failure on uncommon/technical vocabulary. Listen ONE MORE TIME with skepticism -- if the audio is unambiguously the script word with clean phonemes, give credit (no flag). If the audio is at all unclear, flag it; the recognizer's mishearing is evidence the word was below the intelligibility bar.
-- When transcript shows the script word but the audio sounds wrong: trust the audio, flag it. (Rare; recognizers usually don't auto-correct toward the script.)
-- When transcript shows a word that the audio also sounds like: this is the OPPOSITE of confabulation -- two independent sources agree the learner said something other than the script word. ALWAYS flag this.
+CLASSIFY EVERY POTENTIAL PROBLEM WORD INTO ONE OF THREE BUCKETS
+Most pronunciation-coach mistakes come from treating ASR substitutions as pronunciation diagnoses. To prevent that, classify every script word that DIDN'T match the script in either source into one of three buckets. Only buckets 1 and 2 emit problemWords; bucket 3 is silent.
 
-PROBLEM WORDS (walk every line)
-- "problemWords" flags words that came out wrong, decided by the cross-check rules above. Empty array [] only when the line was skipped or read cleanly.
-- DISTINGUISH SUBSTITUTED FROM SKIPPED. SUBSTITUTED: audio shows the learner attempted that slot with a different/wrong word, or both transcript and audio attest to a substitution. SKIPPED: the audio is silent at that slot AND the transcript shows nothing in that span. Skipped words get NO entry in problemWords -- the line just gets a tip telling the learner to read it next time.
-- BE THOROUGH. Walk every script line word by word; for each script word, run the cross-check. Flag every SUBSTITUTED case. If five words in a line are substituted, the problemWords array has five entries. Do not stop after one or two examples.
+BUCKET 1 -- HIGH-CONFIDENCE PRONUNCIATION ISSUE
+Emit with: confidence:"high", issueType:"pronunciation".
+- The AUDIO clearly shows a phoneme-level error you can NAME (consonant pair, vowel quality/length, dropped ending, stress, syllable elision).
+- "reason" describes the audible feature in phonetic terms.
+- "phonemes" lists the diverged IPA symbols (1-3) that match the named feature.
+- Whether the transcript also shows the substitution or not is secondary; audio is the deciding source.
+- Example: { "word":"thought", "phonemes":["θ"], "reason":"voiced /ð/ instead of voiceless /θ/", "confidence":"high", "issueType":"pronunciation" }
+
+BUCKET 2 -- UNCERTAIN ASR MISMATCH (possibly a recognition error)
+Emit with: confidence:"low", issueType:"uncertain_asr_mismatch", asrHeard:"<recognizer's substitute>".
+- The TRANSCRIPT shows a substitution but the AUDIO either sounds correct, or you cannot point to a specific audible phoneme issue.
+- Use this bucket WHENEVER the script word is in a known ASR-failure category (see below) and the only signal is the transcript.
+- "reason" must call out the uncertainty, e.g. "Recognizer heard 'ham', audio not clearly mispronounced -- may be a recognition error. If you want to be sure, exaggerate the /l/ in 'helm'."
+- "phonemes" MAY be empty; if you tentatively suggest one, keep it short.
+- The tip on the line should be softened with phrasing like "may be a recognition error" or "if it is your pronunciation, try ...".
+
+BUCKET 3 -- TRANSCRIPT-ONLY MISMATCH ON A REGULAR WORD (do NOT emit)
+- The transcript shows a different word, the audio sounds clean, and the script word is NOT in a known ASR-failure category. The recognizer probably just slipped. Emit nothing for this word; it must not appear in problemWords and must not affect the score.
+
+KNOWN ASR-FAILURE CATEGORIES (transcript-only mismatch goes to bucket 2, never bucket 1)
+- Proper nouns and named entities: Iris, DevX, AX, Week, GitHub, Linux, Anthropic, etc.
+- Acronyms and initialisms: AX, DevX, IBM, REST, JSON, etc.
+- Domain/technical vocabulary in this script: helm, chart's (in the helm-chart sense), repo, larges, mediums (count noun), provisioning, runner (CI runner), workload, contention.
+- Compound technical phrases: "helm chart's", "AX Week demo", "DevX ticket", "Iris repo", "runner contention", "validation isn't", "increased workload".
+For these, the browser's webkitSpeechRecognition routinely produces wildly wrong substitutions (helm→ham, Iris→arrest, DevX→debit/devastated, larges→largest/latches, viable→vibration) even when the learner said them clearly. The transcript mismatch by itself is NOT a pronunciation diagnosis.
+
+EVIDENCE DISCIPLINE (prevents the most common failure mode)
+- DO NOT reverse-engineer phonemes from the substitute word's spelling. If the recognizer heard "vibration" for "viable", that is NOT evidence the learner mispronounced /aɪ/ or /ə/; it is evidence the recognizer failed. The phonemes in any flag must describe what you can audibly hear in the learner saying the SCRIPT word, not the substitute's IPA.
+- A "reason" of the form "heard as <substitute>" or "transcript heard <X>" with no audible phoneme cited is insufficient for bucket 1. It belongs in bucket 2 (with asrHeard) or bucket 3 (silent).
+
+WALK EVERY LINE
+For each script line, walk word by word. For each, classify into bucket 1, 2, or 3. Emit one entry per word that lands in 1 or 2; nothing for 3 or for clean reads. The problemWords array can mix high- and low-confidence entries on the same line.
+- DISTINGUISH SUBSTITUTED FROM SKIPPED. A SKIPPED word (silent in audio AND missing from transcript) gets NO entry; the line tip notes the skip. SUBSTITUTED words are buckets 1 or 2 per the rules above.
 
 GRADING AXES (each 0-100)
-- "pronunciation" — segmental accuracy of what you hear in the audio. Use phoneme cues (consonant pairs /θ vs s/, /v vs w/, voiced vs unvoiced th, /r vs l/, vowel length ship vs sheep, final-consonant voicing). The dominant penalty is SKIP COVERAGE: lines or word-spans that are silent or unattempted in the audio drag the score down proportionally to how much was skipped. The secondary penalty is mispronunciation per the cross-check rules. Do NOT score high just because the script is in the prompt -- score what the audio actually sounds like.
+- "pronunciation" — segmental accuracy of what you hear in the audio. Use phoneme cues (consonant pairs /θ vs s/, /v vs w/, voiced vs unvoiced th, /r vs l/, vowel length ship vs sheep, final-consonant voicing). The dominant penalty is SKIP COVERAGE: lines or word-spans that are silent or unattempted in the audio drag the score down proportionally to how much was skipped. The secondary penalty is BUCKET-1 (high-confidence) mispronunciations -- each one nudges the score down. BUCKET-2 (low-confidence / uncertain ASR mismatch) entries do NOT count strongly against the score; mention them in the "summary" as practice areas without docking points. Do NOT score high just because the script is in the prompt -- score what the audio actually sounds like.
 - "naturalness" — prosody on the words that were read. Stress placement, intonation contour, sentence-level rhythm. Lower when every syllable carries equal weight, when stress lands on the wrong word, or when intonation is flat. Also lower when most lines were skipped (you can't sound natural reading nothing).
 - "fluency" — flow. Pace, hesitation, restarts, audible reading-aloud tone. Use the duration ratio (recording vs target) and the number of script lines actually attempted. Skipping lines is the worst kind of disfluency -- score near 0 if most lines are missing.
 
@@ -92,10 +117,13 @@ Emit one entry in "lines" for every line in the script:
 - "idx": the 1-based line number from the script above.
 - "said": what was actually heard for this line -- drawn from the local transcript span and/or the audio, NEVER copied from the script. Use "" if not attempted. If your "said" is letter-for-letter identical to the script line, double-check; that is almost always a hallucination.
 - "tip": one specific actionable tip for that line. If the line was skipped, the tip is something like "Read this line next time; it was skipped in the recording." Lead with the fix, no praise.
-- "problemWords": one entry for EVERY script word on this line that came out wrong per the cross-check rules. Walk word by word, do not stop after one example. EACH ENTRY MUST HAVE:
-    - "word": the script word that was misread (lowercase, plain orthography). Use the SCRIPT spelling, not what the recognizer or audio produced.
-    - "phonemes": one to three IPA phoneme SYMBOLS (without slashes) naming ONLY the specific sound(s) that diverged. Pick the minimum set that explains the miss. NEVER emit the full IPA transcription of the word -- e.g. for a mispronounced "understand" pinpoint the bad sound (["d"] if the final /d/ dropped, ["æ"] if the stressed vowel was wrong); do NOT emit ["ʌ","n","d","ə","s","t","æ","n","d"]. For "viable" produced as "available" the phonemes are ["v"] (the /v/ at the start was lost), not the whole IPA of "viable". Empty array [] if you genuinely cannot pin a specific phoneme.
-    - "reason": optional one-liner ("voiced th instead of voiceless", "primary stress on second syllable", "dropped the final /t/", "/v/ flattened to /b/, sounded like 'available'").
+- "problemWords": one entry for every script word that lands in bucket 1 or bucket 2 per the rules above. Walk word by word; mix bucket-1 and bucket-2 entries freely on the same line. EACH ENTRY MUST HAVE:
+    - "word": the script word that was flagged (lowercase, plain orthography). Use the SCRIPT spelling.
+    - "phonemes": for bucket 1, one to three IPA phoneme SYMBOLS (without slashes) naming ONLY the specific sound(s) that diverged in the audio. Pick the minimum set that explains the miss. NEVER emit the full IPA transcription of the word. For bucket 2, [] is fine; only include a phoneme if you have a tentative audible reason to suggest one. NEVER reverse-engineer phonemes from the substitute word's spelling.
+    - "reason": REQUIRED. For bucket 1, describe the audible phonetic feature ("voiced /ð/ instead of voiceless /θ/", "final /s/ dropped", "primary stress on the second syllable"). For bucket 2, call out the uncertainty ("Recognizer heard 'ham', audio not clearly mispronounced -- may be a recognition error. If you want to be sure, exaggerate the /l/ in 'helm'."). Do NOT use bare-substitute reasons like "heard as 'ham'" with no phonetic content.
+    - "confidence": "high" for bucket 1, "low" for bucket 2.
+    - "issueType": "pronunciation" for bucket 1, "uncertain_asr_mismatch" for bucket 2.
+    - "asrHeard": REQUIRED for bucket 2 (the recognizer's substitute word/phrase). Optional for bucket 1; include if it helps the learner. Omit when not applicable.
 
 OUTPUT
 Emit ONE JSON object exactly matching this schema and NOTHING ELSE -- no prose, no markdown fences, no commentary:
@@ -113,10 +141,10 @@ Emit ONE JSON object exactly matching this schema and NOTHING ELSE -- no prose, 
       "said": "(what was actually heard, drawn from transcript and/or audio; not the script)",
       "tip": "...",
       "problemWords": [
-        { "word": "modifying",  "phonemes": ["ŋ"], "reason": "dropped final -ing" },
-        { "word": "helm",       "phonemes": ["h"], "reason": "transcript heard 'ham', audio confirms /h/ and /l/ collapsed" },
-        { "word": "viable",     "phonemes": ["v"], "reason": "/v/ flattened to /b/" },
-        { "word": "us",         "phonemes": ["s"], "reason": "final /s/ unclear" }
+        { "word": "modifying", "phonemes": ["ŋ"], "reason": "dropped final -ing", "confidence": "high", "issueType": "pronunciation" },
+        { "word": "helm",      "phonemes": [],    "reason": "Recognizer heard 'ham', audio not clearly mispronounced -- may be a recognition error. If you want to be sure, exaggerate the /l/ in 'helm'.", "asrHeard": "ham", "confidence": "low", "issueType": "uncertain_asr_mismatch" },
+        { "word": "viable",    "phonemes": [],    "reason": "Recognizer heard 'vibration'; audio sounded like 'viable'. Likely an ASR slip on a less-common word.", "asrHeard": "vibration", "confidence": "low", "issueType": "uncertain_asr_mismatch" },
+        { "word": "us",        "phonemes": ["s"], "reason": "final /s/ dropped", "confidence": "high", "issueType": "pronunciation" }
       ]
     }
   ]
@@ -163,8 +191,15 @@ function coerceProblemWord(raw: unknown): PronCheckProblemWord | null {
     .map(p => p.replace(/^\/|\/$/g, '').trim())
     .filter(Boolean);
   const reason = typeof o.reason === 'string' && o.reason.trim() ? o.reason.trim() : undefined;
+  const confidence = o.confidence === 'high' || o.confidence === 'low' ? o.confidence : undefined;
+  const issueType =
+    o.issueType === 'pronunciation' || o.issueType === 'uncertain_asr_mismatch' ? o.issueType : undefined;
+  const asrHeard = typeof o.asrHeard === 'string' && o.asrHeard.trim() ? o.asrHeard.trim() : undefined;
   const out: PronCheckProblemWord = { word: word.toLowerCase(), phonemes };
   if (reason) out.reason = reason;
+  if (confidence) out.confidence = confidence;
+  if (issueType) out.issueType = issueType;
+  if (asrHeard) out.asrHeard = asrHeard;
   return out;
 }
 
