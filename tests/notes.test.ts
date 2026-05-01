@@ -10,6 +10,7 @@ import {
 import { createNote, STORAGE_KEYS } from '../src/common/types';
 import {
   entryMatches,
+  isExtensionHost,
   isHostAllowed,
   parseRegexEntry,
   validateAllowlistEntry,
@@ -259,6 +260,24 @@ describe('allowlist matching', () => {
     expect(isHostAllowed(list, 'example.com')).toBe(true);
     expect(isHostAllowed(list, 'en.wikipedia.org')).toBe(true);
     expect(isHostAllowed(list, 'reddit.com')).toBe(false);
+  });
+
+  it('isExtensionHost matches the extension id case-insensitively', () => {
+    expect(isExtensionHost('bjfaiogfllkpkjofncfloipkbgbhambh', 'bjfaiogfllkpkjofncfloipkbgbhambh')).toBe(true);
+    expect(isExtensionHost('BJFAIOGFLLKPKJOFNCFLOIPKBGBHAMBH', 'bjfaiogfllkpkjofncfloipkbgbhambh')).toBe(true);
+    expect(isExtensionHost('example.com', 'bjfaiogfllkpkjofncfloipkbgbhambh')).toBe(false);
+    expect(isExtensionHost('bjfaiogfllkpkjofncfloipkbgbhambh', null)).toBe(false);
+    expect(isExtensionHost('bjfaiogfllkpkjofncfloipkbgbhambh', undefined)).toBe(false);
+  });
+
+  it('isHostAllowed implicitly allows the extension\'s own host without a manual entry', () => {
+    const list: string[] = [];
+    const extensionId = 'bjfaiogfllkpkjofncfloipkbgbhambh';
+    expect(isHostAllowed(list, extensionId, extensionId)).toBe(true);
+    expect(isHostAllowed(list, extensionId.toUpperCase(), extensionId)).toBe(true);
+    expect(isHostAllowed(list, 'example.com', extensionId)).toBe(false);
+    // Without an extension id, the legacy behaviour is preserved.
+    expect(isHostAllowed(list, extensionId)).toBe(false);
   });
 
   it('validateAllowlistEntry flags invalid regex but accepts valid ones', () => {

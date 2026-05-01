@@ -31,7 +31,28 @@ export function entryMatches(entry: string, host: string): boolean {
   return trimmed.toLowerCase() === host;
 }
 
-export function isHostAllowed(allowlist: readonly string[], host: string): boolean {
+// True if `host` is the extension's own id (i.e. the page lives under
+// `chrome-extension://<extensionId>/...`). Centralized here so callers don't
+// each re-derive the comparison and so it stays unit-testable without the
+// `chrome` global.
+export function isExtensionHost(
+  host: string,
+  extensionId: string | null | undefined,
+): boolean {
+  if (!extensionId) return false;
+  return host.trim().toLowerCase() === extensionId.trim().toLowerCase();
+}
+
+export function isHostAllowed(
+  allowlist: readonly string[],
+  host: string,
+  // The extension's own pages (chrome-extension://<id>/...) are always
+  // allowed for note capture so the user never has to add the volatile
+  // extension id by hand. Callers in extension contexts pass
+  // `chrome.runtime.id`; callers in tests / pure modules omit it.
+  extensionId?: string | null,
+): boolean {
+  if (isExtensionHost(host, extensionId)) return true;
   for (const entry of allowlist) {
     if (entryMatches(entry, host)) return true;
   }

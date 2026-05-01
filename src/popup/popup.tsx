@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useState, useEffect, useCallback } from 'react';
 import type { Card, Deck, Stats, Settings, UpdateInfo } from '../common/types';
 import type { BlockedCounts } from '../content/blocker';
-import { isHostAllowed, parseRegexEntry } from '../common/allowlist';
+import { isExtensionHost, isHostAllowed, parseRegexEntry } from '../common/allowlist';
 import DeckDropdown from '../dashboard/components/DeckDropdown';
 import './popup.css';
 
@@ -213,7 +213,11 @@ function Popup() {
 
   function isNoteCaptureEnabled(): boolean {
     if (!state.settings || !state.currentSite) return false;
-    return isHostAllowed(state.settings.noteCaptureAllowlist, state.currentSite);
+    return isHostAllowed(
+      state.settings.noteCaptureAllowlist,
+      state.currentSite,
+      chrome?.runtime?.id ?? null,
+    );
   }
 
   // Whether the current site is allowlisted via a regex entry rather than a
@@ -234,9 +238,19 @@ function Popup() {
     return false;
   }
 
+  // True when the active tab is one of this extension's own pages (dashboard,
+  // sidebar, etc.). These are implicitly allowlisted by isHostAllowed so the
+  // user never has to add the volatile extension id by hand; we mirror that
+  // here to disable the toggle and show a friendly hint instead of letting
+  // the user pollute the stored list with a one-off id.
+  function isOwnExtensionPage(): boolean {
+    return isExtensionHost(state.currentSite, chrome?.runtime?.id ?? null);
+  }
+
   async function toggleNoteCapture() {
     if (!state.settings || !state.currentSite) return;
     if (isAllowlistedByRegex()) return;
+    if (isOwnExtensionPage()) return;
 
     const host = state.currentSite;
     const current = state.settings.noteCaptureAllowlist;
@@ -317,6 +331,11 @@ function Popup() {
   const siteEnabled = isSiteEnabled();
   const noteCaptureOn = isNoteCaptureEnabled();
   const noteCaptureLockedByRegex = isAllowlistedByRegex();
+  const isOwnExtension = isOwnExtensionPage();
+  // The current tab's hostname on a chrome-extension:// URL is the volatile
+  // extension id; surface a friendly label in the popup chrome instead so
+  // the user never sees a 32-char gibberish hostname.
+  const displaySite = isOwnExtension ? 'this extension' : currentSite;
   const isFacebook = currentSite.includes('facebook');
   const isYouTube = currentSite.includes('youtube');
   const isInstagram = currentSite.includes('instagram');
@@ -438,7 +457,7 @@ function Popup() {
       <section className="section">
         <div className="section-head">
           <span className="eyebrow">This site</span>
-          <span className="url">{currentSite || '—'}</span>
+          <span className="url">{displaySite || '—'}</span>
         </div>
         {isSocialSite ? (
           <div className="site-row">
@@ -469,11 +488,13 @@ function Popup() {
           <div>
             <div className="head">{noteCaptureOn ? 'Capturing bookmarks' : 'Bookmark capture off'}</div>
             <div className="sub">
-              {noteCaptureLockedByRegex
-                ? 'Allowlisted by a regex pattern — manage in Settings.'
-                : currentSite
-                  ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.</>
-                  : 'Open a tab to enable.'}
+              {isOwnExtension
+                ? 'Always allowlisted — no setup needed on this extension.'
+                : noteCaptureLockedByRegex
+                  ? 'Allowlisted by a regex pattern — manage in Settings.'
+                  : currentSite
+                    ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.</>
+                    : 'Open a tab to enable.'}
             </div>
           </div>
           <button
@@ -481,12 +502,14 @@ function Popup() {
             className={'switch' + (noteCaptureOn ? ' on' : '')}
             aria-pressed={noteCaptureOn}
             onClick={toggleNoteCapture}
-            disabled={!currentSite || noteCaptureLockedByRegex}
-            title={noteCaptureLockedByRegex
-              ? 'Manage regex allowlist in the dashboard Settings'
-              : noteCaptureOn
-                ? `Stop capturing bookmarks on ${currentSite}`
-                : `Capture bookmarks on ${currentSite}`}
+            disabled={!currentSite || noteCaptureLockedByRegex || isOwnExtension}
+            title={isOwnExtension
+              ? 'This extension\'s own pages are always allowlisted'
+              : noteCaptureLockedByRegex
+                ? 'Manage regex allowlist in the dashboard Settings'
+                : noteCaptureOn
+                  ? `Stop capturing bookmarks on ${currentSite}`
+                  : `Capture bookmarks on ${currentSite}`}
           />
         </div>
       </section>
