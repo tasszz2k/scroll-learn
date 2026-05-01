@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.18.0](https://github.com/tasszz2k/scroll-learn/compare/v1.17.3...v1.18.0) (2026-05-01)
+
+
+### Features
+
+* **shadow:** split pron check flags into confidence buckets ([fb463ce](https://github.com/tasszz2k/scroll-learn/commit/fb463ceb3cc39d6f6d04409b50e645620c960893))
+
 ## [1.17.3](https://github.com/tasszz2k/scroll-learn/compare/v1.17.2...v1.17.3) (2026-05-01)
 
 
