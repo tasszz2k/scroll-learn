@@ -76,10 +76,38 @@ interface GeminiProgressBannerProps {
  * Gemini automation job. Returns null when there's nothing to show
  * (idle / success), so callers can drop it inline without guarding.
  */
+// Tiny pill that surfaces which transport the router committed to. 'API'
+// means a direct REST call; 'Browser' means the legacy gemini.google.com
+// automation. The active model name is appended on the API path so the
+// learner can correlate quota changes with the running call.
+function SourcePill({ source, model }: { source: 'api' | 'web'; model?: string }) {
+  const label = source === 'api'
+    ? (model ? `API · ${model}` : 'API')
+    : 'Browser';
+  return (
+    <span
+      className="mono"
+      style={{
+        marginLeft: 10,
+        padding: '1px 8px',
+        borderRadius: 999,
+        border: '1px solid rgba(184,146,58,.45)',
+        background: 'rgba(184,146,58,.12)',
+        fontSize: 10,
+        letterSpacing: '.06em',
+        textTransform: 'uppercase',
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 export default function GeminiProgressBanner({ aiState, aiElapsedMs, liveText, onDismissError }: GeminiProgressBannerProps) {
   if (aiState.kind === 'running') {
     const preview = tailFor(liveText ?? '');
     const charCount = liveText ? liveText.length : 0;
+    const source = aiState.source;
     return (
       <div
         className="card-flat"
@@ -102,7 +130,10 @@ export default function GeminiProgressBanner({ aiState, aiElapsedMs, liveText, o
             gap: 12,
           }}
         >
-          <span>Generating with Gemini</span>
+          <span>
+            Generating with Gemini
+            {source && <SourcePill source={source} model={aiState.model} />}
+          </span>
           <span className="mono" style={{ fontSize: 11, opacity: 0.85 }}>
             {charCount > 0 && (
               <span style={{ marginRight: 12 }}>
@@ -148,9 +179,11 @@ export default function GeminiProgressBanner({ aiState, aiElapsedMs, liveText, o
             {preview}
           </pre>
         )}
-        <div style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.5, opacity: 0.78 }}>
-          A small Gemini window opens behind this one and closes itself when done. Don't minimize the Chrome window -- Chrome freezes minimized windows and the run will time out.
-        </div>
+        {source !== 'api' && (
+          <div style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.5, opacity: 0.78 }}>
+            A small Gemini window opens behind this one and closes itself when done. Don't minimize the Chrome window -- Chrome freezes minimized windows and the run will time out.
+          </div>
+        )}
       </div>
     );
   }

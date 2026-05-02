@@ -1,12 +1,7 @@
 import { useSyncExternalStore } from 'react';
+import { closeGeminiContext, runGeminiJob } from '../../../common/gemini/router';
 import { playSuccessChime, primeChime } from '../../../common/successChime';
-import type { GeminiJobStage } from '../../../common/types';
-import {
-  closeGeminiWindow,
-  isGeminiWindowAlive,
-  openGeminiWindow,
-  type GeminiWindowHandle,
-} from '../../utils/geminiTab';
+import type { GeminiApiModelId, GeminiJobStage } from '../../../common/types';
 
 // A "context key" identifies the surface that started the current assist job
 // (e.g. a specific flashcard or note). Multiple AiAssist components may be
@@ -39,15 +34,19 @@ export type AiAssistState =
       kind: 'running';
       stage: GeminiJobStage;
       detail?: string;
-      // Latest accumulated text snapshot from the content script. Empty until
-      // the streamer starts forwarding chunks.
+      // Latest accumulated text snapshot from the router. Empty until the
+      // first chunk lands.
       text: string;
       startedAt: number;
+      source?: 'api' | 'web';
+      model?: GeminiApiModelId;
     })
   | (ActiveCommon & {
       kind: 'success';
       // Final response text for the most recent turn.
       text: string;
+      source: 'api' | 'web';
+      model?: GeminiApiModelId;
     })
   | (ActiveCommon & {
       kind: 'error';
@@ -62,14 +61,6 @@ export type AiAssistState =
 let state: AiAssistState = { kind: 'idle' };
 const subscribers = new Set<() => void>();
 
-let activeHandle: GeminiWindowHandle | null = null;
-// The contextKey of the conversation currently loaded in activeHandle. Used
-// to decide whether a new start() can reuse the window (same subject = chat
-// follow-up) or must open a fresh one (different subject = clean context).
-let activeContextKey: AiContextKey | null = null;
-let activeTimeoutId: number | null = null;
-let listenerInstalled = false;
-
 function snapshot(): AiAssistState {
   return state;
 }
@@ -81,83 +72,7 @@ function emit(next: AiAssistState): void {
 
 function subscribe(fn: () => void): () => void {
   subscribers.add(fn);
-  installRuntimeListener();
   return () => subscribers.delete(fn);
-}
-
-function clearActiveTimeout(): void {
-  if (activeTimeoutId !== null) {
-    window.clearTimeout(activeTimeoutId);
-    activeTimeoutId = null;
-  }
-}
-
-async function closeActiveWindow(): Promise<void> {
-  const handle = activeHandle;
-  activeHandle = null;
-  activeContextKey = null;
-  await closeGeminiWindow(handle);
-}
-
-function installRuntimeListener(): void {
-  if (listenerInstalled) return;
-  listenerInstalled = true;
-
-  chrome.runtime.onMessage.addListener((message: unknown) => {
-    if (!message || typeof message !== 'object') return;
-    const m = message as { type?: string; jobId?: string };
-    if (!m.type || !m.jobId) return;
-    if (state.kind !== 'running' || state.jobId !== m.jobId) return;
-
-    if (m.type === 'gemini_job_status') {
-      const status = message as { stage: GeminiJobStage; detail?: string };
-      emit({ ...state, stage: status.stage, detail: status.detail });
-      return;
-    }
-
-    if (m.type === 'gemini_stream_chunk') {
-      const chunk = message as { text: string; done: boolean };
-      if (typeof chunk.text === 'string' && chunk.text !== state.text) {
-        emit({ ...state, text: chunk.text });
-      }
-      return;
-    }
-
-    if (m.type === 'gemini_result') {
-      const result = message as { ok: boolean; text?: string; error?: string };
-      clearActiveTimeout();
-      if (result.ok) {
-        const finalText = (result.text ?? state.text ?? '').trim();
-        emit({
-          kind: 'success',
-          jobId: state.jobId,
-          contextKey: state.contextKey,
-          history: state.history,
-          currentQuestion: state.currentQuestion,
-          text: finalText,
-        });
-        playSuccessChime();
-        // Keep the Gemini window open so the next Ask click can reuse the
-        // same conversation and inherit the chat history. The window is
-        // closed on dismiss(), on dashboard unload, or when the user closes
-        // it manually.
-      } else {
-        // Leave the Gemini window open on failure so the user can inspect it.
-        // Drop our handle so a follow-up opens a fresh window instead of
-        // colliding with the stale one the user is reading.
-        activeHandle = null;
-        activeContextKey = null;
-        emit({
-          kind: 'error',
-          jobId: state.jobId,
-          contextKey: state.contextKey,
-          history: state.history,
-          currentQuestion: state.currentQuestion,
-          message: result.error || 'Unknown error',
-        });
-      }
-    }
-  });
 }
 
 function generateJobId(): string {
@@ -196,10 +111,8 @@ async function start({ prompt, contextKey, userTurn }: StartParams): Promise<voi
 
   // Unlock the success chime's audio element while we're still inside the
   // user-click frame; without this Chrome's autoplay policy blocks the
-  // later success play() (which fires from a runtime message, not a gesture).
+  // later success play() (which fires from a callback, not a gesture).
   primeChime();
-
-  installRuntimeListener();
 
   const jobId = generateJobId();
   const history = buildHistoryFor(contextKey);
@@ -214,59 +127,70 @@ async function start({ prompt, contextKey, userTurn }: StartParams): Promise<voi
     startedAt: Date.now(),
   });
 
-  try {
-    // Reuse the existing Gemini window only when this start() targets the
-    // SAME subject as the previous run (e.g. a follow-up about the same
-    // card/note). For a different subject we close the old window first so
-    // the prior chat context doesn't bleed into the new conversation.
-    const sameSubject = activeContextKey === contextKey;
-    const reuse = sameSubject
-      && activeHandle !== null
-      && (await isGeminiWindowAlive(activeHandle));
+  // Translate the conversation history into the router's role/text shape.
+  // Each completed turn maps to a (user, model) pair.
+  const apiHistory = history.flatMap(turn => [
+    { role: 'user' as const, text: turn.question },
+    { role: 'model' as const, text: turn.response },
+  ]);
 
-    if (!reuse) {
-      // Close any leftover window from a different subject before opening a
-      // fresh one. closeActiveWindow clears activeContextKey too.
-      if (activeHandle) await closeActiveWindow();
-    }
+  const result = await runGeminiJob(
+    {
+      prompt,
+      mode: 'explain',
+      history: apiHistory,
+      contextKey,
+    },
+    {
+      onStage: (stage, detail) => {
+        if (state.kind !== 'running' || state.jobId !== jobId) return;
+        emit({ ...state, stage, detail });
+      },
+      onChunk: text => {
+        if (state.kind !== 'running' || state.jobId !== jobId) return;
+        if (text === state.text) return;
+        emit({ ...state, text });
+      },
+      onSource: (source, model) => {
+        if (state.kind !== 'running' || state.jobId !== jobId) return;
+        emit({ ...state, source, model });
+      },
+    },
+  );
 
-    await chrome.storage.local.set({
-      geminiJob: { jobId, prompt, mode: 'explain', createdAt: Date.now() },
+  // Read the current state via the module-level snapshot; TS over-narrows
+  // `state` across the await otherwise.
+  const after = snapshot();
+  if (after.kind !== 'running' || after.jobId !== jobId) return;
+
+  if (result.ok) {
+    const finalText = (result.text ?? after.text ?? '').trim();
+    emit({
+      kind: 'success',
+      jobId,
+      contextKey,
+      history,
+      currentQuestion: userTurn,
+      text: finalText,
+      source: result.source,
+      model: result.model,
     });
-
-    if (!reuse) {
-      // Open Gemini as the active tab in a new unfocused window. See
-      // utils/geminiTab.ts for why -- background tabs in the dashboard window
-      // get throttled and Angular stops updating, which kills automation.
-      activeHandle = await openGeminiWindow();
-      activeContextKey = contextKey;
-    }
-  } catch (err) {
+    playSuccessChime();
+    // The router keeps the Gemini window open (web path) so the next start()
+    // for the same contextKey reuses the chat history.
+  } else {
     emit({
       kind: 'error',
       jobId,
       contextKey,
       history,
       currentQuestion: userTurn,
-      message: err instanceof Error ? err.message : String(err),
+      message: result.error,
     });
-    return;
+    // Drop any cached window for this conversation so a follow-up opens a
+    // fresh one rather than colliding with a stale tab the user is reading.
+    void closeGeminiContext(contextKey);
   }
-
-  clearActiveTimeout();
-  activeTimeoutId = window.setTimeout(() => {
-    if (state.kind === 'running' && state.jobId === jobId) {
-      emit({
-        kind: 'error',
-        jobId,
-        contextKey,
-        history,
-        currentQuestion: userTurn,
-        message: 'Gemini did not respond within 5 minutes. Try again or run the prompt manually.',
-      });
-      void closeActiveWindow();
-    }
-  }, 5 * 60 * 1000);
 }
 
 function dismiss(contextKey: AiContextKey): void {
@@ -276,15 +200,7 @@ function dismiss(contextKey: AiContextKey): void {
   emit({ kind: 'idle' });
   // The conversation is over; close the Gemini window so the next assist
   // request starts from a fresh chat.
-  void closeActiveWindow();
-}
-
-// Best-effort cleanup if the user closes / navigates away from the dashboard
-// while a Gemini conversation window is still open in the background.
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    if (activeHandle) void closeActiveWindow();
-  });
+  void closeGeminiContext(contextKey);
 }
 
 export interface UseGeminiAssistApi {

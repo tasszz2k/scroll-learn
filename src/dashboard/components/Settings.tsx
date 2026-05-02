@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Settings as SettingsType, Response, TranslateDirection } from '../../common/types';
-import { DEFAULT_SETTINGS } from '../../common/types';
+import type {
+  Settings as SettingsType,
+  Response,
+  TranslateDirection,
+  GeminiApiModelId,
+  GeminiModelChoice,
+  GeminiAutoStrategy,
+} from '../../common/types';
+import { DEFAULT_SETTINGS, GEMINI_API_MODELS, STORAGE_KEYS } from '../../common/types';
+import { MODEL_QUOTAS, getUsage, type GeminiApiUsage } from '../../common/gemini/quota';
 import { parseRegexEntry, validateAllowlistEntry } from '../../common/allowlist';
 import EditorialHeader from './EditorialHeader';
 import { useConfirm } from '../hooks/useConfirm';
@@ -224,6 +232,108 @@ function Slider({ value, label, min, max, step, onChange, format }: { value: num
   );
 }
 
+// Multi-line text input for free-form prose like the AI personal-context
+// blob. Wider than FieldInput because the value is paragraphs, not a key.
+function FieldTextarea({
+  value,
+  onChange,
+  placeholder,
+  rows = 6,
+}: { value: string; onChange: (v: string) => void; placeholder?: string; rows?: number }) {
+  return (
+    <textarea
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      spellCheck={true}
+      className="serif"
+      style={{
+        width: '100%',
+        minWidth: 280,
+        padding: '10px 12px',
+        background: 'var(--card)',
+        border: '1px solid var(--rule-2)',
+        borderRadius: 8,
+        outline: 'none',
+        fontSize: 13,
+        lineHeight: 1.5,
+        color: 'var(--ink)',
+        resize: 'vertical',
+        fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace",
+      }}
+    />
+  );
+}
+
+// Tiny read-only tile that shows per-model "X / RPD requests" for the Gemini
+// API path. Subscribes to storage.onChanged so the counters tick up in real
+// time as the dashboard's other tabs make API calls.
+function GeminiUsageDisplay() {
+  const [usage, setUsage] = useState<GeminiApiUsage>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      void getUsage().then(u => { if (!cancelled) setUsage(u); });
+    };
+    refresh();
+    function onChanged(changes: { [key: string]: chrome.storage.StorageChange }, area: string) {
+      if (area !== 'local') return;
+      if (!(STORAGE_KEYS.GEMINI_API_USAGE in changes)) return;
+      refresh();
+    }
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => {
+      cancelled = true;
+      chrome.storage.onChanged.removeListener(onChanged);
+    };
+  }, []);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        minWidth: 260,
+        padding: '8px 12px',
+        border: '1px solid var(--rule-2)',
+        borderRadius: 8,
+        background: 'var(--card)',
+        fontSize: 12,
+      }}
+    >
+      {(Object.keys(MODEL_QUOTAS) as GeminiApiModelId[]).map(id => {
+        const used = usage[id]?.dayCount ?? 0;
+        const quota = MODEL_QUOTAS[id];
+        const exhausted = used >= quota.rpd;
+        return (
+          <div
+            key={id}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}
+          >
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>{id}</span>
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                color: exhausted ? 'var(--rose)' : 'var(--ink)',
+                fontWeight: 600,
+              }}
+            >
+              {used} / {quota.rpd}
+            </span>
+          </div>
+        );
+      })}
+      <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+        resets at 00:00 UTC
+      </div>
+    </div>
+  );
+}
+
 function StyledSelect<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
   return (
     <div
@@ -290,6 +400,8 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   const [allowlistError, setAllowlistError] = useState<string | null>(null);
   const [noteAutoSaveStatus, setNoteAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const noteAutoSaveSkipFirst = useRef(true);
+  const [aiAutoSaveStatus, setAiAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const aiAutoSaveSkipFirst = useRef(true);
 
   // Sticky save-bar plumbing: when the editorial header's action buttons scroll
   // out of view, surface a compact bar pinned just below the dashboard nav.
@@ -360,6 +472,34 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     localSettings.noteTranslateDirection,
     localSettings.noteAutoTranslate,
     localSettings.noteToastDurationSeconds,
+    onSave,
+  ]);
+
+  // Auto-save AI provider fields. Without this the user has to remember to
+  // click Save changes after pasting a key, and Generate quiz silently falls
+  // back to the browser path because storage still reads geminiApiKey: ''.
+  useEffect(() => {
+    if (aiAutoSaveSkipFirst.current) {
+      aiAutoSaveSkipFirst.current = false;
+      return;
+    }
+    setAiAutoSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      await onSave({
+        geminiApiKey: localSettings.geminiApiKey,
+        geminiPersonalContext: localSettings.geminiPersonalContext,
+        geminiPreferredModel: localSettings.geminiPreferredModel,
+        geminiAutoStrategy: localSettings.geminiAutoStrategy,
+      });
+      setAiAutoSaveStatus('saved');
+      setTimeout(() => setAiAutoSaveStatus('idle'), 1500);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [
+    localSettings.geminiApiKey,
+    localSettings.geminiPersonalContext,
+    localSettings.geminiPreferredModel,
+    localSettings.geminiAutoStrategy,
     onSave,
   ]);
 
@@ -505,9 +645,99 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </button>
       </div>
 
-      {/* === A · SITES & BLOCKING === */}
+      {/* === A · AI PROVIDER === */}
       <section style={{ marginTop: 12 }}>
-        <SectionHead num="A" label="Sites & blocking" count={`${SUPPORTED_DOMAINS.length} SITES · ${activeSites} ACTIVE · ${blockedToday} BLOCKED TODAY`} />
+        <SectionHead
+          num="A"
+          label="AI provider"
+          count={
+            aiAutoSaveStatus === 'saved' ? 'AUTO-SAVED'
+            : aiAutoSaveStatus === 'saving' ? 'SAVING...'
+            : localSettings.geminiApiKey ? 'API · LIVE'
+            : 'BROWSER FALLBACK'
+          }
+        />
+        <div className="card-flat" style={{ padding: '4px 28px' }}>
+          <Row
+            label="Gemini API key"
+            hint={
+              <>
+                Free key from <span className="mono">aistudio.google.com/app/apikey</span>. Generate quiz, Ask, Shadow scripts, and pronunciation check then call the API directly with quota-aware model rotation. Empty falls back to driving <span className="mono">gemini.google.com</span> in a popup window.
+              </>
+            }
+          >
+            <FieldInput
+              value={localSettings.geminiApiKey}
+              onChange={v => update('geminiApiKey', v)}
+              mono
+              secret
+              placeholder="AIza..."
+            />
+          </Row>
+          <Row
+            label="Default model"
+            hint={
+              <>
+                Choose a model or let <span className="mono">Auto</span> rotate across the four free-tier flash models. Free quotas (RPD = requests per day) reset at midnight UTC.
+              </>
+            }
+          >
+            <StyledSelect<GeminiModelChoice>
+              value={localSettings.geminiPreferredModel}
+              onChange={v => update('geminiPreferredModel', v)}
+              options={[
+                { value: 'auto', label: 'Auto · pick by strategy' },
+                ...GEMINI_API_MODELS.map(m => ({
+                  value: m.id as GeminiModelChoice,
+                  label: `${m.label} · ${m.rpd}/day`,
+                })),
+              ]}
+            />
+          </Row>
+          {localSettings.geminiPreferredModel === 'auto' && (
+            <Row
+              label="Auto strategy"
+              hint={
+                <>
+                  <strong>Prefer volume</strong> burns the 500-RPD lite pool first (~560 daily total). <strong>Prefer quality</strong> spends the flagship 20-RPD pools first for sharper answers, then falls back to lite.
+                </>
+              }
+            >
+              <ToggleControl
+                on={localSettings.geminiAutoStrategy === 'quality'}
+                onClick={() => update(
+                  'geminiAutoStrategy',
+                  (localSettings.geminiAutoStrategy === 'quality' ? 'volume' : 'quality') as GeminiAutoStrategy,
+                )}
+                label={{ on: 'Prefer quality', off: 'Prefer volume' }}
+                ariaLabel="Auto strategy"
+              />
+            </Row>
+          )}
+          <Row
+            label="Personal context"
+            hint={
+              <>
+                Sent with every AI request (system instruction on API; prepended on first turn for browser fallback). Tell the tutor your name, mother tongue, target language and level, goals, and how you want feedback.
+              </>
+            }
+          >
+            <FieldTextarea
+              value={localSettings.geminiPersonalContext}
+              onChange={v => update('geminiPersonalContext', v)}
+              placeholder={'Mother tongue: ...\nTarget language and level: ...\nGoal: ...\nFeedback style: ...'}
+              rows={6}
+            />
+          </Row>
+          <Row label="API usage today" hint="Live counter of successful API calls per model. Resets at 00:00 UTC." last>
+            <GeminiUsageDisplay />
+          </Row>
+        </div>
+      </section>
+
+      {/* === B · SITES & BLOCKING === */}
+      <section style={{ marginTop: 48 }}>
+        <SectionHead num="B" label="Sites & blocking" count={`${SUPPORTED_DOMAINS.length} SITES · ${activeSites} ACTIVE · ${blockedToday} BLOCKED TODAY`} />
         <div className="card-flat" style={{ borderRadius: 0 }}>
           <table className="dtable">
             <thead>
@@ -561,9 +791,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === B · QUIZ BEHAVIOUR === */}
+      {/* === C · QUIZ BEHAVIOUR === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="B" label="Quiz behaviour" count="8 SETTINGS" />
+        <SectionHead num="C" label="Quiz behaviour" count="8 SETTINGS" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Show after N posts" hint="Cards appear once you have scrolled past this many feed items.">
             <Stepper value={localSettings.showAfterNPosts} unit="posts" min={1} max={50} onChange={n => update('showAfterNPosts', n)} />
@@ -633,9 +863,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === C · ANSWER MATCHING === */}
+      {/* === D · ANSWER MATCHING === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="C" label="Answer matching" count="4 SETTINGS" />
+        <SectionHead num="D" label="Answer matching" count="4 SETTINGS" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Case sensitive" hint={'"Madrid" vs "madrid" — do they count the same?'}>
             <ToggleControl
@@ -680,9 +910,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === D · PIPELINE === */}
+      {/* === E · PIPELINE === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="D" label="The pipeline" />
+        <SectionHead num="E" label="The pipeline" />
         <div className="card-flat" style={{ padding: '24px 32px' }}>
           <pre className="ascii" style={{ margin: 0, fontSize: 12, lineHeight: 1.55 }}>
 {`scroll                  scroll
@@ -698,10 +928,10 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === E · NOTE CAPTURE === */}
+      {/* === F · NOTE CAPTURE === */}
       <section style={{ marginTop: 48 }}>
         <SectionHead
-          num="E"
+          num="F"
           label="Note capture"
           count={noteAutoSaveStatus === 'saved' ? 'AUTO-SAVED' : noteAutoSaveStatus === 'saving' ? 'SAVING…' : `${localSettings.noteCaptureAllowlist.length} ALLOWLISTED`}
         />
@@ -803,9 +1033,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === F · DATA === */}
+      {/* === G · DATA === */}
       <section style={{ marginTop: 48, marginBottom: 24 }}>
-        <SectionHead num="F" label="Data" count="EXPORT · WIPE" />
+        <SectionHead num="G" label="Data" count="EXPORT · WIPE" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Export" hint="Download every card and deck as JSON for backup or migration.">
             <button
@@ -857,9 +1087,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === G · ABOUT === */}
+      {/* === H · ABOUT === */}
       <section style={{ marginTop: 48, marginBottom: 48 }}>
-        <SectionHead num="G" label="About" count={`v${chrome.runtime.getManifest().version}`} />
+        <SectionHead num="H" label="About" count={`v${chrome.runtime.getManifest().version}`} />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Extension" hint="Name and current installed version." last>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>

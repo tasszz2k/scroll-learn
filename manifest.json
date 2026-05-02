@@ -22,6 +22,7 @@
     "https://www.youtube.com/*",
     "https://www.instagram.com/*",
     "https://gemini.google.com/*",
+    "https://generativelanguage.googleapis.com/*",
     "https://hexgrad-kokoro-tts.hf.space/*",
     "<all_urls>"
   ],

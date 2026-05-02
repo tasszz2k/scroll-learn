@@ -217,6 +217,7 @@ export default function App() {
       STORAGE_KEYS.DECKS,
       STORAGE_KEYS.STATS,
       STORAGE_KEYS.SETTINGS,
+      STORAGE_KEYS.GEMINI_API_USAGE,
     ];
     function onChanged(changes: { [key: string]: chrome.storage.StorageChange }, area: string) {
       if (area !== 'local') return;

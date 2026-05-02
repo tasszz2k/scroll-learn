@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { blobToBase64, blobToWav16kMono } from '../../../common/audioWav';
+import { runGeminiJob } from '../../../common/gemini/router';
 import { appendPronCheckRun } from '../../../common/shadowPronHistory';
 import { playSuccessChime, primeChime } from '../../../common/successChime';
 import {
@@ -8,11 +9,6 @@ import {
   type PronCheckRun,
   type ShadowScript,
 } from '../../../common/types';
-import {
-  closeGeminiWindow,
-  openGeminiWindow,
-  type GeminiWindowHandle,
-} from '../../utils/geminiTab';
 import { buildPronCheckPrompt, parsePronCheckJSON } from './pronCheckPrompts';
 
 export type ShadowPronCheckState =
@@ -49,111 +45,15 @@ function generateJobId(): string {
   return `pron-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function isMacPlatform(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  // navigator.platform is deprecated but still returns 'MacIntel' / 'Mac68K' /
-  // etc. in current Chromium. Fall back to the userAgent if the modern
-  // userAgentData is unavailable (still the case in Firefox-shaped UAs).
-  const platform = (navigator.platform || '').toLowerCase();
-  if (platform.includes('mac')) return true;
-  return /Macintosh|Mac OS X/.test(navigator.userAgent || '');
-}
-
 export function useShadowPronCheck({ onResult }: UseShadowPronCheckOptions = {}) {
   const [state, setState] = useState<ShadowPronCheckState>({ kind: 'idle' });
   const [elapsedMs, setElapsedMs] = useState(0);
   const jobIdRef = useRef<string | null>(null);
-  const handleRef = useRef<GeminiWindowHandle | null>(null);
-  const timeoutRef = useRef<number | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const scriptIdRef = useRef<string | null>(null);
   const durationRef = useRef<number>(0);
   const onResultRef = useRef(onResult);
   useEffect(() => { onResultRef.current = onResult; }, [onResult]);
-
-  function clearTimer() {
-    if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }
-
-  async function closeWindow() {
-    const handle = handleRef.current;
-    handleRef.current = null;
-    await closeGeminiWindow(handle);
-  }
-
-  // Listen for status + result messages from the Gemini content script.
-  useEffect(() => {
-    function onMessage(message: unknown): undefined {
-      if (!message || typeof message !== 'object') return;
-      const m = message as { type?: string; jobId?: string };
-      if (!m.type || !m.jobId) return;
-      if (jobIdRef.current !== m.jobId) return;
-
-      if (m.type === 'gemini_job_status') {
-        const status = message as { stage: GeminiJobStage; detail?: string };
-        setState(prev => prev.kind === 'running'
-          ? { ...prev, stage: status.stage, detail: status.detail }
-          : prev);
-        return;
-      }
-
-      if (m.type === 'gemini_result') {
-        const result = message as { ok: boolean; text?: string; error?: string };
-        clearTimer();
-        jobIdRef.current = null;
-        if (!result.ok) {
-          handleRef.current = null;
-          setState({ kind: 'error', message: result.error || 'Unknown error' });
-          return;
-        }
-        const parsed = parsePronCheckJSON(result.text || '');
-        if (!parsed.ok) {
-          handleRef.current = null;
-          setState({
-            kind: 'error',
-            message: `Could not parse the model's reply: ${parsed.error}`,
-            raw: result.text,
-          });
-          return;
-        }
-        const scriptId = scriptIdRef.current;
-        if (!scriptId) {
-          setState({ kind: 'error', message: 'Internal error: missing script id.' });
-          return;
-        }
-        const run: PronCheckRun = {
-          id: generateId(),
-          createdAt: Date.now(),
-          durationSec: durationRef.current,
-          report: parsed.report,
-        };
-        // Drop low-score runs (incomplete reads, mostly-skipped takes) so the
-        // history sparkline and practice plan don't fill up with noise. The
-        // result still surfaces in the UI for this session so the learner
-        // sees what happened.
-        const avg = averageScore(run);
-        const saved = avg >= LOW_SCORE_THRESHOLD;
-        if (saved) {
-          void appendPronCheckRun(scriptId, run).catch(() => { /* tile shows the run anyway */ });
-          // Roll into the daily Statistics tab counters. Fire-and-forget --
-          // the report still renders if this fails.
-          void chrome.runtime
-            .sendMessage({ type: 'record_pron_check', averageScore: avg })
-            .catch(() => { /* ignore */ });
-        }
-        setState({ kind: 'success', run, saved });
-        playSuccessChime();
-        onResultRef.current?.(run);
-        void closeWindow();
-      }
-      return;
-    }
-    chrome.runtime.onMessage.addListener(onMessage);
-    return () => chrome.runtime.onMessage.removeListener(onMessage);
-  }, []);
 
   // Tick the elapsed clock while a job is running.
   useEffect(() => {
@@ -162,30 +62,6 @@ export function useShadowPronCheck({ onResult }: UseShadowPronCheckOptions = {})
     const id = window.setInterval(() => setElapsedMs(compute()), 500);
     return () => window.clearInterval(id);
   }, [state.kind]);
-
-  // macOS keep-alive: Chrome's occlusion throttling on macOS pauses the
-  // Gemini tab the moment the user clicks back to the dashboard, even with
-  // App Nap disabled. Re-focusing the Gemini window every ~25s drags it
-  // back to the foreground so the streaming response can keep flowing. The
-  // pulse is a no-op when the window is already focused, and skipped on
-  // non-macOS platforms where Chrome doesn't throttle visible-but-occluded
-  // tabs as aggressively.
-  useEffect(() => {
-    if (state.kind !== 'running') return;
-    if (!isMacPlatform()) return;
-    const id = window.setInterval(() => {
-      const winId = handleRef.current?.windowId;
-      if (winId == null) return;
-      try {
-        void chrome.windows.update(winId, { focused: true }).catch(() => { /* ignore */ });
-      } catch {
-        /* extension context invalidated */
-      }
-    }, 25_000);
-    return () => window.clearInterval(id);
-  }, [state.kind]);
-
-  useEffect(() => () => clearTimer(), []);
 
   async function start(script: ShadowScript, submission: PronCheckSubmission): Promise<void> {
     primeChime();
@@ -221,37 +97,66 @@ export function useShadowPronCheck({ onResult }: UseShadowPronCheckOptions = {})
       localTranscript: submission.localTranscript,
     });
 
-    try {
-      await chrome.storage.local.set({
-        geminiJob: {
-          jobId,
-          prompt,
-          mode: 'explain',
-          createdAt: Date.now(),
-          audio: {
-            base64: audioBase64,
-            mimeType: 'audio/wav',
-            filename: 'pronunciation-take.wav',
-          },
+    const result = await runGeminiJob(
+      {
+        prompt,
+        mode: 'explain',
+        audio: { base64: audioBase64, mimeType: 'audio/wav', filename: 'pronunciation-take.wav' },
+      },
+      {
+        onStage: (stage, detail) => {
+          if (jobIdRef.current !== jobId) return;
+          setState(prev => prev.kind === 'running'
+            ? { ...prev, stage, detail }
+            : prev);
         },
-      });
-      handleRef.current = await openGeminiWindow();
-    } catch (err) {
-      jobIdRef.current = null;
-      setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      },
+    );
+
+    if (jobIdRef.current !== jobId) return;
+    jobIdRef.current = null;
+
+    if (!result.ok) {
+      setState({ kind: 'error', message: result.error });
       return;
     }
-
-    clearTimer();
-    timeoutRef.current = window.setTimeout(() => {
-      if (jobIdRef.current === jobId) {
-        jobIdRef.current = null;
-        setState({
-          kind: 'error',
-          message: 'Gemini did not respond within 5 minutes. Try again, or paste the prompt manually.',
-        });
-      }
-    }, 5 * 60 * 1000);
+    const parsed = parsePronCheckJSON(result.text || '');
+    if (!parsed.ok) {
+      setState({
+        kind: 'error',
+        message: `Could not parse the model's reply: ${parsed.error}`,
+        raw: result.text,
+      });
+      return;
+    }
+    const scriptId = scriptIdRef.current;
+    if (!scriptId) {
+      setState({ kind: 'error', message: 'Internal error: missing script id.' });
+      return;
+    }
+    const run: PronCheckRun = {
+      id: generateId(),
+      createdAt: Date.now(),
+      durationSec: durationRef.current,
+      report: parsed.report,
+    };
+    // Drop low-score runs (incomplete reads, mostly-skipped takes) so the
+    // history sparkline and practice plan don't fill up with noise. The
+    // result still surfaces in the UI for this session so the learner sees
+    // what happened.
+    const avg = averageScore(run);
+    const saved = avg >= LOW_SCORE_THRESHOLD;
+    if (saved) {
+      void appendPronCheckRun(scriptId, run).catch(() => { /* tile shows the run anyway */ });
+      // Roll into the daily Statistics tab counters. Fire-and-forget --
+      // the report still renders if this fails.
+      void chrome.runtime
+        .sendMessage({ type: 'record_pron_check', averageScore: avg })
+        .catch(() => { /* ignore */ });
+    }
+    setState({ kind: 'success', run, saved });
+    playSuccessChime();
+    onResultRef.current?.(run);
   }
 
   function reset(): void {

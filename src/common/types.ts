@@ -97,7 +97,50 @@ export interface Settings {
   // omits the KL badge, and a previously-saved 'kokoro-local' selection
   // falls back to Web Speech.
   enableKokoroLocal: boolean;
+  // Free Gemini API key from aistudio.google.com/app/apikey. When set the
+  // router prefers a direct REST call over driving gemini.google.com via the
+  // content script. Empty string -> always use the browser-driven path.
+  geminiApiKey: string;
+  // Free-form personal context sent as systemInstruction with every API call
+  // (and prepended to the first turn on web fallback). Lets the tutor adapt
+  // to the learner's mother tongue, level, goals, and preferred feedback style.
+  geminiPersonalContext: string;
+  // Default model selection. 'auto' walks the rotation defined by
+  // geminiAutoStrategy; an explicit id pins one model and falls through to
+  // web on quota exhaustion.
+  geminiPreferredModel: GeminiModelChoice;
+  // Two walk orders for 'auto'. 'volume' burns the 500-RPD lite pool first
+  // (preserves daily capacity); 'quality' spends the flagship 20-RPD pools
+  // first for sharper answers, then drops into the lite pool.
+  geminiAutoStrategy: GeminiAutoStrategy;
 }
+
+// Free-tier Gemini API model picker for Settings -> AI provider. Slugs match
+// the IDs accepted by generativelanguage.googleapis.com/v1beta/models/<id>;
+// the gemini-3 series is still in preview and carries the '-preview' suffix
+// in the API even though Google's docs render the friendly name without it.
+// RPM/RPD numbers were read from the user's actual Google AI Studio project
+// view (ai.google.dev/gemini-api/docs/rate-limits is the spec, the project
+// page applies tier overrides). HAND-CURATED -- do NOT regenerate from a
+// model. Wrong slugs strand a learner on the slow web fallback because the
+// REST endpoint returns 404 ("models/<id> is not found").
+export type GeminiApiModelId =
+  | 'gemini-3.1-flash-lite-preview'
+  | 'gemini-3-flash-preview'
+  | 'gemini-2.5-flash'
+  | 'gemini-2.5-flash-lite';
+
+export type GeminiModelChoice = 'auto' | GeminiApiModelId;
+export type GeminiAutoStrategy = 'quality' | 'volume';
+
+// Ordered for the Settings dropdown: 'auto' first, then explicit models sorted
+// by RPD descending so the cheapest pool is the obvious explicit pick.
+export const GEMINI_API_MODELS: ReadonlyArray<{ id: GeminiApiModelId; label: string; rpd: number }> = [
+  { id: 'gemini-3.1-flash-lite-preview', label: 'gemini-3.1-flash-lite-preview', rpd: 500 },
+  { id: 'gemini-3-flash-preview',        label: 'gemini-3-flash-preview',        rpd: 20 },
+  { id: 'gemini-2.5-flash',              label: 'gemini-2.5-flash',              rpd: 20 },
+  { id: 'gemini-2.5-flash-lite',         label: 'gemini-2.5-flash-lite',         rpd: 20 },
+];
 
 export const DEFAULT_SETTINGS: Settings = {
   showAfterNPosts: 10,
@@ -138,6 +181,10 @@ export const DEFAULT_SETTINGS: Settings = {
   kokoroApiToken: '',
   elevenLabsApiKey: '',
   enableKokoroLocal: false,
+  geminiApiKey: '',
+  geminiPersonalContext: '',
+  geminiPreferredModel: 'auto',
+  geminiAutoStrategy: 'volume',
 };
 
 export type TranslateLang = 'en' | 'vi';
@@ -751,6 +798,9 @@ export const STORAGE_KEYS = {
   IPA_PROGRESS: 'scrolllearn_ipa_progress',
   IPA_STATS: 'scrolllearn_ipa_stats',
   NOTEBOOK_VIEW_MODE: 'scrolllearn_notebook_view_mode',
+  // Per-model free-tier counters for the Gemini API path. Contents:
+  // Record<GeminiApiModelId, { dayBucket, dayCount, minuteBucket, minuteCount, cooldownUntil? }>
+  GEMINI_API_USAGE: 'scrolllearn_gemini_api_usage',
 } as const;
 
 // Update Info
