@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.19.1](https://github.com/tasszz2k/scroll-learn/compare/v1.19.0...v1.19.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* **tts:** implement caching for unavailable ElevenLabs API keys ([487b4ae](https://github.com/tasszz2k/scroll-learn/commit/487b4ae73a86153479884d58514436dd61c621bb))
+
 ## [1.19.0](https://github.com/tasszz2k/scroll-learn/compare/v1.18.0...v1.19.0) (2026-05-02)
 
 
