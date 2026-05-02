@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.19.0](https://github.com/tasszz2k/scroll-learn/compare/v1.18.0...v1.19.0) (2026-05-02)
+
+
+### Features
+
+* **gemini:** add direct API path with personal context and quota-aware rotation ([c3245ee](https://github.com/tasszz2k/scroll-learn/commit/c3245ee7d2946dd8087217b39640fc8008e3eef4))
+
 ## [1.18.0](https://github.com/tasszz2k/scroll-learn/compare/v1.17.3...v1.18.0) (2026-05-01)
 
 
