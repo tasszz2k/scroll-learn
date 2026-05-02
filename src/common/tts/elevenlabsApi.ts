@@ -218,9 +218,30 @@ interface SubscriptionState {
 let subscriptionState: SubscriptionState | null = null;
 const SUBSCRIPTION_REFETCH_MS = 5 * 60 * 1000; // 5 min
 
+// Some ElevenLabs API keys are scoped to text_to_speech only and don't carry
+// the user_read permission needed by /v1/user/subscription. Without backoff
+// every speak() retried the probe and spammed the devtools console with 401s.
+// We cache an "unavailable" sentinel here, keyed by the API key string, so a
+// scoped key fails once and is skipped afterwards. clearSubscriptionCache
+// resets it when the user pastes a new key.
+let unavailableForKey: string | null = null;
+let unavailableUntil = 0;
+// Long enough to suppress the console spam, short enough that a key whose
+// scope changes server-side eventually re-probes.
+const SUBSCRIPTION_UNAVAILABLE_BACKOFF_MS = 24 * 60 * 60 * 1000; // 24 h
+
 async function refreshSubscription(force = false): Promise<SubscriptionState | null> {
   const key = await getApiKey();
   if (!key) return null;
+  // Same key keeps 401-ing -- skip the call. A `force` flush (paste new key
+  // in Settings) clears unavailableForKey via clearSubscriptionCache.
+  if (
+    !force
+    && unavailableForKey === key
+    && Date.now() < unavailableUntil
+  ) {
+    return null;
+  }
   if (
     !force
     && subscriptionState
@@ -232,7 +253,17 @@ async function refreshSubscription(force = false): Promise<SubscriptionState | n
     const res = await fetch(`${API_BASE}/v1/user/subscription`, {
       headers: { 'xi-api-key': key, 'Accept': 'application/json' },
     });
-    if (!res.ok) return subscriptionState;
+    if (!res.ok) {
+      // 401 here typically means the key lacks user_read scope (ElevenLabs
+      // free tier lets you create keys scoped to TTS only). Mark as
+      // unavailable so the next speak() doesn't retry and re-spam the
+      // console.
+      if (res.status === 401 || res.status === 403) {
+        unavailableForKey = key;
+        unavailableUntil = Date.now() + SUBSCRIPTION_UNAVAILABLE_BACKOFF_MS;
+      }
+      return subscriptionState;
+    }
     const data = await res.json() as {
       character_count?: number;
       character_limit?: number;
@@ -258,8 +289,12 @@ function remainingFromState(state: SubscriptionState | null): number | null {
 }
 
 // Lets callers force a refetch (e.g., when the user pastes a new API key).
+// Also flushes the "scope-locked, don't retry" flag so a fresh key gets a
+// real probe instead of inheriting the previous key's verdict.
 export function clearSubscriptionCache(): void {
   subscriptionState = null;
+  unavailableForKey = null;
+  unavailableUntil = 0;
 }
 
 /**
