@@ -9,6 +9,13 @@ interface DeckDropdownProps {
   totalDue: number;
   dueByDeck: Map<string, number>;
   cardCountByDeck?: Map<string, number>;
+  /**
+   * Per-deck learning progress. `learned` = cards with `repetitions > 0`,
+   * `total` = total cards. When present, each row renders a thin progress
+   * bar; the "All decks" row shows the aggregate. Undefined keeps the
+   * pre-existing layout.
+   */
+  progressByDeck?: Map<string, { learned: number; total: number }>;
   allLabel?: string;
   allHint?: string;
   variant?: Variant;
@@ -20,6 +27,7 @@ interface OptionRow {
   name: string;
   due: number;
   count?: number;
+  progress?: { learned: number; total: number };
 }
 
 export default function DeckDropdown({
@@ -28,6 +36,7 @@ export default function DeckDropdown({
   totalDue,
   dueByDeck,
   cardCountByDeck,
+  progressByDeck,
   allLabel = 'All decks',
   allHint,
   variant = 'compact',
@@ -40,15 +49,32 @@ export default function DeckDropdown({
   const listRef = useRef<HTMLDivElement>(null);
 
   const options = useMemo<OptionRow[]>(() => {
-    const all: OptionRow = { id: '', name: allLabel, due: totalDue };
-    const rest: OptionRow[] = decks.map(d => ({
-      id: d.id,
-      name: d.name,
-      due: dueByDeck.get(d.id) || 0,
-      count: cardCountByDeck?.get(d.id),
-    }));
+    let aggLearned = 0;
+    let aggTotal = 0;
+    const rest: OptionRow[] = decks.map(d => {
+      const progress = progressByDeck?.get(d.id);
+      if (progress) {
+        aggLearned += progress.learned;
+        aggTotal += progress.total;
+      }
+      return {
+        id: d.id,
+        name: d.name,
+        due: dueByDeck.get(d.id) || 0,
+        count: cardCountByDeck?.get(d.id),
+        progress,
+      };
+    });
+    const all: OptionRow = {
+      id: '',
+      name: allLabel,
+      due: totalDue,
+      progress: progressByDeck && aggTotal > 0
+        ? { learned: aggLearned, total: aggTotal }
+        : undefined,
+    };
     return [all, ...rest];
-  }, [decks, dueByDeck, cardCountByDeck, totalDue, allLabel]);
+  }, [decks, dueByDeck, cardCountByDeck, progressByDeck, totalDue, allLabel]);
 
   const activeIndex = useMemo(
     () => Math.max(0, options.findIndex(o => o.id === activeDeckId)),
@@ -315,6 +341,10 @@ export default function DeckDropdown({
               const isHighlighted = idx === highlight;
               const isAll = opt.id === '';
               const showCount = cardCountByDeck != null && !isAll;
+              const hasProgress = opt.progress != null && opt.progress.total > 0;
+              const learnedPct = hasProgress
+                ? Math.round((opt.progress!.learned / opt.progress!.total) * 100)
+                : 0;
               return (
                 <div
                   key={opt.id || '__all__'}
@@ -350,7 +380,7 @@ export default function DeckDropdown({
                   >
                     {isActive ? '✓' : ''}
                   </span>
-                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <span
                       className="serif"
                       style={{
@@ -365,9 +395,63 @@ export default function DeckDropdown({
                     >
                       {opt.name}
                     </span>
-                    {showCount && (
-                      <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                        {opt.count ?? 0} {opt.count === 1 ? 'card' : 'cards'}
+                    {(showCount || hasProgress) && (
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 11,
+                          color: 'var(--ink-3)',
+                          minWidth: 0,
+                        }}
+                      >
+                        {showCount && (
+                          <span style={{ flexShrink: 0 }}>
+                            {opt.count ?? 0} {opt.count === 1 ? 'card' : 'cards'}
+                          </span>
+                        )}
+                        {hasProgress && (
+                          <>
+                            <span
+                              role="progressbar"
+                              aria-valuenow={learnedPct}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label={`${learnedPct}% of cards reviewed at least once`}
+                              title={`${opt.progress!.learned} of ${opt.progress!.total} cards started (${learnedPct}%)`}
+                              style={{
+                                flex: 1,
+                                maxWidth: 96,
+                                height: 4,
+                                background: 'var(--rule)',
+                                borderRadius: 999,
+                                overflow: 'hidden',
+                                minWidth: 24,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  display: 'block',
+                                  height: '100%',
+                                  width: `${learnedPct}%`,
+                                  background: learnedPct >= 80
+                                    ? 'var(--moss, var(--clay))'
+                                    : learnedPct >= 40
+                                      ? 'var(--clay)'
+                                      : 'var(--gold, var(--clay))',
+                                  transition: 'width .2s',
+                                }}
+                              />
+                            </span>
+                            <span
+                              className="mono"
+                              style={{ fontSize: 10, color: 'var(--ink-4)', flexShrink: 0 }}
+                            >
+                              {learnedPct}%
+                            </span>
+                          </>
+                        )}
                       </span>
                     )}
                   </span>

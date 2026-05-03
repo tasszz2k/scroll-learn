@@ -51,6 +51,25 @@ function getDueCountsByDeck(cards: Card[]): Map<string, number> {
   return map;
 }
 
+function getProgressByDeck(cards: Card[]): Map<string, { learned: number; total: number }> {
+  const map = new Map<string, { learned: number; total: number }>();
+  for (const card of cards) {
+    const entry = map.get(card.deckId) ?? { learned: 0, total: 0 };
+    entry.total += 1;
+    if (card.repetitions > 0) entry.learned += 1;
+    map.set(card.deckId, entry);
+  }
+  return map;
+}
+
+function getCardCountsByDeck(cards: Card[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const card of cards) {
+    map.set(card.deckId, (map.get(card.deckId) || 0) + 1);
+  }
+  return map;
+}
+
 export default function StudySession({ decks, cards, settings, onDataChange, onSaveSettings }: StudySessionProps) {
   const [sessionState, setSessionState] = useState<SessionState>('loading');
   const [currentCard, setCurrentCard] = useState<Card | null>(null);
@@ -71,6 +90,8 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
   const activeDeckId = settings.activeDeckId || '';
   const activeDeck = useMemo(() => decks.find(d => d.id === activeDeckId) ?? null, [decks, activeDeckId]);
   const dueByDeck = useMemo(() => getDueCountsByDeck(cards), [cards]);
+  const progressByDeck = useMemo(() => getProgressByDeck(cards), [cards]);
+  const cardCountByDeck = useMemo(() => getCardCountsByDeck(cards), [cards]);
   let totalDue = 0;
   for (const c of dueByDeck.values()) totalDue += c;
   const filteredDue = activeDeckId ? (dueByDeck.get(activeDeckId) || 0) : totalDue;
@@ -275,6 +296,8 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
         activeDeckId={activeDeckId}
         totalDue={totalDue}
         dueByDeck={dueByDeck}
+        cardCountByDeck={cardCountByDeck}
+        progressByDeck={progressByDeck}
         onChange={handleDeckChange}
       />
       <span className={'pill' + (filteredDue > 0 ? ' pill-clay' : '')} style={{ whiteSpace: 'nowrap' }}>

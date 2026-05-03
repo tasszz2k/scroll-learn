@@ -13,6 +13,8 @@ interface PopupState {
   decks: Deck[];
   cardCounts: Record<string, number>;
   dueCounts: Record<string, number>;
+  /** Per-deck count of cards with `repetitions > 0` (started, not new). */
+  learnedCounts: Record<string, number>;
   totalDue: number;
   currentSite: string;
   loading: boolean;
@@ -100,6 +102,7 @@ function Popup() {
     decks: [],
     cardCounts: {},
     dueCounts: {},
+    learnedCounts: {},
     totalDue: 0,
     currentSite: '',
     loading: true,
@@ -124,6 +127,7 @@ function Popup() {
 
       const cardCounts: Record<string, number> = {};
       const dueCounts: Record<string, number> = {};
+      const learnedCounts: Record<string, number> = {};
       let totalDue = 0;
       const now = Date.now();
       if (cardsResponse?.ok && Array.isArray(cardsResponse.data)) {
@@ -132,6 +136,9 @@ function Popup() {
           if (card.due <= now) {
             dueCounts[card.deckId] = (dueCounts[card.deckId] ?? 0) + 1;
             totalDue += 1;
+          }
+          if (card.repetitions > 0) {
+            learnedCounts[card.deckId] = (learnedCounts[card.deckId] ?? 0) + 1;
           }
         }
       }
@@ -154,6 +161,7 @@ function Popup() {
         decks: decksResponse.ok ? decksResponse.data : [],
         cardCounts,
         dueCounts,
+        learnedCounts,
         totalDue,
         currentSite,
         loading: false,
@@ -329,7 +337,7 @@ function Popup() {
     );
   }
 
-  const { stats, settings, currentSite, decks, cardCounts, dueCounts, totalDue, blockedCount, blockedCounts, updateInfo } = state;
+  const { stats, settings, currentSite, decks, cardCounts, dueCounts, learnedCounts, totalDue, blockedCount, blockedCounts, updateInfo } = state;
   const updateAvailable = !!updateInfo?.updateAvailable;
   const currentVersion = chrome.runtime.getManifest().version;
   const versionLabel = updateAvailable && updateInfo?.latestVersion
@@ -541,6 +549,12 @@ function Popup() {
             totalDue={totalDue}
             dueByDeck={new Map(Object.entries(dueCounts))}
             cardCountByDeck={new Map(Object.entries(cardCounts))}
+            progressByDeck={new Map(
+              Object.entries(cardCounts).map(([deckId, total]) => [
+                deckId,
+                { learned: learnedCounts[deckId] ?? 0, total },
+              ])
+            )}
             allLabel="Auto-select"
             allHint="Most overdue deck is chosen for you"
             variant="rich"
