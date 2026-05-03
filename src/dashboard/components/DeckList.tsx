@@ -356,7 +356,6 @@ export default function DeckList({
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               minWidth: 0,
-                              flex: 1,
                             }}
                             title={deck.name}
                           >
@@ -725,15 +724,23 @@ export default function DeckList({
                               />
                             )}
                           </div>
-                          <table className="dtable" style={{ marginTop: 10 }}>
+                          <table className="dtable" style={{ marginTop: 10, tableLayout: 'fixed' }}>
+                            <colgroup>
+                              <col style={{ width: 80 }} />
+                              <col />
+                              <col />
+                              <col style={{ width: 70 }} />
+                              <col style={{ width: 50 }} />
+                              <col style={{ width: 180 }} />
+                            </colgroup>
                             <thead>
                               <tr>
-                                <th style={{ width: 90 }}>Type</th>
+                                <th>Type</th>
                                 <th>Front</th>
                                 <th>Back</th>
-                                <th style={{ width: 90 }}>Due</th>
-                                <th style={{ width: 60 }}>Ease</th>
-                                <th style={{ width: 80, textAlign: 'right' }}></th>
+                                <th>Due</th>
+                                <th>Ease</th>
+                                <th style={{ textAlign: 'right' }}></th>
                               </tr>
                             </thead>
                             <tbody>
@@ -789,7 +796,7 @@ export default function DeckList({
                                       {due.label}
                                     </td>
                                     <td className="mono">{(card.ease ?? 2.5).toFixed(1)}</td>
-                                    <td style={{ textAlign: 'right' }}>
+                                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -797,7 +804,7 @@ export default function DeckList({
                                           setPreviewState({ deckId: deck.id, index: Math.max(0, idx) });
                                         }}
                                         className="ulink"
-                                        style={{ background: 'none', padding: 0, fontSize: 12, marginRight: 12, cursor: 'pointer' }}
+                                        style={{ background: 'none', padding: 0, fontSize: 12, marginRight: 14, cursor: 'pointer' }}
                                       >
                                         preview
                                       </button>
@@ -805,7 +812,7 @@ export default function DeckList({
                                         type="button"
                                         onClick={() => setEditingCard(card)}
                                         className="ulink"
-                                        style={{ background: 'none', padding: 0, fontSize: 12, marginRight: 12, cursor: 'pointer' }}
+                                        style={{ background: 'none', padding: 0, fontSize: 12, marginRight: 14, cursor: 'pointer' }}
                                       >
                                         edit
                                       </button>
