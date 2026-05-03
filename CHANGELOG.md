@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.3](https://github.com/tasszz2k/scroll-learn/compare/v1.20.2...v1.20.3) (2026-05-03)
+
+
+### Bug Fixes
+
+* **decks:** drop the row-hover background on the deck list ([2f43f55](https://github.com/tasszz2k/scroll-learn/commit/2f43f55870dddabce6201d4195cb859862fede08))
+
 ## [1.20.2](https://github.com/tasszz2k/scroll-learn/compare/v1.20.1...v1.20.2) (2026-05-03)
 
 
