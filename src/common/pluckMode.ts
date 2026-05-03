@@ -5,7 +5,7 @@
 //
 // The whole UX is encapsulated here so the two callers are tiny:
 //   * src/content/notes.ts gates on `isAllowed()` and toggles
-//     `mountPluckMode({ fab: true })` whenever the allowlist changes.
+//     `mountPluckMode()` whenever the allowlist changes.
 //   * src/dashboard/main.tsx calls `mountPluckMode()` once at startup.
 //
 // The module owns its settings hydration via chrome.storage so each caller
@@ -24,15 +24,6 @@ const TOAST_MAX_MS = 30000;
 // hit-testing in `pluckTargetFromPoint` can ignore our own UI without
 // magic-string drift between functions.
 const TOAST_STACK_ID = 'scrolllearn-note-toast-stack';
-const SIDEBAR_FAB_ID = 'scrolllearn-sidebar-fab';
-
-export interface MountPluckOptions {
-  // When true, attach the floating action button that opens the side panel.
-  // The content script wants this on every allowlisted host page; the
-  // dashboard does NOT (it already exposes that affordance through its own
-  // chrome). Defaults to false.
-  fab?: boolean;
-}
 
 export interface PluckHandle {
   // Detach every listener and remove every DOM node this mount created.
@@ -42,7 +33,6 @@ export interface PluckHandle {
 
 interface PluckState {
   settings: Settings;
-  fab: boolean;
   unmounted: boolean;
   storageListener: ((
     changes: { [key: string]: chrome.storage.StorageChange },
@@ -66,10 +56,9 @@ interface PluckState {
 
 // Mount the pluck flow on the current document. Returns a handle whose
 // `unmount` removes every listener and DOM node created here.
-export function mountPluckMode(options: MountPluckOptions = {}): PluckHandle {
+export function mountPluckMode(): PluckHandle {
   const state: PluckState = {
     settings: { ...DEFAULT_SETTINGS },
-    fab: options.fab === true,
     unmounted: false,
     storageListener: null,
     active: false,
@@ -509,7 +498,6 @@ export function mountPluckMode(options: MountPluckOptions = {}): PluckHandle {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
     if (!el) return null;
     if (el.id === TOAST_STACK_ID || el.closest(`#${TOAST_STACK_ID}`)) return null;
-    if (el.id === SIDEBAR_FAB_ID || el.closest(`#${SIDEBAR_FAB_ID}`)) return null;
     return el;
   }
 
@@ -713,94 +701,6 @@ export function mountPluckMode(options: MountPluckOptions = {}): PluckHandle {
     stopPluck({ skipCapture: true });
   }
 
-  function ensureSidebarFab(): HTMLElement {
-    const existing = document.getElementById(SIDEBAR_FAB_ID);
-    if (existing) return existing;
-    const fab = document.createElement('button');
-    fab.id = SIDEBAR_FAB_ID;
-    fab.type = 'button';
-    fab.setAttribute('aria-label', 'Open Scroll Learn sidebar');
-    fab.title = 'Open Scroll Learn sidebar';
-    fab.style.cssText = [
-      'all: initial',
-      'box-sizing: border-box',
-      'position: fixed',
-      'right: 16px',
-      'bottom: 88px',
-      'z-index: 2147483646',
-      'width: 44px',
-      'height: 44px',
-      'border-radius: 999px',
-      'background: #1F1B16',
-      'color: #FBF8F2',
-      'display: inline-flex',
-      'align-items: center',
-      'justify-content: center',
-      'box-shadow: 0 10px 24px rgba(0,0,0,0.28)',
-      'cursor: pointer',
-      'transition: transform 0.15s ease, box-shadow 0.15s ease',
-    ].join(';');
-    fab.innerHTML = [
-      '<svg width="22" height="22" viewBox="0 0 64 64" aria-hidden="true" style="display:block">',
-      '<rect x="14" y="16" width="36" height="3" fill="#FBF8F2" />',
-      '<rect x="14" y="26" width="28" height="3" fill="#FBF8F2" />',
-      '<rect x="14" y="36" width="32" height="3" fill="#FBF8F2" />',
-      '<path d="M 50 12 Q 60 32 50 52" fill="none" stroke="#C96442" stroke-width="3" stroke-linecap="round" />',
-      '<circle cx="50" cy="46" r="3" fill="#C96442" />',
-      '</svg>',
-    ].join('');
-    fab.addEventListener('mouseenter', () => {
-      fab.style.transform = 'translateY(-1px)';
-      fab.style.boxShadow = '0 14px 28px rgba(0,0,0,0.32)';
-    });
-    fab.addEventListener('mouseleave', () => {
-      fab.style.transform = '';
-      fab.style.boxShadow = '0 10px 24px rgba(0,0,0,0.28)';
-    });
-    fab.addEventListener('click', e => {
-      // Prevent the page from interpreting the click on its own elements.
-      e.preventDefault();
-      e.stopPropagation();
-      try {
-        chrome.runtime.sendMessage({ type: 'open_side_panel' }, response => {
-          if (chrome.runtime.lastError) {
-            const msg = chrome.runtime.lastError.message ?? 'unknown';
-            console.warn('[ScrollLearn:pluck] open_side_panel failed:', msg);
-            showStatusToast(`Sidebar failed: ${msg}`, 'error');
-            return;
-          }
-          if (response && response.ok === false) {
-            const errMsg = String(response.error ?? 'unknown');
-            console.warn('[ScrollLearn:pluck] open_side_panel error:', errMsg);
-            showStatusToast(`Sidebar: ${errMsg}`, 'error');
-          }
-        });
-      } catch (err) {
-        console.warn('[ScrollLearn:pluck] open_side_panel threw:', err);
-        showStatusToast('Sidebar: extension context invalid. Reload the extension.', 'error');
-      }
-    });
-    document.body.appendChild(fab);
-    return fab;
-  }
-
-  function mountFab() {
-    if (!state.fab) return;
-    if (!document.body) {
-      // Body may not exist yet on document_start; wait for DOMContentLoaded.
-      document.addEventListener('DOMContentLoaded', () => {
-        if (!state.unmounted && state.fab) ensureSidebarFab();
-      }, { once: true });
-      return;
-    }
-    ensureSidebarFab();
-  }
-
-  function unmountFab() {
-    const fab = document.getElementById(SIDEBAR_FAB_ID);
-    fab?.remove();
-  }
-
   function unmountToastStack() {
     const stack = document.getElementById(TOAST_STACK_ID);
     stack?.remove();
@@ -854,17 +754,15 @@ export function mountPluckMode(options: MountPluckOptions = {}): PluckHandle {
   // safe to attach before the first read returns -- noteMinLength etc. just
   // defaults until the real values arrive.
   attachListeners();
-  mountFab();
   void loadSettings();
   watchSettings();
-  console.log('[ScrollLearn:pluck] mounted', { fab: state.fab });
+  console.log('[ScrollLearn:pluck] mounted');
 
   return {
     unmount() {
       if (state.unmounted) return;
       state.unmounted = true;
       detachListeners();
-      unmountFab();
       unmountToastStack();
       if (state.storageListener) {
         try {

@@ -75,6 +75,10 @@ export interface Settings {
   hideInstagramStrangers: boolean;
   // Note capture
   noteCaptureAllowlist: string[];
+  // When true, every host is treated as allowlisted and `noteCaptureAllowlist`
+  // is ignored. Lets the user enable pluck capture everywhere without curating
+  // a per-site list. Off by default to keep the original opt-in behaviour.
+  noteCaptureAllSites: boolean;
   noteMinLength: number;
   noteRetentionDays: number;
   noteTranslateDirection: TranslateDirection;
@@ -172,6 +176,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideFacebookStrangers: true,
   hideInstagramStrangers: true,
   noteCaptureAllowlist: ['app.zim.vn'],
+  noteCaptureAllSites: false,
   noteMinLength: 2,
   noteRetentionDays: 0,
   noteTranslateDirection: 'auto',

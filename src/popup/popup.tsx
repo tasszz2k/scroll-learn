@@ -217,7 +217,16 @@ function Popup() {
       state.settings.noteCaptureAllowlist,
       state.currentSite,
       chrome?.runtime?.id ?? null,
+      state.settings.noteCaptureAllSites,
     );
+  }
+
+  // Whether the current allow decision comes from the global "all sites" flag
+  // rather than a per-host entry. Mirrors the regex case: toggling off the
+  // per-site switch wouldn't actually disable capture here, so we lock the
+  // popup toggle and surface a hint instead.
+  function isAllowedByAllSites(): boolean {
+    return state.settings?.noteCaptureAllSites === true;
   }
 
   // Whether the current site is allowlisted via a regex entry rather than a
@@ -249,6 +258,7 @@ function Popup() {
 
   async function toggleNoteCapture() {
     if (!state.settings || !state.currentSite) return;
+    if (isAllowedByAllSites()) return;
     if (isAllowlistedByRegex()) return;
     if (isOwnExtensionPage()) return;
 
@@ -330,6 +340,7 @@ function Popup() {
     : 'Extension version';
   const siteEnabled = isSiteEnabled();
   const noteCaptureOn = isNoteCaptureEnabled();
+  const noteCaptureAllSitesOn = isAllowedByAllSites();
   const noteCaptureLockedByRegex = isAllowlistedByRegex();
   const isOwnExtension = isOwnExtensionPage();
   // The current tab's hostname on a chrome-extension:// URL is the volatile
@@ -490,11 +501,13 @@ function Popup() {
             <div className="sub">
               {isOwnExtension
                 ? 'Always allowlisted — no setup needed on this extension.'
-                : noteCaptureLockedByRegex
-                  ? 'Allowlisted by a regex pattern — manage in Settings.'
-                  : currentSite
-                    ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.</>
-                    : 'Open a tab to enable.'}
+                : noteCaptureAllSitesOn
+                  ? 'Enabled on all sites — turn off in Settings.'
+                  : noteCaptureLockedByRegex
+                    ? 'Allowlisted by a regex pattern — manage in Settings.'
+                    : currentSite
+                      ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.</>
+                      : 'Open a tab to enable.'}
             </div>
           </div>
           <button
@@ -502,14 +515,16 @@ function Popup() {
             className={'switch' + (noteCaptureOn ? ' on' : '')}
             aria-pressed={noteCaptureOn}
             onClick={toggleNoteCapture}
-            disabled={!currentSite || noteCaptureLockedByRegex || isOwnExtension}
+            disabled={!currentSite || noteCaptureAllSitesOn || noteCaptureLockedByRegex || isOwnExtension}
             title={isOwnExtension
               ? 'This extension\'s own pages are always allowlisted'
-              : noteCaptureLockedByRegex
-                ? 'Manage regex allowlist in the dashboard Settings'
-                : noteCaptureOn
-                  ? `Stop capturing bookmarks on ${currentSite}`
-                  : `Capture bookmarks on ${currentSite}`}
+              : noteCaptureAllSitesOn
+                ? '"Enable on all sites" is on - turn it off in Settings to manage per-host'
+                : noteCaptureLockedByRegex
+                  ? 'Manage regex allowlist in the dashboard Settings'
+                  : noteCaptureOn
+                    ? `Stop capturing bookmarks on ${currentSite}`
+                    : `Capture bookmarks on ${currentSite}`}
           />
         </div>
       </section>

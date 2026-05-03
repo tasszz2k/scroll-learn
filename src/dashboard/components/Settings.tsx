@@ -455,6 +455,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     const timer = setTimeout(async () => {
       await onSave({
         noteCaptureAllowlist: localSettings.noteCaptureAllowlist,
+        noteCaptureAllSites: localSettings.noteCaptureAllSites,
         noteMinLength: localSettings.noteMinLength,
         noteRetentionDays: localSettings.noteRetentionDays,
         noteTranslateDirection: localSettings.noteTranslateDirection,
@@ -467,6 +468,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     return () => clearTimeout(timer);
   }, [
     localSettings.noteCaptureAllowlist,
+    localSettings.noteCaptureAllSites,
     localSettings.noteMinLength,
     localSettings.noteRetentionDays,
     localSettings.noteTranslateDirection,
@@ -526,6 +528,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
       ...DEFAULT_SETTINGS,
       activeDeckId: prev.activeDeckId,
       noteCaptureAllowlist: prev.noteCaptureAllowlist,
+      noteCaptureAllSites: prev.noteCaptureAllSites,
     }));
   }
 
@@ -933,17 +936,48 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         <SectionHead
           num="F"
           label="Note capture"
-          count={noteAutoSaveStatus === 'saved' ? 'AUTO-SAVED' : noteAutoSaveStatus === 'saving' ? 'SAVING…' : `${localSettings.noteCaptureAllowlist.length} ALLOWLISTED`}
+          count={
+            noteAutoSaveStatus === 'saved'
+              ? 'AUTO-SAVED'
+              : noteAutoSaveStatus === 'saving'
+                ? 'SAVING…'
+                : localSettings.noteCaptureAllSites
+                  ? 'ALL SITES'
+                  : `${localSettings.noteCaptureAllowlist.length} ALLOWLISTED`
+          }
         />
         <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 14px', maxWidth: 720 }}>
           Selections from allowlisted sites become Notes. Auto-saved as you edit.
         </p>
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row
-            label="Allowlist domain"
-            hint={<>Add a host like <span className="mono" style={{ fontSize: 12 }}>en.wikipedia.org</span> or a regex like <span className="mono" style={{ fontSize: 12 }}>/^.*\.wiki/</span>.</>}
+            label="Enable on all sites"
+            hint="Capture bookmarks on every site you visit. Overrides the allowlist below."
           >
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <ToggleControl
+              on={localSettings.noteCaptureAllSites}
+              onClick={() => toggle('noteCaptureAllSites')}
+              ariaLabel="Enable note capture on all sites"
+            />
+          </Row>
+          <Row
+            label="Allowlist domain"
+            hint={
+              localSettings.noteCaptureAllSites
+                ? <>Currently ignored because <strong>Enable on all sites</strong> is on. Turn it off to manage per-host.</>
+                : <>Add a host like <span className="mono" style={{ fontSize: 12 }}>en.wikipedia.org</span> or a regex like <span className="mono" style={{ fontSize: 12 }}>/^.*\.wiki/</span>.</>
+            }
+          >
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                opacity: localSettings.noteCaptureAllSites ? 0.45 : 1,
+                pointerEvents: localSettings.noteCaptureAllSites ? 'none' : 'auto',
+              }}
+              aria-disabled={localSettings.noteCaptureAllSites || undefined}
+            >
               <FieldInput
                 value={allowlistInput}
                 onChange={v => setAllowlistInput(v)}
@@ -955,7 +989,13 @@ export default function Settings({ settings, onSave }: SettingsProps) {
             </div>
           </Row>
           {(allowlistError || localSettings.noteCaptureAllowlist.length > 0) && (
-            <div style={{ padding: '14px 0', borderBottom: '1px solid var(--rule)' }}>
+            <div
+              style={{
+                padding: '14px 0',
+                borderBottom: '1px solid var(--rule)',
+                opacity: localSettings.noteCaptureAllSites ? 0.45 : 1,
+              }}
+            >
               {allowlistError && (
                 <div className="mono" style={{ fontSize: 11, color: 'var(--rose)', marginBottom: 8 }}>{allowlistError}</div>
               )}

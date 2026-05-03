@@ -18,7 +18,6 @@ createRoot(document.getElementById('root')!).render(
 // content scripts into chrome-extension:// URLs, so we mount the same flow
 // inline from the dashboard to give the user the same affordance on every
 // dashboard tab (Notebooks, Bookmarks, Decks, ...). No allowlist gate here:
-// the user is already on our own page. The sidebar FAB is suppressed
-// because the dashboard already surfaces those affordances natively.
-mountPluckMode({ fab: false });
+// the user is already on our own page.
+mountPluckMode();
 

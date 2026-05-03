@@ -51,8 +51,13 @@ export function isHostAllowed(
   // extension id by hand. Callers in extension contexts pass
   // `chrome.runtime.id`; callers in tests / pure modules omit it.
   extensionId?: string | null,
+  // When true, every non-empty host is allowed regardless of the allowlist.
+  // Lets users opt into pluck capture everywhere without curating per-site
+  // entries. The extension-host short-circuit above still wins for free.
+  allowAllSites?: boolean,
 ): boolean {
   if (isExtensionHost(host, extensionId)) return true;
+  if (allowAllSites && host.trim().length > 0) return true;
   for (const entry of allowlist) {
     if (entryMatches(entry, host)) return true;
   }

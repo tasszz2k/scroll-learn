@@ -36,13 +36,14 @@ function isAllowed(): boolean {
     ctx.settings.noteCaptureAllowlist,
     host,
     chrome?.runtime?.id ?? null,
+    ctx.settings.noteCaptureAllSites,
   );
 }
 
 function applyState() {
   const shouldBeActive = isAllowed();
   if (shouldBeActive && !ctx.handle) {
-    ctx.handle = mountPluckMode({ fab: true });
+    ctx.handle = mountPluckMode();
     console.log('[ScrollLearn:notes] capture ACTIVE on', normalizeHost(location.hostname));
   } else if (!shouldBeActive && ctx.handle) {
     ctx.handle.unmount();

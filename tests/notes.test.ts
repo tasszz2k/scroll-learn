@@ -280,6 +280,18 @@ describe('allowlist matching', () => {
     expect(isHostAllowed(list, extensionId)).toBe(false);
   });
 
+  it('isHostAllowed with allowAllSites=true matches every non-empty host', () => {
+    const list: string[] = [];
+    expect(isHostAllowed(list, 'example.com', null, true)).toBe(true);
+    expect(isHostAllowed(list, 'reddit.com', null, true)).toBe(true);
+    expect(isHostAllowed(list, 'unrelated.host', null, true)).toBe(true);
+    // Empty hostnames still fail so we never capture from a blank/about: page.
+    expect(isHostAllowed(list, '', null, true)).toBe(false);
+    expect(isHostAllowed(list, '   ', null, true)).toBe(false);
+    // allowAllSites=false (or omitted) preserves the original allowlist gate.
+    expect(isHostAllowed(list, 'example.com', null, false)).toBe(false);
+  });
+
   it('validateAllowlistEntry flags invalid regex but accepts valid ones', () => {
     expect(validateAllowlistEntry('example.com')).toBeNull();
     expect(validateAllowlistEntry('/.*\\.wikipedia\\.org$/')).toBeNull();

@@ -212,7 +212,7 @@ export default function NotesPanel({ notes, settings, onRefresh, onPendingImport
     }
   }
 
-  const allowlistEmpty = settings.noteCaptureAllowlist.length === 0;
+  const allowlistEmpty = settings.noteCaptureAllowlist.length === 0 && !settings.noteCaptureAllSites;
 
   return (
     <div className="space-y-6">
