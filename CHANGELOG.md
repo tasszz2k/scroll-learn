@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.1](https://github.com/tasszz2k/scroll-learn/compare/v1.20.0...v1.20.1) (2026-05-03)
+
+
+### Bug Fixes
+
+* **study:** repair retention metric and add practice-anyway flow ([b627015](https://github.com/tasszz2k/scroll-learn/commit/b62701590838fe54fcd0bde3c9f4ced6274203d1))
+
 ## [1.20.0](https://github.com/tasszz2k/scroll-learn/compare/v1.19.1...v1.20.0) (2026-05-03)
 
 
