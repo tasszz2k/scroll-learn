@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.21.0](https://github.com/tasszz2k/scroll-learn/compare/v1.20.3...v1.21.0) (2026-05-03)
+
+
+### Features
+
+* **dropdown:** show per-deck progress bar in deck picker ([be0a88a](https://github.com/tasszz2k/scroll-learn/commit/be0a88a2f0008ca106a84eeaa2c472e25d6d2a0c))
+
 ## [1.20.3](https://github.com/tasszz2k/scroll-learn/compare/v1.20.2...v1.20.3) (2026-05-03)
 
 
