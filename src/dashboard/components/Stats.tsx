@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import type { Stats as StatsType, Deck, Card, Note, DailyStats } from '../../common/types';
+import type { Stats as StatsType, Deck, Card, Grade, Note, DailyStats } from '../../common/types';
 import EditorialHeader from './EditorialHeader';
+import { calculateRetentionRate } from '../../background/scheduler';
 import {
   dailySessionMs,
   monthWindow,
@@ -123,9 +124,20 @@ export default function Stats({ stats, decks, cards, notes }: StatsProps) {
     [cards, now],
   );
 
-  const totalReps = cards.reduce((s, c) => s + (c.repetitions ?? 0), 0);
-  const totalLapses = cards.reduce((s, c) => s + (c.lapses ?? 0), 0);
-  const retentionPct = totalReps > 0 ? Math.round((1 - totalLapses / totalReps) * 100) : 0;
+  // Retention is the share of recent reviews graded >= 2. We can't derive it
+  // from per-card `repetitions` because that field resets to 0 on each lapse,
+  // making a deck-level `1 - lapses/repetitions` arithmetically broken.
+  const retentionWindowDays = 30;
+  const recentReviewsCount = useMemo(() => {
+    const cutoff = now - retentionWindowDays * DAY_MS;
+    return stats.reviewHistory.filter(r => r.timestamp >= cutoff).length;
+  }, [stats.reviewHistory, now]);
+  const retentionRate = useMemo(
+    () => calculateRetentionRate(stats.reviewHistory, retentionWindowDays),
+    [stats.reviewHistory],
+  );
+  const retentionPct = Math.round(retentionRate * 100);
+  const totalReps = recentReviewsCount;
 
   // ----- Range window for sections that follow it ---------------------------
   const window = useMemo(() => rangeWindow(range, now), [range, now]);
@@ -252,22 +264,30 @@ export default function Stats({ stats, decks, cards, notes }: StatsProps) {
     return map;
   }, [stats.reviewHistory]);
 
+  const reviewsByDeckId = useMemo(() => {
+    const map = new Map<string, { grade: Grade; timestamp: number }[]>();
+    for (const r of stats.reviewHistory) {
+      const list = map.get(r.deckId);
+      if (list) list.push({ grade: r.grade, timestamp: r.timestamp });
+      else map.set(r.deckId, [{ grade: r.grade, timestamp: r.timestamp }]);
+    }
+    return map;
+  }, [stats.reviewHistory]);
+
   const deckRetention = useMemo(() => {
     return decks.map(deck => {
-      const list = cards.filter(c => c.deckId === deck.id);
-      const reps = list.reduce((s, c) => s + (c.repetitions ?? 0), 0);
-      const lapses = list.reduce((s, c) => s + (c.lapses ?? 0), 0);
-      const r = reps > 0 ? Math.max(0, Math.min(1, 1 - lapses / reps)) : 0;
+      const reviews = reviewsByDeckId.get(deck.id) ?? [];
+      const r = calculateRetentionRate(reviews, retentionWindowDays);
       const meta = lastReviewByDeck.get(deck.id);
       return {
         deck,
         retention: r,
-        hasReviews: reps > 0,
+        hasReviews: reviews.length > 0,
         recentReviews: meta?.reviews ?? 0,
         lastReviewedAt: meta?.ts ?? 0,
       };
     });
-  }, [decks, cards, lastReviewByDeck]);
+  }, [decks, reviewsByDeckId, lastReviewByDeck]);
 
   // ----- Annual heatmap (existing) ------------------------------------------
   const heatmap = useMemo(() => {

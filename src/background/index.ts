@@ -337,7 +337,7 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
       return handleOpenDashboard();
 
     case 'get_next_study_card':
-      return handleGetNextStudyCard(message.deckId);
+      return handleGetNextStudyCard(message.deckId, message.practiceMode);
 
     case 'save_note':
       return handleSaveNote(message.note);
@@ -509,24 +509,46 @@ async function handleGetUpdateInfo(): Promise<Response<UpdateInfo | null>> {
 /**
  * Select the next due card, optionally filtered by deck.
  * Shared logic used by both domain-based and standalone study flows.
+ *
+ * When `practiceMode` is true and nothing is currently due, falls back to
+ * the next-soonest card (deck-scoped or global) so the learner can keep
+ * drilling after the SM-2 queue is empty.
  */
-async function selectNextDueCard(filterDeckId?: string): Promise<Card | null> {
+async function selectNextDueCard(
+  filterDeckId?: string,
+  practiceMode: boolean = false,
+): Promise<Card | null> {
   // When filtering by deck, fetch that deck's cards directly to avoid the 100-card limit
   // missing cards from the target deck.
   const now = Date.now();
-  let dueCards: Card[];
+  let candidateCards: Card[];
   if (filterDeckId) {
     const deckCards = await storage.getCards(filterDeckId);
-    dueCards = deckCards.filter(c => c.due <= now);
+    const dueCards = deckCards.filter(c => c.due <= now);
+    if (dueCards.length > 0) {
+      candidateCards = dueCards;
+    } else if (practiceMode) {
+      candidateCards = [...deckCards].sort((a, b) => a.due - b.due);
+    } else {
+      candidateCards = [];
+    }
   } else {
-    dueCards = await storage.getDueCards(100);
+    const dueCards = await storage.getDueCards(100);
+    if (dueCards.length > 0) {
+      candidateCards = dueCards;
+    } else if (practiceMode) {
+      const all = await storage.getCards();
+      candidateCards = [...all].sort((a, b) => a.due - b.due).slice(0, 100);
+    } else {
+      candidateCards = [];
+    }
   }
-  if (dueCards.length === 0) return null;
+  if (candidateCards.length === 0) return null;
 
   const decks = await storage.getDecks();
   const deckMap = new Map(decks.map(d => [d.id, d.name]));
 
-  const sorted = sortCardsForReview(dueCards);
+  const sorted = sortCardsForReview(candidateCards);
   const snoozedFlags = await Promise.all(sorted.map(card => storage.isCardSnoozed(card.id)));
   const availableCards = sorted.filter((_, index) => !snoozedFlags[index]);
 
@@ -623,9 +645,9 @@ async function handleGetNextCard(domain: string): Promise<Response<Card | null>>
 /**
  * Get next due card for standalone study (no domain checks, no deck rotation side effects)
  */
-async function handleGetNextStudyCard(deckId?: string): Promise<Response<Card | null>> {
+async function handleGetNextStudyCard(deckId?: string, practiceMode?: boolean): Promise<Response<Card | null>> {
   try {
-    const card = await selectNextDueCard(deckId);
+    const card = await selectNextDueCard(deckId, practiceMode);
     return { ok: true, data: card };
   } catch (error) {
     return { ok: false, error: String(error) };

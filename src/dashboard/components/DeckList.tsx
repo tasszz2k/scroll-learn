@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import type { Deck, Card, Stats, Response } from '../../common/types';
+import type { Deck, Card, Grade, Stats, Response } from '../../common/types';
+import { calculateRetentionRate } from '../../background/scheduler';
 import CardEditor from './CardEditor';
 import CardPreview from './CardPreview';
 import EditorialHeader from './EditorialHeader';
@@ -117,6 +118,20 @@ export default function DeckList({
   // is short-lived; we accept slight clock staleness in exchange for purity.
   const [now] = useState(() => Date.now());
 
+  // Group review history by deck once, then derive retention per deck.
+  // Using stats.reviewHistory is necessary because per-card `repetitions`
+  // resets to 0 on a lapse, so a deck-level `1 - lapses/repetitions` is
+  // mathematically broken (denominator drops while lapses keep climbing).
+  const reviewsByDeck = useMemo(() => {
+    const map = new Map<string, { grade: Grade; timestamp: number }[]>();
+    for (const r of stats?.reviewHistory ?? []) {
+      const list = map.get(r.deckId);
+      if (list) list.push({ grade: r.grade, timestamp: r.timestamp });
+      else map.set(r.deckId, [{ grade: r.grade, timestamp: r.timestamp }]);
+    }
+    return map;
+  }, [stats?.reviewHistory]);
+
   // Per-deck aggregates ----------------------------------------------------
   const perDeck = useMemo(() => {
     const map = new Map<string, {
@@ -124,7 +139,7 @@ export default function DeckList({
       due: number;
       newCount: number;
       avgEase: number;
-      retention: number; // 0..1 — heuristic from lapses / reviews
+      retention: number; // 0..1 — share of recent reviews graded >= 2
       kinds: Record<string, number>;
       forecast: number[]; // 14 days
       cardList: Card[];
@@ -136,11 +151,7 @@ export default function DeckList({
       const avgEase = list.length > 0
         ? list.reduce((s, c) => s + (c.ease ?? 2.5), 0) / list.length
         : 2.5;
-      const totalReps = list.reduce((s, c) => s + (c.repetitions ?? 0), 0);
-      const totalLapses = list.reduce((s, c) => s + (c.lapses ?? 0), 0);
-      const retention = totalReps > 0
-        ? Math.max(0, Math.min(1, 1 - totalLapses / totalReps))
-        : 0;
+      const retention = calculateRetentionRate(reviewsByDeck.get(deck.id) ?? [], 30);
       const kinds: Record<string, number> = { text: 0, 'mcq-single': 0, 'mcq-multi': 0, cloze: 0, audio: 0 };
       for (const c of list) kinds[c.kind] = (kinds[c.kind] ?? 0) + 1;
       const forecast = new Array(14).fill(0);
@@ -154,7 +165,7 @@ export default function DeckList({
       map.set(deck.id, { total: list.length, due, newCount, avgEase, retention, kinds, forecast, cardList });
     }
     return map;
-  }, [decks, cards, now]);
+  }, [decks, cards, now, reviewsByDeck]);
 
   const totalDue = useMemo(() => cards.filter(c => c.due <= now).length, [cards, now]);
 
@@ -242,7 +253,7 @@ export default function DeckList({
     : `${pluralize(cards.length, 'total card')}. Pick one to make active, or let the scheduler choose what is most overdue.`;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 48 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 260px', gap: 32 }}>
       {/* LEFT — header + table + expanded */}
       <div>
         <EditorialHeader
@@ -305,15 +316,23 @@ export default function DeckList({
         ) : (
           <>
             {/* DECK TABLE — editorial */}
-            <table className="dtable">
+            <table className="dtable" style={{ tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: 36 }} />
+                <col />
+                <col style={{ width: 56 }} />
+                <col style={{ width: 60 }} />
+                <col style={{ width: 110 }} />
+                <col style={{ width: 130 }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ width: 36 }}>№</th>
+                  <th>№</th>
                   <th>Deck</th>
-                  <th style={{ width: 110 }}>Cards</th>
-                  <th style={{ width: 110 }}>Due</th>
-                  <th style={{ width: 200 }}>Retention</th>
-                  <th style={{ width: 90, textAlign: 'right' }}></th>
+                  <th>Cards</th>
+                  <th>Due</th>
+                  <th>Retention</th>
+                  <th style={{ textAlign: 'right' }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -324,15 +343,38 @@ export default function DeckList({
                   return (
                     <tr key={deck.id}>
                       <td className="mono" style={{ color: 'var(--ink-4)' }}>{String(i + 1).padStart(2, '0')}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                          <span className="serif" style={{ fontSize: 18, fontWeight: 600, color: 'var(--ink)' }}>
+                      <td style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+                          <span
+                            className="serif"
+                            style={{
+                              fontSize: 18,
+                              fontWeight: 600,
+                              color: 'var(--ink)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              minWidth: 0,
+                              flex: 1,
+                            }}
+                            title={deck.name}
+                          >
                             {deck.name}
                           </span>
-                          {isActive && <span className="pill pill-ink">active</span>}
+                          {isActive && <span className="pill pill-ink" style={{ flexShrink: 0 }}>active</span>}
                         </div>
                         {deck.description && (
-                          <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 3 }}>
+                          <div
+                            style={{
+                              fontSize: 12.5,
+                              color: 'var(--ink-3)',
+                              marginTop: 3,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                            title={deck.description}
+                          >
                             {deck.description}
                           </div>
                         )}
@@ -363,32 +405,49 @@ export default function DeckList({
                         </div>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpandedDeck(isOpen ? null : deck.id);
-                            setCardFilter('');
-                          }}
-                          className={isOpen ? 'btn btn-dark' : 'btn btn-ghost'}
-                          style={{ padding: '6px 14px', fontSize: 12, gap: 6 }}
-                          aria-expanded={isOpen}
-                          aria-label={isOpen ? `Close ${deck.name}` : `Open ${deck.name}`}
-                        >
-                          {isOpen ? 'Close' : 'Open'}
-                          <svg
-                            width="11"
-                            height="11"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}
+                        <div style={{ display: 'inline-flex', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (onSetActiveDeck && !isActive) {
+                                await onSetActiveDeck(deck.id);
+                              }
+                              onBeginStudy?.();
+                            }}
+                            className="btn btn-clay"
+                            style={{ padding: '6px 10px', fontSize: 12 }}
+                            aria-label={`Study ${deck.name}`}
+                            disabled={agg.total === 0}
                           >
-                            <polyline points="6 9 12 15 18 9" />
-                          </svg>
-                        </button>
+                            Study
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedDeck(isOpen ? null : deck.id);
+                              setCardFilter('');
+                            }}
+                            className={isOpen ? 'btn btn-dark' : 'btn btn-ghost'}
+                            style={{ padding: '6px 10px', fontSize: 12, gap: 4 }}
+                            aria-expanded={isOpen}
+                            aria-label={isOpen ? `Close ${deck.name}` : `Open ${deck.name}`}
+                          >
+                            {isOpen ? 'Close' : 'Open'}
+                            <svg
+                              width="11"
+                              height="11"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}
+                            >
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

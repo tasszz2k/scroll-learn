@@ -62,6 +62,10 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
   const [startedAt, setStartedAt] = useState<number>(() => Date.now());
   const [now, setNow] = useState<number>(() => Date.now());
   const [initialDue, setInitialDue] = useState<number | null>(null);
+  // Practice mode: lets the learner keep drilling after the SM-2 queue is
+  // empty by serving cards in soonest-due order. Reviews still run through
+  // SM-2 so the schedule keeps tracking.
+  const [practiceMode, setPracticeMode] = useState(false);
   const autoStarted = useRef<boolean | null>(null);
 
   const activeDeckId = settings.activeDeckId || '';
@@ -71,14 +75,24 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
   for (const c of dueByDeck.values()) totalDue += c;
   const filteredDue = activeDeckId ? (dueByDeck.get(activeDeckId) || 0) : totalDue;
 
+  // Total cards available for practice (active deck or, when no filter, the
+  // background's 100-card global cap from selectNextDueCard).
+  const practicePool = useMemo(() => {
+    if (activeDeckId) return cards.filter(c => c.deckId === activeDeckId).length;
+    return Math.min(cards.length, 100);
+  }, [cards, activeDeckId]);
+
   // Lock the rail length to the count we started with — fires exactly once
   // per session, gated by `initialDue == null`.
   useEffect(() => {
     if (initialDue == null && (sessionState === 'answering' || sessionState === 'feedback')) {
+      const target = practiceMode
+        ? Math.max(practicePool, 1)
+        : Math.max(filteredDue + sessionStats.reviewed, 1);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot lock of rail length
-      setInitialDue(Math.max(filteredDue + sessionStats.reviewed, 1));
+      setInitialDue(target);
     }
-  }, [initialDue, sessionState, filteredDue, sessionStats.reviewed]);
+  }, [initialDue, sessionState, filteredDue, sessionStats.reviewed, practiceMode, practicePool]);
 
   // Tick once a second for elapsed display
   useEffect(() => {
@@ -86,12 +100,13 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
     return () => window.clearInterval(id);
   }, []);
 
-  const fetchNextCard = useCallback(async (deckId?: string) => {
+  const fetchNextCard = useCallback(async (deckId?: string, practice: boolean = false) => {
     setSessionState('loading');
     try {
       const response = await chrome.runtime.sendMessage({
         type: 'get_next_study_card',
         deckId: deckId || undefined,
+        practiceMode: practice || undefined,
       });
       if (response.ok && response.data) {
         const card = response.data as Card;
@@ -122,8 +137,18 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
     setSessionStats({ reviewed: 0, correct: 0, incorrect: 0, streak: 0 });
     setOutcomes([]);
     setInitialDue(null);
+    setPracticeMode(false);
     setStartedAt(Date.now());
     fetchNextCard(deckId || undefined);
+  }
+
+  function handleStartPractice() {
+    setPracticeMode(true);
+    setSessionStats({ reviewed: 0, correct: 0, incorrect: 0, streak: 0 });
+    setOutcomes([]);
+    setInitialDue(null);
+    setStartedAt(Date.now());
+    fetchNextCard(activeDeckId || undefined, true);
   }
 
   async function handleAnswer(userAnswer: string | number | number[]) {
@@ -163,12 +188,12 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
         snoozeMinutes: 10,
       });
     } catch { /* noop */ }
-    fetchNextCard(activeDeckId || undefined);
+    fetchNextCard(activeDeckId || undefined, practiceMode);
   }
 
   async function handleNext() {
     await onDataChange();
-    fetchNextCard(activeDeckId || undefined);
+    fetchNextCard(activeDeckId || undefined, practiceMode);
   }
 
   function handleEdit() {
@@ -185,7 +210,7 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
     try {
       await chrome.runtime.sendMessage({ type: 'delete_card', cardId: currentCard.id });
       await onDataChange();
-      fetchNextCard(activeDeckId || undefined);
+      fetchNextCard(activeDeckId || undefined, practiceMode);
     } catch { /* noop */ }
   }
 
@@ -215,7 +240,9 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
   const denom = Math.max(railLen, 1);
 
   // Section title (matches design — italic clay accent)
-  const sectionTitle: React.ReactNode = filteredDue === 0 && sessionStats.reviewed === 0 ? (
+  const sectionTitle: React.ReactNode = practiceMode ? (
+    <>Practice run. <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>Open drill.</span></>
+  ) : filteredDue === 0 && sessionStats.reviewed === 0 ? (
     <>Nothing due. <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>Quiet shelves.</span></>
   ) : (
     <>
@@ -257,7 +284,8 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
   );
 
   // Empty / complete state ------------------------------------------------
-  if (sessionState === 'complete' || (sessionState === 'loading' && sessionStats.reviewed === 0 && filteredDue === 0)) {
+  if (sessionState === 'complete' || (sessionState === 'loading' && sessionStats.reviewed === 0 && filteredDue === 0 && !practiceMode)) {
+    const canPractice = practicePool > 0;
     return (
       <div>
         {deckSelectorRow}
@@ -268,7 +296,16 @@ export default function StudySession({ decks, cards, settings, onDataChange, onS
             : <>Session complete. <span style={{ fontStyle: 'italic', color: 'var(--clay)' }}>Well done.</span></>}
           sub={sessionStats.reviewed === 0
             ? 'All caught up. Come back when more cards are due — or import new ones.'
-            : 'A small batch of cards put back into the schedule. Come back tomorrow.'}
+            : 'A small batch of cards put back into the schedule. Come back tomorrow — or keep drilling below.'}
+          action={canPractice ? (
+            <button
+              type="button"
+              className="btn btn-clay"
+              onClick={handleStartPractice}
+            >
+              Practice anyway →
+            </button>
+          ) : undefined}
         />
         {sessionStats.reviewed > 0 && (
           <div style={{

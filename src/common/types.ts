@@ -368,6 +368,10 @@ export interface OpenSidePanelMessage {
 export interface GetNextStudyCardMessage {
   type: 'get_next_study_card';
   deckId?: string;
+  // When true, return the next card even if nothing is due. Powers the
+  // "Practice anyway" flow on the Study tab so learners can keep drilling
+  // after the daily queue is empty without waiting on the SM-2 schedule.
+  practiceMode?: boolean;
 }
 
 export interface SaveNoteMessage {
