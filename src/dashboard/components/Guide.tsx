@@ -181,6 +181,43 @@ Capital of France? | Paris`}</Pre>
         <P>
           Failed cards (Again) reschedule to <strong>10 minutes</strong>, not the next day — they come back inside the same session so you actually re-encounter them.
         </P>
+
+        <H>How long until a card returns?</H>
+        <P>
+          The next due date depends on the grade you give and how many times you've already passed the card. Here's the schedule the scheduler runs.
+        </P>
+
+        <H>First review (brand-new card)</H>
+        <List>
+          <Bullet><Kbd>Again</Kbd> reschedules to <strong>10 minutes</strong> (ease drops 0.2).</Bullet>
+          <Bullet><Kbd>Hard</Kbd> reschedules to <strong>1 day</strong> (ease drops 0.15).</Bullet>
+          <Bullet><Kbd>Good</Kbd> reschedules to <strong>1 day</strong> (ease unchanged).</Bullet>
+          <Bullet><Kbd>Easy</Kbd> reschedules to <strong>4 days</strong> (ease rises 0.15).</Bullet>
+        </List>
+
+        <H>Second review (the next session)</H>
+        <List>
+          <Bullet><Kbd>Again</Kbd>: <strong>10 minutes</strong> (and the card resets to "first review" state).</Bullet>
+          <Bullet><Kbd>Hard</Kbd>: <strong>3 days</strong>.</Bullet>
+          <Bullet><Kbd>Good</Kbd>: <strong>6 days</strong>.</Bullet>
+          <Bullet><Kbd>Easy</Kbd>: <strong>10 days</strong>.</Bullet>
+        </List>
+
+        <H>Third review and onward (SM-2 takes over)</H>
+        <P>
+          From the third successful review forward, the new interval is calculated from your previous interval and the card's current ease:
+        </P>
+        <Pre>{`Hard:  next = round(prevInterval * ease * 0.8)
+Good:  next = round(prevInterval * ease)
+Easy:  next = round(prevInterval * ease * 1.3)
+Again: card resets, returns in 10 minutes`}</Pre>
+        <P>
+          So a card sitting at a 6-day interval with ease 2.5 jumps to ~15 days on Good, ~12 days on Hard, or ~20 days on Easy. Ease itself drifts: <Kbd>Easy</Kbd> +0.15, <Kbd>Good</Kbd> 0, <Kbd>Hard</Kbd> -0.15, <Kbd>Again</Kbd> -0.2, clamped to 1.3-3.5. Intervals cap at 365 days.
+        </P>
+        <P>
+          Concretely: if you grade a brand-new card <Kbd>Good</Kbd> every time, you'll see it again in 1 day, then 6 days, then ~2 weeks, ~1 month, ~2.5 months, ~6 months, then capped at 1 year. Grading <Kbd>Easy</Kbd> every time stretches that curve out about 2-3x faster.
+        </P>
+
         <H>Where to study</H>
         <List>
           <Bullet>Click <strong>Begin study</strong> in the dashboard, or <strong>Study now</strong> in the popup, for a focused session.</Bullet>

@@ -78,6 +78,7 @@ export default function DeckList({
   const [newDeckDescription, setNewDeckDescription] = useState('');
   const [cardFilter, setCardFilter] = useState('');
   const [previewState, setPreviewState] = useState<{ deckId: string; index: number } | null>(null);
+  const [showSchedulerHelp, setShowSchedulerHelp] = useState(false);
   const pendingScrollCardIdRef = useRef<string | null>(null);
 
   // Honor the "edit card from quiz" deep link. Effect-driven setState is
@@ -532,6 +533,107 @@ export default function DeckList({
                           <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>+14d</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Scheduler reference (collapsible) */}
+                    <div style={{ marginTop: 22 }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowSchedulerHelp(v => !v)}
+                        className="btn btn-ghost"
+                        style={{ padding: '4px 10px', fontSize: 11, gap: 6, color: 'var(--ink-3)' }}
+                        aria-expanded={showSchedulerHelp}
+                      >
+                        <span className="mono" aria-hidden="true">?</span>
+                        {showSchedulerHelp ? 'Hide scheduler reference' : 'How are these calculated?'}
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ transform: showSchedulerHelp ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}
+                          aria-hidden="true"
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
+                      {showSchedulerHelp && (
+                        <div
+                          className="card-flat"
+                          style={{
+                            padding: '20px 24px',
+                            marginTop: 10,
+                            fontSize: 13,
+                            lineHeight: 1.55,
+                            color: 'var(--ink-2)',
+                          }}
+                        >
+                          <div className="eyebrow" style={{ marginBottom: 10 }}>Scheduler reference</div>
+
+                          <div style={{ marginBottom: 14 }}>
+                            <strong style={{ color: 'var(--ink)' }}>Avg ease.</strong>{' '}
+                            Average of every card's ease factor in this deck. New cards start at 2.5.
+                            Goes up on Easy (+0.15), down on Hard (-0.15) or Again (-0.2). Clamped to 1.3 to 3.5.
+                          </div>
+
+                          <div style={{ marginBottom: 14 }}>
+                            <strong style={{ color: 'var(--ink)' }}>14-day forecast.</strong>{' '}
+                            How many cards become due each day for the next two weeks. The first
+                            bar (TODAY) includes everything overdue right now.
+                          </div>
+
+                          <div style={{ marginBottom: 6 }}>
+                            <strong style={{ color: 'var(--ink)' }}>How long until a card returns.</strong>
+                          </div>
+                          <div style={{ overflowX: 'auto', marginTop: 6 }}>
+                            <table className="dtable" style={{ fontSize: 12, minWidth: 460 }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ width: 70 }}>Grade</th>
+                                  <th style={{ width: 90 }}>1st review</th>
+                                  <th style={{ width: 110 }}>2nd review</th>
+                                  <th>3rd review onward</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td><span className="pill">Again</span></td>
+                                  <td className="mono">10 min</td>
+                                  <td className="mono">10 min (resets)</td>
+                                  <td className="mono">10 min (resets)</td>
+                                </tr>
+                                <tr>
+                                  <td><span className="pill">Hard</span></td>
+                                  <td className="mono">1 day</td>
+                                  <td className="mono">3 days</td>
+                                  <td className="mono">prev x ease x 0.8</td>
+                                </tr>
+                                <tr>
+                                  <td><span className="pill">Good</span></td>
+                                  <td className="mono">1 day</td>
+                                  <td className="mono">6 days</td>
+                                  <td className="mono">prev x ease</td>
+                                </tr>
+                                <tr>
+                                  <td><span className="pill">Easy</span></td>
+                                  <td className="mono">4 days</td>
+                                  <td className="mono">10 days</td>
+                                  <td className="mono">prev x ease x 1.3</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <p style={{ marginTop: 14, color: 'var(--ink-3)', fontSize: 12 }}>
+                            Intervals cap at 365 days. The 'Ease' column in the cards table below shows each card's
+                            current ease factor. See the <a href="#guide" className="ulink">Guide</a> for the full SM-2 walkthrough.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action bar */}
