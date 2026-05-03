@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.2](https://github.com/tasszz2k/scroll-learn/compare/v1.20.1...v1.20.2) (2026-05-03)
+
+
+### Bug Fixes
+
+* **decks:** keep active pill next to title and stop card actions wrapping ([d71f960](https://github.com/tasszz2k/scroll-learn/commit/d71f9603622b21942f7cee4c9d6b0609cb1057c2))
+
 ## [1.20.1](https://github.com/tasszz2k/scroll-learn/compare/v1.20.0...v1.20.1) (2026-05-03)
 
 
