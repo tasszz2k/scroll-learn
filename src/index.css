@@ -264,6 +264,7 @@ body {
 }
 .dtable tr:last-child td { border-bottom: none; }
 .dtable tr:hover td { background: var(--paper-2); }
+.dtable.no-row-hover tr:hover td { background: transparent; }
 
 /* ----------------------------------------------------------------
  * Misc — bar, links, stat numerals, ascii block

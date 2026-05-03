@@ -317,7 +317,7 @@ export default function DeckList({
         ) : (
           <>
             {/* DECK TABLE — editorial */}
-            <table className="dtable" style={{ tableLayout: 'fixed' }}>
+            <table className="dtable no-row-hover" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: 36 }} />
                 <col />
