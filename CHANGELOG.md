@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.0](https://github.com/tasszz2k/scroll-learn/compare/v1.19.1...v1.20.0) (2026-05-03)
+
+
+### Features
+
+* **notes:** add "Enable on all sites" toggle and remove sidebar FAB ([cbb9192](https://github.com/tasszz2k/scroll-learn/commit/cbb919262c355c0a420168a034f33a1f5766a38f))
+
 ## [1.19.1](https://github.com/tasszz2k/scroll-learn/compare/v1.19.0...v1.19.1) (2026-05-02)
 
 
