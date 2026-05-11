@@ -73,6 +73,9 @@ export interface Settings {
   hideYouTubeShorts: boolean;
   hideFacebookStrangers: boolean;
   hideInstagramStrangers: boolean;
+  hideByKeyword: boolean;
+  blockedKeywords: string[];
+  keywordHits: Record<string, number>;
   // Note capture
   noteCaptureAllowlist: string[];
   // When true, every host is treated as allowlisted and `noteCaptureAllowlist`
@@ -175,6 +178,9 @@ export const DEFAULT_SETTINGS: Settings = {
   hideYouTubeShorts: true,
   hideFacebookStrangers: true,
   hideInstagramStrangers: true,
+  hideByKeyword: true,
+  blockedKeywords: [],
+  keywordHits: {},
   noteCaptureAllowlist: ['app.zim.vn'],
   noteCaptureAllSites: false,
   noteMinLength: 2,
@@ -305,6 +311,11 @@ export interface GetSettingsMessage {
 export interface SetSettingsMessage {
   type: 'set_settings';
   settings: Partial<Settings>;
+}
+
+export interface IncrementKeywordHitsMessage {
+  type: 'increment_keyword_hits';
+  hits: Record<string, number>;
 }
 
 export interface GetDecksMessage {
@@ -704,6 +715,7 @@ export type Message =
   | BatchImportMessage
   | GetSettingsMessage
   | SetSettingsMessage
+  | IncrementKeywordHitsMessage
   | GetDecksMessage
   | SaveDeckMessage
   | DeleteDeckMessage
