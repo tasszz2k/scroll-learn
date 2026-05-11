@@ -83,7 +83,15 @@ async function initialize() {
   // Listen for settings changes and reload
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes[STORAGE_KEYS.SETTINGS]) {
-      console.log('[ScrollLearn] Settings changed, reloading...');
+      const old = changes[STORAGE_KEYS.SETTINGS].oldValue as Settings | undefined;
+      const next = changes[STORAGE_KEYS.SETTINGS].newValue as Settings | undefined;
+      // Skip blocker reload when only keywordHits changed (stats-only write from
+      // increment_keyword_hits). Reloading calls unhideAll() which would un-hide
+      // posts immediately after hiding them, causing an infinite loop.
+      if (old && next) {
+        const strip = (s: Settings) => { const { keywordHits: _kh, ...rest } = s; return rest; };
+        if (JSON.stringify(strip(old)) === JSON.stringify(strip(next))) return;
+      }
       loadSettings().then(() => {
         updateBlocker(settings);
       });
@@ -284,24 +292,30 @@ async function showQuiz() {
   
   // Load today's stats before showing quiz
   await loadTodayStats();
-  
+
+  // Re-check after await: another scroll tick may have already started a quiz
+  if (isQuizActive) return;
+
   console.log('[ScrollLearn] Requesting card from background...');
-  
+
   // Request next card from background
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'get_next_card_for_domain',
       domain: getDomainKey(),
     });
-    
+
     console.log('[ScrollLearn] Background response:', response);
-    
+
     if (!response.ok || !response.data) {
       console.log('[ScrollLearn] No cards due - make sure you have imported cards in the extension!');
       scrolledPastPostIds.clear(); scrolledPastCount = 0;
       return;
     }
-    
+
+    // Re-check after second await: quiz may have been dismissed while fetching card
+    if (isQuizActive) return;
+
     currentCard = response.data as Card;
     isQuizActive = true;
     

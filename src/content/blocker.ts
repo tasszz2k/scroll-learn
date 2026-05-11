@@ -14,6 +14,10 @@ import type { Settings } from '../common/types';
 
 const STYLE_ID = 'scrolllearn-blocker-styles';
 const HIDDEN_CLASS = 'scrolllearn-hidden';
+// Combined selector for already-hidden elements. data-sl-hidden is React-proof
+// (React doesn't remove data-* attrs it doesn't render); HIDDEN_CLASS covers
+// elements hidden via CSS class.
+const HIDDEN_SEL = `[data-sl-hidden],.${HIDDEN_CLASS}`;
 
 let blockerObserver: MutationObserver | null = null;
 let currentSettings: Settings | null = null;
@@ -112,8 +116,12 @@ function buildYouTubeShortsCSS(): string {
 }
 
 function buildHiddenClassCSS(): string {
+  // data-sl-hidden is used for elements where React reconciliation would otherwise
+  // remove our class (e.g. non-article Facebook posts). React doesn't manage
+  // custom data-* attributes it doesn't render, so the attribute persists.
   return `
-    .${HIDDEN_CLASS} {
+    .${HIDDEN_CLASS},
+    [data-sl-hidden] {
       display: none !important;
     }
   `;
@@ -168,11 +176,23 @@ function getHostname(): string {
 }
 
 /**
- * Hide an element by adding the hidden class.
+ * Hide an element.
+ * Uses three layers (most → least React-proof):
+ *  1. Inline style display:none — React only updates inline style properties it
+ *     explicitly renders; post containers render no inline styles, so ours persists
+ *     through reconciliation.
+ *  2. data-sl-hidden attribute — persists through reconciliation (React doesn't
+ *     remove data-* attrs it doesn't render), but lost on full node remount.
+ *  3. CSS class — fastest for CSS engine; may be reset by React className assignment.
  * Returns true if the element was newly hidden.
  */
 function hideElement(el: Element | null, category: BlockCategory = 'other'): boolean {
-  if (!el || el.classList.contains(HIDDEN_CLASS)) return false;
+  if (!el) return false;
+  const htmlEl = el as HTMLElement;
+  if (htmlEl.style.getPropertyValue('display') === 'none') return false;
+  if (el.hasAttribute('data-sl-hidden')) return false;
+  htmlEl.style.setProperty('display', 'none', 'important');
+  el.setAttribute('data-sl-hidden', '');
   el.classList.add(HIDDEN_CLASS);
   blockedCounts[category]++;
   notifyCountChange();
@@ -195,6 +215,7 @@ function closestFeedUnit(start: Element, hostname: string): Element | null {
   return null;
 }
 
+
 /**
  * Search the entire document for elements that indicate "Sponsored" content.
  * Returns the indicator elements themselves (the element closest to the label).
@@ -213,7 +234,7 @@ function findSponsoredIndicators(): Element[] {
 
   // Strategy B: aria-labelledby pointing to hidden element with "Sponsored"
   for (const el of document.querySelectorAll('[aria-labelledby]')) {
-    if (el.closest(`.${HIDDEN_CLASS}`)) continue;
+    if (el.closest(HIDDEN_SEL)) continue;
     if (el.closest('[role="article"]')) continue;
     const labelId = el.getAttribute('aria-labelledby');
     if (labelId) {
@@ -229,7 +250,7 @@ function findSponsoredIndicators(): Element[] {
 
   // Strategy C: Flex containers with obfuscated "Sponsored" text
   for (const container of document.querySelectorAll<HTMLElement>('span[style*="display: flex"], span[style*="display:flex"]')) {
-    if (container.closest(`.${HIDDEN_CLASS}`)) continue;
+    if (container.closest(HIDDEN_SEL)) continue;
     if (container.closest('[role="article"]')) continue;
     const children = container.children;
     if (children.length < 8 || children.length > 80) continue;
@@ -241,7 +262,7 @@ function findSponsoredIndicators(): Element[] {
 
   // Strategy D: Direct text match on link spans
   for (const el of document.querySelectorAll('a[role="link"] span, a span[dir="auto"]')) {
-    if (el.closest(`.${HIDDEN_CLASS}`)) continue;
+    if (el.closest(HIDDEN_SEL)) continue;
     if (el.closest('[role="article"]')) continue;
     const cleaned = stripInvisible(el.textContent || '').trim().toLowerCase();
     if (cleaned === 'sponsored') {
@@ -618,17 +639,17 @@ function scanNonArticleSponsored(scope: Element) {
   const candidates: HTMLElement[] = [];
 
   for (const c of scope.querySelectorAll<HTMLElement>(flexSel)) {
-    if (!c.closest('[role="article"]') && !c.closest(`.${HIDDEN_CLASS}`)) {
+    if (!c.closest('[role="article"]') && !c.closest(HIDDEN_SEL)) {
       candidates.push(c);
     }
   }
   if (scope instanceof HTMLElement && scope.matches?.(flexSel) &&
-      !scope.closest('[role="article"]') && !scope.closest(`.${HIDDEN_CLASS}`)) {
+      !scope.closest('[role="article"]') && !scope.closest(HIDDEN_SEL)) {
     candidates.push(scope);
   }
   const parentFlex = scope.closest?.<HTMLElement>(flexSel);
   if (parentFlex && !parentFlex.closest('[role="article"]') &&
-      !parentFlex.closest(`.${HIDDEN_CLASS}`)) {
+      !parentFlex.closest(HIDDEN_SEL)) {
     candidates.push(parentFlex);
   }
 
@@ -636,7 +657,7 @@ function scanNonArticleSponsored(scope: Element) {
     if (container.children.length < 8 || container.children.length > 80) continue;
     if (reconstructVisibleText(container).toLowerCase() === 'sponsored') {
       const unit = findAdFeedUnit(container);
-      if (unit && !unit.classList.contains(HIDDEN_CLASS)) hideElement(unit, 'sponsored');
+      if (unit && !unit.hasAttribute('data-sl-hidden')) hideElement(unit, 'sponsored');
     }
   }
 }
@@ -651,17 +672,17 @@ function scanNonArticleStrangers(scope: Element) {
   const profileNames: Element[] = [];
 
   for (const pn of scope.querySelectorAll(pnSel)) {
-    if (!pn.closest('[role="article"]') && !pn.closest(`.${HIDDEN_CLASS}`)) {
+    if (!pn.closest('[role="article"]') && !pn.closest(HIDDEN_SEL)) {
       profileNames.push(pn);
     }
   }
   if (scope.matches?.(pnSel) &&
-      !scope.closest('[role="article"]') && !scope.closest(`.${HIDDEN_CLASS}`)) {
+      !scope.closest('[role="article"]') && !scope.closest(HIDDEN_SEL)) {
     profileNames.push(scope);
   }
   const parentPN = scope.closest?.(pnSel);
   if (parentPN && !parentPN.closest('[role="article"]') &&
-      !parentPN.closest(`.${HIDDEN_CLASS}`)) {
+      !parentPN.closest(HIDDEN_SEL)) {
     profileNames.push(parentPN);
   }
 
@@ -677,7 +698,7 @@ function scanNonArticleStrangers(scope: Element) {
     }
     if (!hasFollow) continue;
     const unit = findAdFeedUnit(pn);
-    if (unit && !unit.classList.contains(HIDDEN_CLASS)) hideElement(unit, 'strangers');
+    if (unit && !unit.hasAttribute('data-sl-hidden')) hideElement(unit, 'strangers');
   }
 }
 
@@ -882,16 +903,52 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
     const keywords = settings.blockedKeywords;
 
     if (isFacebook) {
-      const articles: Element[] = el.getAttribute('role') === 'article'
-        ? [el]
-        : Array.from(el.querySelectorAll('[role="article"]'));
+      // Collect candidates: [role="article"] elements + direct children of
+      // [role="feed"] (covers colored-background posts, link-share cards, and
+      // other post types that don't get an article wrapper).
+      const seen = new Set<Element>();
+      const candidates: Element[] = [];
+
+      const addCandidate = (e: Element) => {
+        if (!seen.has(e)) { seen.add(e); candidates.push(e); }
+      };
+
+      if (el.getAttribute('role') === 'article') {
+        addCandidate(el);
+      } else {
+        for (const a of el.querySelectorAll('[role="article"]')) addCandidate(a);
+      }
       const parentArticle = el.closest('[role="article"]');
-      if (parentArticle && !articles.includes(parentArticle)) articles.push(parentArticle);
-      for (const article of articles) {
-        if (article.classList.contains(HIDDEN_CLASS)) continue;
-        const text = stripInvisible(article.textContent || '');
+      if (parentArticle) addCandidate(parentArticle);
+
+      // Feed children (any feed in or containing el)
+      for (const feed of el.querySelectorAll('[role="feed"]')) {
+        for (const child of feed.children) addCandidate(child);
+      }
+      const parentFeed = el.closest('[role="feed"]');
+      if (parentFeed) {
+        for (const child of parentFeed.children) addCandidate(child);
+      }
+      if (el.getAttribute('role') === 'feed') {
+        for (const child of el.children) addCandidate(child);
+      }
+
+      for (const candidate of candidates) {
+        if (candidate.hasAttribute('data-sl-hidden')) continue;
+        const text = stripInvisible(candidate.textContent || '');
         const kw = matchedKeyword(text, keywords);
-        if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); }
+        if (kw) { if (hideElement(candidate, 'other')) bufferKeywordHit(kw); }
+      }
+
+      // Fallback for feed-level posts without [role="article"] (colored-bg,
+      // link-share cards, group posts). When the MutationObserver adds a direct
+      // feed child (parent has 8+ children), story_message data-* attrs may not
+      // be set yet; scan textContent directly before the periodic tick catches it.
+      const elParent = el.parentElement;
+      if (elParent && elParent.children.length >= 8) {
+        const text = stripInvisible(el.textContent || '');
+        const kw = matchedKeyword(text, keywords);
+        if (kw) { if (hideElement(el, 'other')) bufferKeywordHit(kw); }
       }
     }
 
@@ -902,7 +959,7 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
       const parentArticle = el.closest('article');
       if (parentArticle && !articles.includes(parentArticle)) articles.push(parentArticle);
       for (const article of articles) {
-        if (article.classList.contains(HIDDEN_CLASS)) continue;
+        if (article.hasAttribute('data-sl-hidden')) continue;
         const text = stripInvisible(article.textContent || '');
         const kw = matchedKeyword(text, keywords);
         if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); }
@@ -915,7 +972,7 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
       const parentItem = el.closest?.(ytSel);
       if (parentItem && !items.includes(parentItem)) items.push(parentItem);
       for (const item of items) {
-        if (item.classList.contains(HIDDEN_CLASS)) continue;
+        if (item.hasAttribute('data-sl-hidden')) continue;
         const text = stripInvisible(item.textContent || '');
         const kw = matchedKeyword(text, keywords);
         if (kw) { hideElement(item, 'other'); bufferKeywordHit(kw); }
@@ -984,7 +1041,7 @@ function startPeriodicScan(hostname: string) {
 
     if (!currentSettings) return;
 
-    const notHidden = `:not(.${HIDDEN_CLASS})`;
+    const notHidden = `:not(.${HIDDEN_CLASS}):not([data-sl-hidden])`;
 
     if (isFacebook) {
       if (currentSettings.hideFacebookReels) {
@@ -1003,9 +1060,9 @@ function startPeriodicScan(hostname: string) {
         scanNonArticleSponsored(document.body);
         const sponsoredEls = findSponsoredIndicators();
         for (const el of sponsoredEls) {
-          if (el.closest(`.${HIDDEN_CLASS}`)) continue;
+          if (el.closest(HIDDEN_SEL)) continue;
           const container = findAdFeedUnit(el);
-          if (container && !container.classList.contains(HIDDEN_CLASS)) {
+          if (container && !container.hasAttribute('data-sl-hidden')) {
             hideElement(container, 'sponsored');
           }
         }
@@ -1030,8 +1087,44 @@ function startPeriodicScan(hostname: string) {
           continue;
         }
         if (currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
-          const kw = matchedKeyword(stripInvisible(article.textContent || ''), currentSettings.blockedKeywords);
-          if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); continue; }
+          const raw = stripInvisible(article.textContent || '');
+          const kw = matchedKeyword(raw, currentSettings.blockedKeywords);
+          if (kw) { if (hideElement(article, 'other')) bufferKeywordHit(kw); continue; }
+        }
+      }
+
+      // Scan story_message elements for keyword matches (non-article post types:
+      // colored-bg posts, link-share cards, group posts, etc.)
+      if (currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
+        const keywords = currentSettings.blockedKeywords;
+        const allSM = document.querySelectorAll('[data-ad-rendering-role="story_message"]');
+        for (const sm of allSM) {
+          if (sm.closest(HIDDEN_SEL)) continue;
+          if (sm.closest('[role="article"]')) continue; // already handled by article loop
+          const raw = stripInvisible(sm.textContent || '');
+          const kw = matchedKeyword(raw, keywords);
+          if (kw) {
+            // Walk up to find the post-level container.
+            // Stop when parent has 8+ children (feed level) or at explicit signals.
+            let container: Element | null = null;
+            let cur: Element | null = sm;
+            while (cur && cur !== document.body) {
+              const p: Element | null = cur.parentElement;
+              if (!p) break;
+              if (p.getAttribute('role') === 'feed') { container = cur; break; }
+              if (cur.hasAttribute('data-pagelet')) { container = cur; break; }
+              if (p.children.length >= 8) { container = cur; break; }
+              cur = p;
+            }
+            if (!container) {
+              let up: Element | null = sm;
+              for (let i = 0; i < 15 && up && up !== document.body; i++) {
+                up = up.parentElement;
+              }
+              container = up;
+            }
+            if (hideElement(container, 'other')) bufferKeywordHit(kw);
+          }
         }
       }
     }
@@ -1124,6 +1217,14 @@ export function getBlockedCounts(): BlockedCounts {
 // Public API
 // ---------------------------------------------------------------------------
 
+function unhideAll() {
+  for (const el of document.querySelectorAll(`[data-sl-hidden],.${HIDDEN_CLASS}`)) {
+    (el as HTMLElement).style.removeProperty('display');
+    el.removeAttribute('data-sl-hidden');
+    el.classList.remove(HIDDEN_CLASS);
+  }
+}
+
 export function startBlocker(settings: Settings) {
   currentSettings = settings;
   const hostname = getHostname();
@@ -1136,12 +1237,8 @@ export function updateBlocker(settings: Settings) {
   const hostname = getHostname();
   injectOrUpdateStyle(buildCSS(settings, hostname));
 
-  // Remove hidden class from previously hidden elements when settings change
-  // so they reappear without a page reload.
-  const hidden = document.querySelectorAll(`.${HIDDEN_CLASS}`);
-  for (const el of hidden) {
-    el.classList.remove(HIDDEN_CLASS);
-  }
+  // Remove all hidden markers (including inline style) so re-scan starts clean.
+  unhideAll();
 
   // Re-scan the page with updated settings
   scanPage(settings);
@@ -1152,8 +1249,5 @@ export function stopBlocker() {
   removeStyle();
   currentSettings = null;
 
-  const hidden = document.querySelectorAll(`.${HIDDEN_CLASS}`);
-  for (const el of hidden) {
-    el.classList.remove(HIDDEN_CLASS);
-  }
+  unhideAll();
 }
