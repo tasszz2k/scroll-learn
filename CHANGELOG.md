@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.22.1](https://github.com/tasszz2k/scroll-learn/compare/v1.22.0...v1.22.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* **blocker:** fix settings-change propagation to content script and add FB/IG keyword periodic scan ([19db543](https://github.com/tasszz2k/scroll-learn/commit/19db543e325e7602f5e1512c7bac06ad386c495b))
+
 ## [1.22.0](https://github.com/tasszz2k/scroll-learn/compare/v1.21.1...v1.22.0) (2026-05-11)
 
 
