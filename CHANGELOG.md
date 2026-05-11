@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.22.4](https://github.com/tasszz2k/scroll-learn/compare/v1.22.3...v1.22.4) (2026-05-11)
+
+
+### Bug Fixes
+
+* **blocker:** prevent infinite hide/un-hide loop for keyword-blocked posts ([8821625](https://github.com/tasszz2k/scroll-learn/commit/88216254307076da222a04a800d0a4cb8156cb44))
+
 ## [1.22.3](https://github.com/tasszz2k/scroll-learn/compare/v1.22.2...v1.22.3) (2026-05-11)
 
 
