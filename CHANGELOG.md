@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.22.3](https://github.com/tasszz2k/scroll-learn/compare/v1.22.2...v1.22.3) (2026-05-11)
+
+
+### Bug Fixes
+
+* **blocker:** prevent periodic scan timer from dying on sendMessage throw ([2746bfc](https://github.com/tasszz2k/scroll-learn/commit/2746bfccbc4240e40bcb39f0e4b64ece4c717a07))
+
 ## [1.22.2](https://github.com/tasszz2k/scroll-learn/compare/v1.22.1...v1.22.2) (2026-05-11)
 
 
