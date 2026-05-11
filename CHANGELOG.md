@@ -4,6 +4,17 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.22.0](https://github.com/tasszz2k/scroll-learn/compare/v1.21.1...v1.22.0) (2026-05-11)
+
+
+### Features
+
+* **background:** handle increment_keyword_hits message ([4d3d87b](https://github.com/tasszz2k/scroll-learn/commit/4d3d87b89f2d8214d55eba83f7968056f09c3512))
+* **blocker:** add keyword-based post hiding with hit buffering ([7a85083](https://github.com/tasszz2k/scroll-learn/commit/7a85083902b7fdaed23691956fade3177133fc85))
+* **settings:** add keyword filters section with tag input and preset groups ([99eac14](https://github.com/tasszz2k/scroll-learn/commit/99eac14a1ff90cc7816867dbb0106407d6e20d18))
+* **stats:** add keyword blocks breakdown section ([fab334f](https://github.com/tasszz2k/scroll-learn/commit/fab334f2ed03ce43b1d07193b8e9beef54fd41e0))
+* **types:** add keyword filtering fields to Settings ([22501bb](https://github.com/tasszz2k/scroll-learn/commit/22501bbc27a58b3093c1046705defe25c3c7ba87))
+
 ## [1.21.1](https://github.com/tasszz2k/scroll-learn/compare/v1.21.0...v1.21.1) (2026-05-11)
 
 
