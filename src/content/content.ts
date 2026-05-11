@@ -9,7 +9,7 @@
  */
 
 import type { Card, Settings } from '../common/types';
-import { DEFAULT_SETTINGS } from '../common/types';
+import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../common/types';
 import { facebookDetector, getVisiblePosts, type DomainDetector } from './fb';
 import { youtubeDetector, isYouTubeFeedPage, isYouTubeWatchPage } from './youtube';
 import { instagramDetector, isInstagramFeedPage } from './instagram';
@@ -82,7 +82,7 @@ async function initialize() {
 
   // Listen for settings changes and reload
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.settings) {
+    if (areaName === 'local' && changes[STORAGE_KEYS.SETTINGS]) {
       console.log('[ScrollLearn] Settings changed, reloading...');
       loadSettings().then(() => {
         updateBlocker(settings);

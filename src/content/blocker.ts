@@ -1019,6 +1019,10 @@ function startPeriodicScan(hostname: string) {
           hideElement(article, 'strangers');
           continue;
         }
+        if (currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
+          const kw = matchedKeyword(stripInvisible(article.textContent || ''), currentSettings.blockedKeywords);
+          if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); continue; }
+        }
       }
     }
 
@@ -1036,6 +1040,10 @@ function startPeriodicScan(hostname: string) {
         if (currentSettings.hideInstagramStrangers && isInstagramStranger(article)) {
           hideElement(article, 'strangers');
           continue;
+        }
+        if (currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
+          const kw = matchedKeyword(stripInvisible(article.textContent || ''), currentSettings.blockedKeywords);
+          if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); continue; }
         }
       }
     }
