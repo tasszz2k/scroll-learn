@@ -44,7 +44,11 @@ function flushKeywordHits() {
   if (Object.keys(pendingKeywordHits).length === 0) return;
   const hits = { ...pendingKeywordHits };
   pendingKeywordHits = {};
-  chrome.runtime.sendMessage({ type: 'increment_keyword_hits', hits }).catch(() => {});
+  try {
+    chrome.runtime.sendMessage({ type: 'increment_keyword_hits', hits }).catch(() => {});
+  } catch {
+    // extension context may be invalidated; drop hits silently
+  }
 }
 
 export type BlockCategory = 'reels' | 'shorts' | 'sponsored' | 'suggested' | 'strangers' | 'other';
@@ -975,6 +979,9 @@ function startPeriodicScan(hostname: string) {
   if (!isFacebook && !isInstagram && !isYouTube) return;
 
   const tick = () => {
+    // Reschedule first so the timer survives any error below.
+    periodicScanTimer = setTimeout(tick, INTERVAL_MS);
+
     if (!currentSettings) return;
 
     const notHidden = `:not(.${HIDDEN_CLASS})`;
@@ -1062,7 +1069,6 @@ function startPeriodicScan(hostname: string) {
     }
 
     flushKeywordHits();
-    periodicScanTimer = setTimeout(tick, INTERVAL_MS);
   };
 
   periodicScanTimer = setTimeout(tick, INTERVAL_MS);
