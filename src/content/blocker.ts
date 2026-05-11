@@ -522,7 +522,7 @@ function isFacebookStranger(article: Element): boolean {
   );
   for (const el of candidates) {
     const text = stripInvisible(el.textContent || '').trim();
-    if (text === 'Follow') {
+    if (text === 'Follow' || text === 'Join') {
       // Make sure this is in the header, not in the post body.
       // The post body is wrapped in [data-ad-rendering-role="story_message"]
       // or a deeply nested content div. We reject if the element is inside
@@ -637,7 +637,8 @@ function scanNonArticleStrangers(scope: Element) {
     const btns = pn.querySelectorAll('[role="button"], a[role="link"], div[tabindex="0"]');
     let hasFollow = false;
     for (const btn of btns) {
-      if (stripInvisible(btn.textContent || '').trim() === 'Follow') {
+      const text = stripInvisible(btn.textContent || '').trim();
+      if (text === 'Follow' || text === 'Join') {
         hasFollow = true;
         break;
       }
