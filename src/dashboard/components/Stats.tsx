@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import type { Stats as StatsType, Deck, Card, Grade, Note, DailyStats } from '../../common/types';
+import type { Stats as StatsType, Deck, Card, Grade, Note, DailyStats, Settings } from '../../common/types';
 import EditorialHeader from './EditorialHeader';
 import { calculateRetentionRate } from '../../background/scheduler';
 import {
@@ -18,6 +18,7 @@ interface StatsProps {
   decks: Deck[];
   cards: Card[];
   notes: Note[];
+  settings: Settings | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -108,7 +109,7 @@ function deltaLabel(current: number, prior: number, unit: string): string {
   return `${sign}${numberFmt(diff)} ${unit} (${sign}${pct}% vs prior period)`;
 }
 
-export default function Stats({ stats, decks, cards, notes }: StatsProps) {
+export default function Stats({ stats, decks, cards, notes, settings }: StatsProps) {
   const [range, setRange] = useState<Range>('30d');
   const [now] = useState(() => Date.now());
 
@@ -851,6 +852,43 @@ export default function Stats({ stats, decks, cards, notes }: StatsProps) {
           </div>
         </div>
       </div>
+
+      {/* Keyword blocks */}
+      <section style={{ marginTop: 48 }}>
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #888)' }}>
+            Keyword blocks
+          </span>
+        </div>
+        {!settings || settings.blockedKeywords.length === 0 ? (
+          <div className="card-flat" style={{ padding: '20px 28px', fontSize: 13, color: 'var(--text-muted, #888)' }}>
+            No keywords configured — add some in Settings.
+          </div>
+        ) : (
+          <div className="card-flat" style={{ borderRadius: 0 }}>
+            <table className="dtable">
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: 24 }}>Keyword</th>
+                  <th style={{ textAlign: 'right', paddingRight: 24 }}>Hidden (all time)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...settings.blockedKeywords]
+                  .sort((a, b) => (settings.keywordHits[b] ?? 0) - (settings.keywordHits[a] ?? 0))
+                  .map(kw => (
+                    <tr key={kw}>
+                      <td style={{ paddingLeft: 24 }}>{kw}</td>
+                      <td style={{ textAlign: 'right', paddingRight: 24 }}>
+                        {numberFmt(settings.keywordHits[kw] ?? 0)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

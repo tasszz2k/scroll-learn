@@ -561,6 +561,7 @@ export default function App() {
             decks={decks}
             cards={cards}
             notes={notes}
+            settings={settings}
           />
         )}
 
