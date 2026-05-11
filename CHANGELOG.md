@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.21.1](https://github.com/tasszz2k/scroll-learn/compare/v1.21.0...v1.21.1) (2026-05-11)
+
+
+### Bug Fixes
+
+* **blocker:** hide stranger Facebook groups with Join button ([b34acb8](https://github.com/tasszz2k/scroll-learn/commit/b34acb850184b440015f41df353d72c8ec280792))
+
 ## [1.21.0](https://github.com/tasszz2k/scroll-learn/compare/v1.20.3...v1.21.0) (2026-05-03)
 
 
