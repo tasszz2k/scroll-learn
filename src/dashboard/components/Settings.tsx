@@ -30,6 +30,14 @@ function normalizeAllowlistInput(raw: string): string {
   return host;
 }
 
+const KEYWORD_PRESETS: { label: string; keywords: string[] }[] = [
+  { label: 'War & conflict',  keywords: ['war', 'conflict', 'attack', 'missile', 'bomb', 'military', 'troops'] },
+  { label: 'Politics',        keywords: ['election', 'congress', 'senate', 'president', 'democrat', 'republican'] },
+  { label: 'Crypto',          keywords: ['bitcoin', 'crypto', 'ethereum', 'nft', 'blockchain', 'defi', 'altcoin'] },
+  { label: 'Celebrity',       keywords: ['celebrity', 'gossip', 'drama', 'kardashian', 'paparazzi'] },
+  { label: 'Sports scores',   keywords: ['score', 'match result', 'standings', 'league table', 'fixture'] },
+];
+
 const SUPPORTED_DOMAINS = [
   { domain: 'facebook.com',  label: 'facebook.com',  reels: 'hideFacebookReels',  sponsored: 'hideFacebookSponsored',  suggested: 'hideFacebookSuggested',  strangers: 'hideFacebookStrangers',  hides: 'Reels · Sponsored · Suggested · Strangers' },
   { domain: 'instagram.com', label: 'instagram.com', reels: 'hideInstagramReels', sponsored: 'hideInstagramSponsored', suggested: 'hideInstagramSuggested', strangers: 'hideInstagramStrangers', hides: 'Reels · Sponsored · Suggested · Strangers' },
@@ -398,6 +406,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   const [saved, setSaved] = useState(false);
   const [allowlistInput, setAllowlistInput] = useState('');
   const [allowlistError, setAllowlistError] = useState<string | null>(null);
+  const [keywordInput, setKeywordInput] = useState('');
   const [noteAutoSaveStatus, setNoteAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const noteAutoSaveSkipFirst = useRef(true);
   const [aiAutoSaveStatus, setAiAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -536,6 +545,12 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     setLocalSettings({ ...localSettings, [key]: value });
   }
 
+  function updateMany(partial: Partial<SettingsType>) {
+    const next = { ...localSettings, ...partial };
+    setLocalSettings(next);
+    onSave(partial);
+  }
+
   function toggle<K extends keyof SettingsType>(key: K) {
     update(key, !localSettings[key] as SettingsType[K]);
   }
@@ -552,6 +567,29 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         [domain]: { ...localSettings.domainSettings[domain], enabled: !isDomainEnabled(domain) },
       },
     });
+  }
+
+  function addKeyword(raw: string) {
+    const kw = raw.trim();
+    if (!kw) return;
+    const lower = kw.toLowerCase();
+    if (localSettings.blockedKeywords.some(k => k.toLowerCase() === lower)) return;
+    const next = [...localSettings.blockedKeywords, kw];
+    update('blockedKeywords', next);
+  }
+
+  function removeKeyword(kw: string) {
+    const next = localSettings.blockedKeywords.filter(k => k !== kw);
+    const hits = { ...localSettings.keywordHits };
+    delete hits[kw];
+    updateMany({ blockedKeywords: next, keywordHits: hits });
+  }
+
+  function addPreset(keywords: string[]) {
+    const existing = new Set(localSettings.blockedKeywords.map(k => k.toLowerCase()));
+    const toAdd = keywords.filter(k => !existing.has(k.toLowerCase()));
+    if (toAdd.length === 0) return;
+    update('blockedKeywords', [...localSettings.blockedKeywords, ...toAdd]);
   }
 
   function addAllowlistDomain() {
@@ -794,9 +832,130 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === C · QUIZ BEHAVIOUR === */}
+      {/* === C · KEYWORD FILTERS === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="C" label="Quiz behaviour" count="8 SETTINGS" />
+        <SectionHead
+          num="C"
+          label="Keyword filters"
+          count={`${localSettings.blockedKeywords.length} KEYWORDS · ${Object.values(localSettings.keywordHits).reduce((a, b) => a + b, 0)} BLOCKED`}
+        />
+        <div className="card-flat" style={{ padding: '16px 28px' }}>
+          <Row label="Hide posts by keyword" hint="Hide any post on Facebook, Instagram, or YouTube whose text contains a matching word or phrase (whole-word, case-insensitive).">
+            <ToggleControl on={localSettings.hideByKeyword} onClick={() => toggle('hideByKeyword')} ariaLabel="Hide posts by keyword" />
+          </Row>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--text-muted, #888)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick add</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {KEYWORD_PRESETS.map(preset => (
+                <button
+                  key={preset.label}
+                  onClick={() => addPreset(preset.keywords)}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: 12,
+                    borderRadius: 12,
+                    border: '1px solid var(--border, #ddd)',
+                    background: 'var(--bg-secondary, #f5f5f5)',
+                    cursor: 'pointer',
+                    color: 'var(--text, #333)',
+                  }}
+                >
+                  + {preset.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <input
+                type="text"
+                value={keywordInput}
+                onChange={e => setKeywordInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    addKeyword(keywordInput);
+                    setKeywordInput('');
+                  }
+                }}
+                placeholder="Add keyword, press Enter"
+                style={{
+                  flex: 1,
+                  padding: '6px 12px',
+                  fontSize: 13,
+                  border: '1px solid var(--border, #ddd)',
+                  borderRadius: 6,
+                  background: 'var(--bg-input, #fff)',
+                  color: 'var(--text, #333)',
+                }}
+              />
+              <button
+                onClick={() => { addKeyword(keywordInput); setKeywordInput(''); }}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  borderRadius: 6,
+                  border: '1px solid var(--border, #ddd)',
+                  background: 'var(--bg-secondary, #f5f5f5)',
+                  cursor: 'pointer',
+                  color: 'var(--text, #333)',
+                }}
+              >
+                Add
+              </button>
+            </div>
+            {localSettings.blockedKeywords.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--text-muted, #888)', padding: '8px 0' }}>
+                No keywords yet. Add one above or pick a quick-add group.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {localSettings.blockedKeywords.map(kw => {
+                  const hits = localSettings.keywordHits[kw] ?? 0;
+                  return (
+                    <span
+                      key={kw}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '4px 10px',
+                        fontSize: 13,
+                        borderRadius: 14,
+                        background: 'var(--accent-soft, #e8f0fe)',
+                        color: 'var(--accent, #1a73e8)',
+                        border: '1px solid var(--accent-border, #c5d8fb)',
+                      }}
+                    >
+                      {kw}
+                      {hits > 0 && (
+                        <span style={{ fontSize: 11, opacity: 0.75 }}>({hits})</span>
+                      )}
+                      <button
+                        onClick={() => removeKeyword(kw)}
+                        aria-label={`Remove keyword ${kw}`}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 0,
+                          lineHeight: 1,
+                          color: 'inherit',
+                          opacity: 0.6,
+                          fontSize: 14,
+                        }}
+                      >
+                        x
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* === D · QUIZ BEHAVIOUR === */}
+      <section style={{ marginTop: 48 }}>
+        <SectionHead num="D" label="Quiz behaviour" count="8 SETTINGS" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Show after N posts" hint="Cards appear once you have scrolled past this many feed items.">
             <Stepper value={localSettings.showAfterNPosts} unit="posts" min={1} max={50} onChange={n => update('showAfterNPosts', n)} />
@@ -866,9 +1025,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === D · ANSWER MATCHING === */}
+      {/* === E · ANSWER MATCHING === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="D" label="Answer matching" count="4 SETTINGS" />
+        <SectionHead num="E" label="Answer matching" count="4 SETTINGS" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Case sensitive" hint={'"Madrid" vs "madrid" — do they count the same?'}>
             <ToggleControl
@@ -913,9 +1072,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === E · PIPELINE === */}
+      {/* === F · PIPELINE === */}
       <section style={{ marginTop: 48 }}>
-        <SectionHead num="E" label="The pipeline" />
+        <SectionHead num="F" label="The pipeline" />
         <div className="card-flat" style={{ padding: '24px 32px' }}>
           <pre className="ascii" style={{ margin: 0, fontSize: 12, lineHeight: 1.55 }}>
 {`scroll                  scroll
@@ -931,10 +1090,10 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === F · NOTE CAPTURE === */}
+      {/* === G · NOTE CAPTURE === */}
       <section style={{ marginTop: 48 }}>
         <SectionHead
-          num="F"
+          num="G"
           label="Note capture"
           count={
             noteAutoSaveStatus === 'saved'
@@ -1073,9 +1232,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === G · DATA === */}
+      {/* === H · DATA === */}
       <section style={{ marginTop: 48, marginBottom: 24 }}>
-        <SectionHead num="G" label="Data" count="EXPORT · WIPE" />
+        <SectionHead num="H" label="Data" count="EXPORT · WIPE" />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Export" hint="Download every card and deck as JSON for backup or migration.">
             <button
@@ -1127,9 +1286,9 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         </div>
       </section>
 
-      {/* === H · ABOUT === */}
+      {/* === I · ABOUT === */}
       <section style={{ marginTop: 48, marginBottom: 48 }}>
-        <SectionHead num="H" label="About" count={`v${chrome.runtime.getManifest().version}`} />
+        <SectionHead num="I" label="About" count={`v${chrome.runtime.getManifest().version}`} />
         <div className="card-flat" style={{ padding: '4px 28px' }}>
           <Row label="Extension" hint="Name and current installed version." last>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
