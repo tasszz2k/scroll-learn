@@ -302,7 +302,10 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     
     case 'set_settings':
       return handleSetSettings(message.settings);
-    
+
+    case 'increment_keyword_hits':
+      return handleIncrementKeywordHits(message.hits);
+
     case 'get_decks':
       return handleGetDecks();
     
@@ -777,6 +780,23 @@ async function handleSetSettings(settings: Partial<Settings>): Promise<Response<
   try {
     const updated = await storage.saveSettings(settings);
     return { ok: true, data: updated };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+/**
+ * Increment keyword hits
+ */
+async function handleIncrementKeywordHits(hits: Record<string, number>): Promise<Response<void>> {
+  try {
+    const current = await storage.getSettings();
+    const merged: Record<string, number> = { ...current.keywordHits };
+    for (const [kw, count] of Object.entries(hits)) {
+      merged[kw] = (merged[kw] ?? 0) + count;
+    }
+    await storage.saveSettings({ keywordHits: merged });
+    return { ok: true, data: undefined };
   } catch (error) {
     return { ok: false, error: String(error) };
   }
