@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.22.2](https://github.com/tasszz2k/scroll-learn/compare/v1.22.1...v1.22.2) (2026-05-11)
+
+
+### Bug Fixes
+
+* **blocker:** normalize Unicode before keyword matching ([f5935a1](https://github.com/tasszz2k/scroll-learn/commit/f5935a1ede79b2e481043bafe34674c95a47bfde))
+
 ## [1.22.1](https://github.com/tasszz2k/scroll-learn/compare/v1.22.0...v1.22.1) (2026-05-11)
 
 
