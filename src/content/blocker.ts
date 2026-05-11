@@ -22,12 +22,15 @@ let periodicScanTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingKeywordHits: Record<string, number> = {};
 
 export function matchedKeyword(text: string, keywords: string[]): string | null {
-  const lower = text.toLowerCase();
+  // NFC-normalize + lowercase both sides so precomposed/decomposed Unicode
+  // variants (e.g. "ê" vs "e" + combining circumflex) compare as equal.
+  const lower = text.normalize('NFC').toLowerCase();
   for (const kw of keywords) {
-    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const kwNorm = kw.normalize('NFC').toLowerCase();
+    const escaped = kwNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // Use lookahead/lookbehind instead of \b so keywords starting or ending
     // with non-word characters (e.g. "$money") still respect word boundaries.
-    const re = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, 'i');
+    const re = new RegExp(`(?<![\\w])${escaped}(?![\\w])`);
     if (re.test(lower)) return kw;
   }
   return null;
