@@ -19,6 +19,31 @@ let blockerObserver: MutationObserver | null = null;
 let currentSettings: Settings | null = null;
 let periodicScanTimer: ReturnType<typeof setTimeout> | null = null;
 
+let pendingKeywordHits: Record<string, number> = {};
+
+export function matchedKeyword(text: string, keywords: string[]): string | null {
+  const lower = text.toLowerCase();
+  for (const kw of keywords) {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Use lookahead/lookbehind instead of \b so keywords starting or ending
+    // with non-word characters (e.g. "$money") still respect word boundaries.
+    const re = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, 'i');
+    if (re.test(lower)) return kw;
+  }
+  return null;
+}
+
+function bufferKeywordHit(keyword: string) {
+  pendingKeywordHits[keyword] = (pendingKeywordHits[keyword] ?? 0) + 1;
+}
+
+function flushKeywordHits() {
+  if (Object.keys(pendingKeywordHits).length === 0) return;
+  const hits = { ...pendingKeywordHits };
+  pendingKeywordHits = {};
+  chrome.runtime.sendMessage({ type: 'increment_keyword_hits', hits }).catch(() => {});
+}
+
 export type BlockCategory = 'reels' | 'shorts' | 'sponsored' | 'suggested' | 'strangers' | 'other';
 export type BlockedCounts = Record<BlockCategory, number>;
 
@@ -844,6 +869,52 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
       hideElement(parentArticle, 'strangers');
     }
   }
+
+  // --- Keyword Filters (all platforms) ---
+  if (settings.hideByKeyword && settings.blockedKeywords.length > 0) {
+    const keywords = settings.blockedKeywords;
+
+    if (isFacebook) {
+      const articles: Element[] = el.getAttribute('role') === 'article'
+        ? [el]
+        : Array.from(el.querySelectorAll('[role="article"]'));
+      const parentArticle = el.closest('[role="article"]');
+      if (parentArticle && !articles.includes(parentArticle)) articles.push(parentArticle);
+      for (const article of articles) {
+        if (article.classList.contains(HIDDEN_CLASS)) continue;
+        const text = stripInvisible(article.textContent || '');
+        const kw = matchedKeyword(text, keywords);
+        if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); }
+      }
+    }
+
+    if (isInstagram) {
+      const articles: Element[] = el.tagName === 'ARTICLE'
+        ? [el]
+        : Array.from(el.querySelectorAll('article'));
+      const parentArticle = el.closest('article');
+      if (parentArticle && !articles.includes(parentArticle)) articles.push(parentArticle);
+      for (const article of articles) {
+        if (article.classList.contains(HIDDEN_CLASS)) continue;
+        const text = stripInvisible(article.textContent || '');
+        const kw = matchedKeyword(text, keywords);
+        if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); }
+      }
+    }
+
+    if (isYouTube) {
+      const ytSel = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer';
+      const items: Element[] = el.matches?.(ytSel) ? [el] : Array.from(el.querySelectorAll(ytSel));
+      const parentItem = el.closest?.(ytSel);
+      if (parentItem && !items.includes(parentItem)) items.push(parentItem);
+      for (const item of items) {
+        if (item.classList.contains(HIDDEN_CLASS)) continue;
+        const text = stripInvisible(item.textContent || '');
+        const kw = matchedKeyword(text, keywords);
+        if (kw) { hideElement(item, 'other'); bufferKeywordHit(kw); }
+      }
+    }
+  }
 }
 
 /**
@@ -896,8 +967,9 @@ function startPeriodicScan(hostname: string) {
   const INTERVAL_MS = 2000;
   const isFacebook = hostname.includes('facebook');
   const isInstagram = hostname.includes('instagram');
+  const isYouTube = hostname.includes('youtube');
 
-  if (!isFacebook && !isInstagram) return;
+  if (!isFacebook && !isInstagram && !isYouTube) return;
 
   const tick = () => {
     if (!currentSettings) return;
@@ -968,6 +1040,17 @@ function startPeriodicScan(hostname: string) {
       }
     }
 
+    if (isYouTube && currentSettings?.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
+      const ytSel = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer';
+      const notHiddenSel = `:not(.${HIDDEN_CLASS})`;
+      for (const item of document.querySelectorAll(`${ytSel}${notHiddenSel}`)) {
+        const text = stripInvisible(item.textContent || '');
+        const kw = matchedKeyword(text, currentSettings.blockedKeywords);
+        if (kw) { hideElement(item, 'other'); bufferKeywordHit(kw); }
+      }
+    }
+
+    flushKeywordHits();
     periodicScanTimer = setTimeout(tick, INTERVAL_MS);
   };
 
