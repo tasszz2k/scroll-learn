@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.23.2](https://github.com/tasszz2k/scroll-learn/compare/v1.23.1...v1.23.2) (2026-05-15)
+
+
+### Bug Fixes
+
+* **popup:** lift version pill onto its own line with proper spacing ([b7cecc6](https://github.com/tasszz2k/scroll-learn/commit/b7cecc69ae0ec313f66e3b328ba22682f46d1002))
+
 ## [1.23.1](https://github.com/tasszz2k/scroll-learn/compare/v1.23.0...v1.23.1) (2026-05-15)
 
 
