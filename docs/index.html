@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ScrollLearn - Install</title>
-    <meta name="description" content="A Chrome extension that turns scrolling into spaced-repetition learning." />
+    <meta name="description" content="Reclaim your attention from the social media algorithm. ScrollLearn injects spaced-repetition flashcards into your feed, mutes Reels and Shorts, runs IPA-level English shadowing, and pairs with a Gemini AI tutor. macOS and Windows + Chrome." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -171,6 +171,64 @@
       }
       .panel p { margin: 0; color: var(--ink-3); font-size: 14px; }
 
+      .section-title {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-weight: 400;
+        line-height: 1.1;
+        font-size: 38px;
+        margin: 12px 0 0;
+      }
+      .section-title em { color: var(--clay); font-style: italic; }
+      .section-lead {
+        color: var(--ink-3);
+        font-size: 16px;
+        margin: 14px 0 0;
+        max-width: 56ch;
+      }
+
+      .features {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+        margin-top: 28px;
+      }
+      .feature {
+        border: 1px solid var(--rule);
+        background: #fbf8f2;
+        border-radius: 12px;
+        padding: 20px 22px;
+      }
+      .feature-index {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        color: var(--clay);
+        margin-bottom: 6px;
+      }
+      .feature-name {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: 20px;
+        line-height: 1.15;
+        margin: 0 0 8px;
+      }
+      .feature-body {
+        margin: 0;
+        font-size: 13.5px;
+        color: var(--ink-3);
+        line-height: 1.6;
+      }
+      .feature-body code {
+        background: #efe9dc;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+
+      @media (max-width: 560px) {
+        .features { grid-template-columns: 1fr; gap: 14px; }
+        .section-title { font-size: 30px; }
+      }
+
       .small {
         font-size: 13px; color: var(--ink-3);
       }
@@ -247,6 +305,82 @@ curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.
       <div class="cmd os-only os-windows" data-cmd="windows">
 powershell -c "iwr -useb https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.ps1 | iex"
         <span class="cmd-copied">copied</span>
+      </div>
+
+      <hr class="rule" />
+
+      <div class="eyebrow">What's inside</div>
+      <h2 class="section-title">More than a <em>flashcard</em> app.</h2>
+      <p class="section-lead">
+        A pocket study system that lives wherever you scroll. Six things
+        ScrollLearn does after you click install.
+      </p>
+
+      <div class="features">
+        <div class="feature">
+          <div class="feature-index">01 / Learn</div>
+          <h3 class="feature-name">Quizzes in your feed</h3>
+          <p class="feature-body">
+            Cards appear between Facebook, YouTube, and Instagram posts
+            every <code>N</code> scrolls. Text, multiple-choice, cloze, and
+            audio formats, scheduled by the SM-2 spaced-repetition algorithm
+            so cards you struggle with come back sooner.
+          </p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-index">02 / Block</div>
+          <h3 class="feature-name">A quieter feed</h3>
+          <p class="feature-body">
+            Hide Reels, Shorts, Sponsored posts, Suggested-for-you sections,
+            and posts from strangers. Add your own keyword filters,
+            organized by topic groups (politics, crypto, drama, whatever is
+            loud this week) and tracked with per-group block tallies.
+          </p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-index">03 / Shadow</div>
+          <h3 class="feature-name">English shadowing</h3>
+          <p class="feature-body">
+            Foundation drills cover all 44 IPA phonemes with curated BBC
+            Learning English clips and a built-in pronunciation grader.
+            Practice mode generates scripts at your level for a four-stage
+            listen / slow / full / blind shadowing loop.
+          </p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-index">04 / Capture</div>
+          <h3 class="feature-name">Capture as you read</h3>
+          <p class="feature-body">
+            Pluck any word or sentence from an allowlisted page. ScrollLearn
+            fetches the translation, dictionary senses grouped by part of
+            speech, and the morphological family. One click promotes a note
+            into a flashcard.
+          </p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-index">05 / Assist</div>
+          <h3 class="feature-name">AI side panel</h3>
+          <p class="feature-body">
+            Ask Gemini to explain whatever you are looking at, summarize a
+            notebook, or generate a quiz from your notes. No API key
+            required for the chat path. Bring your own ElevenLabs or Kokoro
+            key when you want lifelike text-to-speech voices.
+          </p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-index">06 / Reflect</div>
+          <h3 class="feature-name">Stats that respect you</h3>
+          <p class="feature-body">
+            Daily, weekly, and monthly recap. Retention by deck. Annual
+            heatmap. Time on task. Per-topic keyword-block tallies. No
+            leaderboards. No streak shaming.
+          </p>
+        </div>
       </div>
 
       <hr class="rule" />
