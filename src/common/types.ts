@@ -53,6 +53,39 @@ export interface FuzzyThresholds {
 
 export type TranslateDirection = 'auto' | 'en->vi' | 'vi->en';
 
+// A user-defined topic bucket for keyword filtering. `keywords` are the
+// literal strings the content blocker matches (whole-word, case-insensitive,
+// see matchedKeyword in src/content/blocker.ts). `enabled: false` hides the
+// group's keywords from the live block list without losing them. `id` is
+// stable across renames so storage references survive a label change.
+export interface KeywordGroup {
+  id: string;
+  label: string;
+  enabled: boolean;
+  keywords: string[];
+}
+
+// Flatten the user's groups into the deduped, ordered list the content
+// blocker actually scans against. Disabled groups contribute nothing. Order
+// follows group order; within a group, keyword order is preserved; later
+// duplicates are dropped (case-insensitive). `blockedKeywords` on Settings
+// is a denormalized cache of this function so the content script keeps
+// reading one flat field instead of walking groups.
+export function flattenEnabledKeywords(groups: KeywordGroup[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const g of groups) {
+    if (!g.enabled) continue;
+    for (const kw of g.keywords) {
+      const key = kw.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(kw);
+    }
+  }
+  return out;
+}
+
 export interface Settings {
   showAfterNPosts: number; // Default 5
   pauseMinutesAfterQuiz: number; // Default 0
@@ -74,6 +107,15 @@ export interface Settings {
   hideFacebookStrangers: boolean;
   hideInstagramStrangers: boolean;
   hideByKeyword: boolean;
+  // Topic buckets that own the user's keywords. Source of truth -- the UI
+  // edits this directly. The content blocker still reads the flat
+  // `blockedKeywords` list below, which is auto-recomputed in
+  // storage.saveSettings as flattenEnabledKeywords(keywordGroups). Groups
+  // with `enabled: false` simply contribute nothing to that flat list.
+  keywordGroups: KeywordGroup[];
+  // Denormalized cache: union of keywords from enabled groups (deduped,
+  // case-insensitive). Recomputed on every settings save; never edit this
+  // directly from the dashboard -- write to `keywordGroups` instead.
   blockedKeywords: string[];
   keywordHits: Record<string, number>;
   // Note capture
@@ -179,6 +221,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideFacebookStrangers: true,
   hideInstagramStrangers: true,
   hideByKeyword: true,
+  keywordGroups: [],
   blockedKeywords: [],
   keywordHits: {},
   noteCaptureAllowlist: ['app.zim.vn'],

@@ -2,6 +2,7 @@ import type {
   Card,
   DailyStats,
   Deck,
+  KeywordGroup,
   Note,
   Notebook,
   Settings,
@@ -11,7 +12,7 @@ import type {
   IpaProgress,
   IpaStudyStats,
 } from './types';
-import { STORAGE_KEYS, DEFAULT_SETTINGS } from './types';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, flattenEnabledKeywords, generateId } from './types';
 
 // Batch size for chunked operations
 const BATCH_SIZE = 100;
@@ -125,16 +126,67 @@ export async function batchImportCards(newCards: Card[]): Promise<number> {
 }
 
 // Settings Operations
+
+// One-shot migration: existing installs may have a flat `blockedKeywords`
+// list but no `keywordGroups`. Bucket the legacy list into a single
+// "Uncategorized" group so the new grouped UI has something to render. After
+// the first save it persists as a real group and this path is never taken
+// again. Pure / idempotent so it's safe to test directly.
+export function migrateKeywordGroups(stored: Partial<Settings>): KeywordGroup[] {
+  const existing = stored.keywordGroups;
+  if (Array.isArray(existing) && existing.length > 0) return existing;
+  const legacy = Array.isArray(stored.blockedKeywords) ? stored.blockedKeywords : [];
+  if (legacy.length === 0) return [];
+  return [{
+    id: 'uncategorized',
+    label: 'Uncategorized',
+    enabled: true,
+    keywords: [...legacy],
+  }];
+}
+
 export async function getSettings(): Promise<Settings> {
   const settings = await get<Partial<Settings>>(STORAGE_KEYS.SETTINGS, {});
-  return { ...DEFAULT_SETTINGS, ...settings };
+  const keywordGroups = migrateKeywordGroups(settings);
+  const merged: Settings = { ...DEFAULT_SETTINGS, ...settings, keywordGroups };
+  // Always derive blockedKeywords from enabled groups so the content blocker
+  // never sees stale entries (e.g. a group flipped off but its keywords still
+  // hanging around in the legacy flat list).
+  merged.blockedKeywords = flattenEnabledKeywords(keywordGroups);
+  return merged;
 }
 
 export async function saveSettings(settings: Partial<Settings>): Promise<Settings> {
   const current = await getSettings();
-  const updated = { ...current, ...settings };
+  const updated: Settings = { ...current, ...settings };
+  // Recompute the flat list whenever groups change. If the caller passed
+  // `blockedKeywords` explicitly, ignore it -- the grouped store is the
+  // source of truth and we never want callers diverging the two.
+  updated.blockedKeywords = flattenEnabledKeywords(updated.keywordGroups);
+  // Drop keywordHits entries that no longer match any keyword in any group
+  // (case-insensitive). Keeps the all-time counter map from growing
+  // forever as users churn through topic ideas. Run only when groups were
+  // actually part of this save so a hits-only increment doesn't trigger a
+  // prune race against an in-flight group edit.
+  if ('keywordGroups' in settings) {
+    const live = new Set<string>();
+    for (const g of updated.keywordGroups) {
+      for (const kw of g.keywords) live.add(kw.toLowerCase());
+    }
+    const pruned: Record<string, number> = {};
+    for (const [kw, hits] of Object.entries(updated.keywordHits)) {
+      if (live.has(kw.toLowerCase())) pruned[kw] = hits;
+    }
+    updated.keywordHits = pruned;
+  }
   await set(STORAGE_KEYS.SETTINGS, updated);
   return updated;
+}
+
+// Mint a fresh KeywordGroup id. Wraps generateId so call sites in the
+// dashboard don't need to import generateId just to create a group.
+export function newKeywordGroupId(): string {
+  return `kg-${generateId()}`;
 }
 
 // Stats Operations
