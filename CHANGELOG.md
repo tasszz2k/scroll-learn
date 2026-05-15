@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.23.1](https://github.com/tasszz2k/scroll-learn/compare/v1.23.0...v1.23.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **popup:** shorten popup tagline to fit the 380px header ([8a389bf](https://github.com/tasszz2k/scroll-learn/commit/8a389bf1dfc6bd4711218d1e2d76763470d68741))
+
 ## [1.23.0](https://github.com/tasszz2k/scroll-learn/compare/v1.22.4...v1.23.0) (2026-05-15)
 
 
