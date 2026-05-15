@@ -17,10 +17,18 @@ WRAPPER="$INSTALL_DIR/scrolllearn-updater.sh"
 NM_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
 NM_MANIFEST="$NM_DIR/com.scrolllearn.updater.json"
 
-if [[ "$(uname)" != "Darwin" ]]; then
-  echo "ScrollLearn installer currently supports macOS only." >&2
-  exit 1
-fi
+case "$(uname -s)" in
+  Darwin) ;;
+  MINGW*|MSYS*|CYGWIN*)
+    echo "Detected a Windows shell. Use the Windows installer instead:" >&2
+    echo "  powershell -c \"iwr -useb https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.ps1 | iex\"" >&2
+    exit 1
+    ;;
+  *)
+    echo "ScrollLearn installer supports macOS (install.sh) and Windows (install.ps1)." >&2
+    exit 1
+    ;;
+esac
 
 for cmd in curl unzip python3; do
   if ! command -v "$cmd" >/dev/null 2>&1; then

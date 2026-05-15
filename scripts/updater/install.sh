@@ -11,10 +11,18 @@
 
 set -euo pipefail
 
-if [[ "$(uname)" != "Darwin" ]]; then
-  echo "This installer currently supports macOS only."
-  exit 1
-fi
+case "$(uname -s)" in
+  Darwin) ;;
+  MINGW*|MSYS*|CYGWIN*)
+    echo "Detected a Windows shell. Use the Windows installer instead:"
+    echo "  pwsh scripts/updater/install.ps1 <extension-id> <extension-dir>"
+    exit 1
+    ;;
+  *)
+    echo "This installer supports macOS (install.sh) and Windows (install.ps1)."
+    exit 1
+    ;;
+esac
 
 EXT_ID="${1:-}"
 EXT_DIR="${2:-}"
