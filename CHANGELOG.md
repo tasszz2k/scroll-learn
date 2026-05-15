@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.24.0](https://github.com/tasszz2k/scroll-learn/compare/v1.23.2...v1.24.0) (2026-05-15)
+
+
+### Features
+
+* **blocker:** add AI content review filter with per-reason stats ([f589219](https://github.com/tasszz2k/scroll-learn/commit/f589219496cb61736f6392f5351c4c96a983d8dd))
+
 ## [1.23.2](https://github.com/tasszz2k/scroll-learn/compare/v1.23.1...v1.23.2) (2026-05-15)
 
 
