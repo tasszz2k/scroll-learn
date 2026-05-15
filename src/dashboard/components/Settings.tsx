@@ -6,11 +6,15 @@ import type {
   GeminiApiModelId,
   GeminiModelChoice,
   GeminiAutoStrategy,
+  KeywordGroup,
 } from '../../common/types';
 import { DEFAULT_SETTINGS, GEMINI_API_MODELS, STORAGE_KEYS } from '../../common/types';
+import { newKeywordGroupId } from '../../common/storage';
 import { MODEL_QUOTAS, getUsage, type GeminiApiUsage } from '../../common/gemini/quota';
 import { parseRegexEntry, validateAllowlistEntry } from '../../common/allowlist';
 import EditorialHeader from './EditorialHeader';
+import SettingsKeywordSuggest from './SettingsKeywordSuggest';
+import SettingsKeywordAutoGroup from './SettingsKeywordAutoGroup';
 import { useConfirm } from '../hooks/useConfirm';
 
 interface SettingsProps {
@@ -397,6 +401,214 @@ function SiteToggle({ on, onClick, dim, ariaLabel }: { on: boolean; onClick: () 
   );
 }
 
+/* ----- Keyword group card ----- */
+
+interface KeywordGroupCardProps {
+  group: KeywordGroup;
+  keywordHits: Record<string, number>;
+  onRename: (label: string) => void;
+  onToggle: () => void;
+  onDelete: () => void;
+  onAddKeyword: (raw: string) => void;
+  onRemoveKeyword: (kw: string) => void;
+}
+
+function KeywordGroupCard({
+  group,
+  keywordHits,
+  onRename,
+  onToggle,
+  onDelete,
+  onAddKeyword,
+  onRemoveKeyword,
+}: KeywordGroupCardProps) {
+  // Local-only state for the rename input so unmounted edits don't trigger
+  // a save mid-typing -- we only commit on blur / Enter.
+  const [labelDraft, setLabelDraft] = useState(group.label);
+  const [addInput, setAddInput] = useState('');
+
+  // Keep labelDraft in sync if the parent rewrites the group (e.g. another
+  // tab/window edits settings via chrome.storage.onChanged). Uses the
+  // "adjusting state on parent change" pattern from React docs -- compare
+  // during render via a `prevLabel` slot so setState never runs from inside
+  // a useEffect body.
+  const [prevLabel, setPrevLabel] = useState(group.label);
+  if (prevLabel !== group.label) {
+    setPrevLabel(group.label);
+    setLabelDraft(group.label);
+  }
+
+  function commitRename() {
+    const cleaned = labelDraft.trim();
+    if (!cleaned) {
+      setLabelDraft(group.label);
+      return;
+    }
+    if (cleaned !== group.label) onRename(cleaned);
+  }
+
+  function submitAdd() {
+    const cleaned = addInput.trim();
+    if (!cleaned) return;
+    onAddKeyword(cleaned);
+    setAddInput('');
+  }
+
+  const totalHits = group.keywords.reduce((sum, kw) => sum + (keywordHits[kw] ?? 0), 0);
+  const muted = !group.enabled;
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--rule-2, #e0e0e0)',
+        borderRadius: 8,
+        padding: '12px 14px',
+        background: muted ? 'var(--bg-secondary, #f8f8f8)' : 'var(--card, #fff)',
+        opacity: muted ? 0.72 : 1,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <input
+          type="text"
+          value={labelDraft}
+          onChange={e => setLabelDraft(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.currentTarget.blur(); }
+            else if (e.key === 'Escape') { setLabelDraft(group.label); e.currentTarget.blur(); }
+          }}
+          aria-label={`Rename group ${group.label}`}
+          className="serif"
+          style={{
+            flex: 1,
+            padding: '4px 6px',
+            fontSize: 15,
+            fontWeight: 600,
+            border: '1px solid transparent',
+            background: 'transparent',
+            color: 'var(--ink, #111)',
+            outline: 'none',
+            borderRadius: 4,
+            textDecoration: muted ? 'line-through' : 'none',
+          }}
+        />
+        <span
+          className="mono"
+          style={{ fontSize: 11, color: 'var(--ink-3, #777)', letterSpacing: '0.05em' }}
+          title={`${group.keywords.length} keyword${group.keywords.length === 1 ? '' : 's'} · ${totalHits} hidden all time`}
+        >
+          {group.keywords.length} kw · {totalHits} blocked
+        </span>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={group.enabled}
+          aria-label={`${group.enabled ? 'Mute' : 'Enable'} group ${group.label}`}
+          className={'switch-editorial' + (group.enabled ? ' on' : '')}
+        />
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`Delete group ${group.label}`}
+          title="Delete group"
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--rule-2, #ddd)',
+            borderRadius: 6,
+            padding: '4px 8px',
+            cursor: 'pointer',
+            color: 'var(--ink-3, #777)',
+            fontSize: 12,
+          }}
+        >
+          Delete
+        </button>
+      </div>
+
+      {group.keywords.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-muted, #888)', padding: '4px 0 8px' }}>
+          No keywords in this group yet.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {group.keywords.map(kw => {
+            const hits = keywordHits[kw] ?? 0;
+            return (
+              <span
+                key={kw}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 10px',
+                  fontSize: 13,
+                  borderRadius: 14,
+                  background: 'var(--accent-soft, #e8f0fe)',
+                  color: 'var(--accent, #1a73e8)',
+                  border: '1px solid var(--accent-border, #c5d8fb)',
+                }}
+              >
+                {kw}
+                {hits > 0 && <span style={{ fontSize: 11, opacity: 0.75 }}>({hits})</span>}
+                <button
+                  onClick={() => onRemoveKeyword(kw)}
+                  aria-label={`Remove keyword ${kw} from ${group.label}`}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    lineHeight: 1,
+                    color: 'inherit',
+                    opacity: 0.6,
+                    fontSize: 14,
+                  }}
+                >
+                  x
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          type="text"
+          value={addInput}
+          onChange={e => setAddInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') submitAdd(); }}
+          placeholder={`Add to "${group.label}"`}
+          aria-label={`Add keyword to ${group.label}`}
+          style={{
+            flex: 1,
+            padding: '5px 10px',
+            fontSize: 12,
+            border: '1px solid var(--border, #ddd)',
+            borderRadius: 6,
+            background: 'var(--bg-input, #fff)',
+            color: 'var(--text, #333)',
+          }}
+        />
+        <button
+          onClick={submitAdd}
+          style={{
+            padding: '5px 12px',
+            fontSize: 12,
+            borderRadius: 6,
+            border: '1px solid var(--border, #ddd)',
+            background: 'var(--bg-secondary, #f5f5f5)',
+            cursor: 'pointer',
+            color: 'var(--text, #333)',
+          }}
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ----- Settings ----- */
 
 export default function Settings({ settings, onSave }: SettingsProps) {
@@ -411,6 +623,20 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   const noteAutoSaveSkipFirst = useRef(true);
   const [aiAutoSaveStatus, setAiAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const aiAutoSaveSkipFirst = useRef(true);
+  const [keywordAutoSaveStatus, setKeywordAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const keywordAutoSaveSkipFirst = useRef(true);
+
+  // Auto-save effects call onSave through this ref instead of taking it as a
+  // dependency. If the parent ever passes an unstable onSave (fresh function
+  // ref every render), the dep-array version of these effects would fire on
+  // every App render and produce a SAVING / AUTO-SAVED spam loop the moment
+  // the dashboard re-renders for any reason (storage live-sync, blocker hit,
+  // etc.). The ref decouples effect re-runs from callback identity so the
+  // effects only re-run when actual settings content changes.
+  const onSaveRef = useRef(onSave);
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
   // Sticky save-bar plumbing: when the editorial header's action buttons scroll
   // out of view, surface a compact bar pinned just below the dashboard nav.
@@ -462,7 +688,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     }
     setNoteAutoSaveStatus('saving');
     const timer = setTimeout(async () => {
-      await onSave({
+      await onSaveRef.current({
         noteCaptureAllowlist: localSettings.noteCaptureAllowlist,
         noteCaptureAllSites: localSettings.noteCaptureAllSites,
         noteMinLength: localSettings.noteMinLength,
@@ -483,7 +709,6 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     localSettings.noteTranslateDirection,
     localSettings.noteAutoTranslate,
     localSettings.noteToastDurationSeconds,
-    onSave,
   ]);
 
   // Auto-save AI provider fields. Without this the user has to remember to
@@ -496,7 +721,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     }
     setAiAutoSaveStatus('saving');
     const timer = setTimeout(async () => {
-      await onSave({
+      await onSaveRef.current({
         geminiApiKey: localSettings.geminiApiKey,
         geminiPersonalContext: localSettings.geminiPersonalContext,
         geminiPreferredModel: localSettings.geminiPreferredModel,
@@ -511,7 +736,43 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     localSettings.geminiPersonalContext,
     localSettings.geminiPreferredModel,
     localSettings.geminiAutoStrategy,
-    onSave,
+  ]);
+
+  // Auto-save keyword filter fields. Without this, adding a keyword (Enter,
+  // Add button, quick-add preset, AI Suggest, group toggle, group rename)
+  // only mutates local state until the user remembers to click Save
+  // changes, so the content blocker keeps reading the old list and never
+  // hides the new term. storage.saveSettings recomputes blockedKeywords
+  // from keywordGroups, so we don't ship the flat list here -- groups own
+  // the truth.
+  //
+  // IMPORTANT: keywordHits is intentionally NOT in this effect. The content
+  // blocker writes hits to chrome.storage on every blocked post, the
+  // dashboard's storage.onChanged listener live-syncs them into
+  // localSettings, and watching that field here would (a) spam a save on
+  // every blocked post (status flickers SAVING / AUTO-SAVED endlessly) and
+  // (b) race with the blocker -- the dashboard's stale hits would overwrite
+  // the blocker's freshly incremented counts. Hits are blocker-owned;
+  // storage.saveSettings prunes stale entries against keywordGroups on its
+  // own, so leaving keywordHits out of the payload is correct.
+  useEffect(() => {
+    if (keywordAutoSaveSkipFirst.current) {
+      keywordAutoSaveSkipFirst.current = false;
+      return;
+    }
+    setKeywordAutoSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      await onSaveRef.current({
+        hideByKeyword: localSettings.hideByKeyword,
+        keywordGroups: localSettings.keywordGroups,
+      });
+      setKeywordAutoSaveStatus('saved');
+      setTimeout(() => setKeywordAutoSaveStatus('idle'), 1500);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [
+    localSettings.hideByKeyword,
+    localSettings.keywordGroups,
   ]);
 
   async function handleSave() {
@@ -545,12 +806,6 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     setLocalSettings({ ...localSettings, [key]: value });
   }
 
-  function updateMany(partial: Partial<SettingsType>) {
-    const next = { ...localSettings, ...partial };
-    setLocalSettings(next);
-    onSave(partial);
-  }
-
   function toggle<K extends keyof SettingsType>(key: K) {
     update(key, !localSettings[key] as SettingsType[K]);
   }
@@ -569,27 +824,198 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     });
   }
 
-  function addKeyword(raw: string) {
+  // --- Keyword group helpers ---
+  //
+  // The grouped store (localSettings.keywordGroups) is the source of truth.
+  // storage.saveSettings recomputes the flat blockedKeywords list from these
+  // groups on every persist, so the content blocker keeps reading one flat
+  // field and we never need to keep two lists in sync from the UI side.
+
+  function setGroups(next: KeywordGroup[]) {
+    setLocalSettings({ ...localSettings, keywordGroups: next });
+  }
+
+  // Find a group by case-insensitive label (used by quick-add preset buttons
+  // and AI Suggest -- both want "extend if a topic group already exists,
+  // otherwise create it").
+  function findGroupByLabel(label: string): KeywordGroup | undefined {
+    const norm = label.trim().toLowerCase();
+    return localSettings.keywordGroups.find(g => g.label.trim().toLowerCase() === norm);
+  }
+
+  function addGroup(label: string): KeywordGroup {
+    const cleaned = label.trim() || 'Untitled';
+    const fresh: KeywordGroup = {
+      id: newKeywordGroupId(),
+      label: cleaned,
+      enabled: true,
+      keywords: [],
+    };
+    setGroups([...localSettings.keywordGroups, fresh]);
+    return fresh;
+  }
+
+  function renameGroup(id: string, nextLabel: string) {
+    const cleaned = nextLabel.trim() || 'Untitled';
+    setGroups(localSettings.keywordGroups.map(g => g.id === id ? { ...g, label: cleaned } : g));
+  }
+
+  function deleteGroup(id: string) {
+    setGroups(localSettings.keywordGroups.filter(g => g.id !== id));
+  }
+
+  function toggleGroup(id: string) {
+    setGroups(localSettings.keywordGroups.map(g => g.id === id ? { ...g, enabled: !g.enabled } : g));
+  }
+
+  function addKeywordToGroup(groupId: string, raw: string) {
     const kw = raw.trim();
     if (!kw) return;
     const lower = kw.toLowerCase();
-    if (localSettings.blockedKeywords.some(k => k.toLowerCase() === lower)) return;
-    const next = [...localSettings.blockedKeywords, kw];
-    update('blockedKeywords', next);
+    setGroups(localSettings.keywordGroups.map(g => {
+      if (g.id !== groupId) return g;
+      if (g.keywords.some(k => k.toLowerCase() === lower)) return g;
+      return { ...g, keywords: [...g.keywords, kw] };
+    }));
   }
 
-  function removeKeyword(kw: string) {
-    const next = localSettings.blockedKeywords.filter(k => k !== kw);
-    const hits = { ...localSettings.keywordHits };
-    delete hits[kw];
-    updateMany({ blockedKeywords: next, keywordHits: hits });
+  function removeKeywordFromGroup(groupId: string, kw: string) {
+    setGroups(localSettings.keywordGroups.map(g => {
+      if (g.id !== groupId) return g;
+      return { ...g, keywords: g.keywords.filter(k => k !== kw) };
+    }));
   }
 
-  function addPreset(keywords: string[]) {
-    const existing = new Set(localSettings.blockedKeywords.map(k => k.toLowerCase()));
-    const toAdd = keywords.filter(k => !existing.has(k.toLowerCase()));
-    if (toAdd.length === 0) return;
-    update('blockedKeywords', [...localSettings.blockedKeywords, ...toAdd]);
+  // Add the preset's keywords to a same-named group, creating it on first use.
+  // Idempotent and case-insensitive: clicking "+ Politics" twice never
+  // duplicates a keyword, never creates two "Politics" groups.
+  function addPreset(label: string, keywords: string[]) {
+    const existing = findGroupByLabel(label);
+    if (existing) {
+      const existingLower = new Set(existing.keywords.map(k => k.toLowerCase()));
+      const toAdd = keywords.filter(k => !existingLower.has(k.toLowerCase()));
+      if (toAdd.length === 0) {
+        // Nothing new to merge; just make sure the group is enabled so the
+        // user's click feels acknowledged.
+        if (!existing.enabled) toggleGroup(existing.id);
+        return;
+      }
+      setGroups(localSettings.keywordGroups.map(g => {
+        if (g.id !== existing.id) return g;
+        return { ...g, enabled: true, keywords: [...g.keywords, ...toAdd] };
+      }));
+      return;
+    }
+    const fresh: KeywordGroup = {
+      id: newKeywordGroupId(),
+      label,
+      enabled: true,
+      keywords: [...keywords],
+    };
+    setGroups([...localSettings.keywordGroups, fresh]);
+  }
+
+  // AI Suggest hands us a topic + a list of fresh keywords. Drop them into a
+  // group named after the topic (so the user can later mute that specific
+  // topic without losing other AI-generated buckets).
+  function addAiSuggestion(topic: string, keywords: string[]) {
+    if (keywords.length === 0) return;
+    addPreset(topic, keywords);
+  }
+
+  // AI Auto-group hands us a plan: each entry is { label, keywords[] }, where
+  // `keywords` is a subset of the current "Uncategorized" group (already
+  // narrowed by the parser to the verbatim input set). Apply the entire plan
+  // in one setGroups call so the auto-save only fires once.
+  //
+  // Semantics:
+  //   1. Each planned keyword is removed from "Uncategorized" (case-insensitive
+  //      match against the planned set).
+  //   2. For each plan entry, merge into an existing same-named group (case-
+  //      insensitive on label) if one exists; otherwise create a fresh group.
+  //      Existing groups stay enabled regardless; new groups start enabled.
+  //   3. Keywords already present in the target group are deduped out.
+  function applyAutoGroup(plan: { label: string; keywords: string[] }[]) {
+    if (plan.length === 0) return;
+
+    // Collect every keyword the plan touches so we can clear them out of
+    // "Uncategorized" in one pass.
+    const movedLower = new Set<string>();
+    for (const g of plan) {
+      for (const kw of g.keywords) movedLower.add(kw.toLowerCase());
+    }
+    if (movedLower.size === 0) return;
+
+    let next = localSettings.keywordGroups;
+
+    // Remove the moved keywords from any "Uncategorized" group (case-
+    // insensitive label match).
+    next = next.map(g => {
+      if (g.label.trim().toLowerCase() !== 'uncategorized') return g;
+      const remaining = g.keywords.filter(k => !movedLower.has(k.toLowerCase()));
+      return remaining.length === g.keywords.length ? g : { ...g, keywords: remaining };
+    });
+
+    // Merge each plan entry into an existing same-named group or create a
+    // new one. We rebuild `next` step-by-step rather than going through the
+    // setGroups/findGroupByLabel pair so a single render pass sees the full
+    // result.
+    for (const planGroup of plan) {
+      const label = planGroup.label.trim();
+      if (!label || planGroup.keywords.length === 0) continue;
+      const labelLower = label.toLowerCase();
+
+      // Skip moving keywords back into "Uncategorized" -- if the model
+      // labeled some keywords "Uncategorized" we leave them where they were.
+      if (labelLower === 'uncategorized') continue;
+
+      const existingIdx = next.findIndex(
+        g => g.label.trim().toLowerCase() === labelLower,
+      );
+      if (existingIdx >= 0) {
+        const existing = next[existingIdx];
+        const existingLower = new Set(existing.keywords.map(k => k.toLowerCase()));
+        const toAdd = planGroup.keywords.filter(k => !existingLower.has(k.toLowerCase()));
+        if (toAdd.length === 0) continue;
+        next = next.map((g, i) =>
+          i === existingIdx
+            ? { ...g, enabled: true, keywords: [...g.keywords, ...toAdd] }
+            : g,
+        );
+      } else {
+        next = [
+          ...next,
+          {
+            id: newKeywordGroupId(),
+            label,
+            enabled: true,
+            keywords: [...planGroup.keywords],
+          },
+        ];
+      }
+    }
+
+    setGroups(next);
+  }
+
+  // Convenience for the inline "Add keyword" composer at the top of Section C.
+  // Drops the keyword into a default "Uncategorized" group (creating it on
+  // first use) so users who don't want to think about topic taxonomy can
+  // still add a one-off keyword.
+  function addKeyword(raw: string) {
+    const kw = raw.trim();
+    if (!kw) return;
+    let group = findGroupByLabel('Uncategorized');
+    if (!group) {
+      group = addGroup('Uncategorized');
+      // addGroup mutated state asynchronously via setLocalSettings; build the
+      // next state by hand so the keyword lands in the new group in the same
+      // render pass instead of waiting for a second render to see the group.
+      const fresh: KeywordGroup = { ...group, keywords: [kw] };
+      setGroups([...localSettings.keywordGroups, fresh]);
+      return;
+    }
+    addKeywordToGroup(group.id, kw);
   }
 
   function addAllowlistDomain() {
@@ -837,34 +1263,73 @@ export default function Settings({ settings, onSave }: SettingsProps) {
         <SectionHead
           num="C"
           label="Keyword filters"
-          count={`${localSettings.blockedKeywords.length} KEYWORDS · ${Object.values(localSettings.keywordHits).reduce((a, b) => a + b, 0)} BLOCKED`}
+          count={
+            keywordAutoSaveStatus === 'saved' ? 'AUTO-SAVED'
+            : keywordAutoSaveStatus === 'saving' ? 'SAVING...'
+            : `${localSettings.keywordGroups.length} GROUPS · ${localSettings.blockedKeywords.length} KEYWORDS · ${Object.values(localSettings.keywordHits).reduce((a, b) => a + b, 0)} BLOCKED`
+          }
         />
         <div className="card-flat" style={{ padding: '16px 28px' }}>
-          <Row label="Hide posts by keyword" hint="Hide any post on Facebook, Instagram, or YouTube whose text contains a matching word or phrase (whole-word, case-insensitive).">
+          <Row label="Hide posts by keyword" hint="Hide any post on Facebook, Instagram, or YouTube whose text contains a matching word or phrase (whole-word, case-insensitive). Per-group toggles let you mute a topic without losing its keywords.">
             <ToggleControl on={localSettings.hideByKeyword} onClick={() => toggle('hideByKeyword')} ariaLabel="Hide posts by keyword" />
           </Row>
           <div style={{ marginTop: 12 }}>
-            <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--text-muted, #888)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick add</div>
+            <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--text-muted, #888)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick add a topic group</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {KEYWORD_PRESETS.map(preset => (
-                <button
-                  key={preset.label}
-                  onClick={() => addPreset(preset.keywords)}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: 12,
-                    borderRadius: 12,
-                    border: '1px solid var(--border, #ddd)',
-                    background: 'var(--bg-secondary, #f5f5f5)',
-                    cursor: 'pointer',
-                    color: 'var(--text, #333)',
-                  }}
-                >
-                  + {preset.label}
-                </button>
-              ))}
+              {KEYWORD_PRESETS.map(preset => {
+                const existing = findGroupByLabel(preset.label);
+                const isLive = !!existing && existing.enabled;
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => addPreset(preset.label, preset.keywords)}
+                    title={existing
+                      ? `Merge new keywords into existing "${preset.label}" group`
+                      : `Create a "${preset.label}" group with ${preset.keywords.length} keywords`}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      borderRadius: 12,
+                      border: '1px solid var(--border, #ddd)',
+                      background: isLive ? 'var(--accent-soft, #e8f0fe)' : 'var(--bg-secondary, #f5f5f5)',
+                      cursor: 'pointer',
+                      color: isLive ? 'var(--accent, #1a73e8)' : 'var(--text, #333)',
+                    }}
+                  >
+                    + {preset.label}{existing ? ' (added)' : ''}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => addGroup('Untitled')}
+                title="Create a custom topic group"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  borderRadius: 12,
+                  border: '1px dashed var(--border, #ddd)',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: 'var(--text, #333)',
+                }}
+              >
+                + New group
+              </button>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <SettingsKeywordSuggest
+              existingKeywords={localSettings.blockedKeywords}
+              onAdd={(topic, keywords) => addAiSuggestion(topic, keywords)}
+            />
+            <SettingsKeywordAutoGroup
+              ungroupedKeywords={
+                findGroupByLabel('Uncategorized')?.keywords ?? []
+              }
+              existingLabels={localSettings.keywordGroups
+                .map(g => g.label.trim())
+                .filter(label => label && label.toLowerCase() !== 'uncategorized')}
+              onApply={applyAutoGroup}
+            />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <input
                 type="text"
                 value={keywordInput}
@@ -875,7 +1340,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
                     setKeywordInput('');
                   }
                 }}
-                placeholder="Add keyword, press Enter"
+                placeholder='Add a keyword to "Uncategorized", press Enter'
                 style={{
                   flex: 1,
                   padding: '6px 12px',
@@ -901,52 +1366,24 @@ export default function Settings({ settings, onSave }: SettingsProps) {
                 Add
               </button>
             </div>
-            {localSettings.blockedKeywords.length === 0 ? (
+            {localSettings.keywordGroups.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--text-muted, #888)', padding: '8px 0' }}>
-                No keywords yet. Add one above or pick a quick-add group.
+                No groups yet. Pick a quick-add topic above, add a keyword, or click "+ New group".
               </div>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {localSettings.blockedKeywords.map(kw => {
-                  const hits = localSettings.keywordHits[kw] ?? 0;
-                  return (
-                    <span
-                      key={kw}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: '4px 10px',
-                        fontSize: 13,
-                        borderRadius: 14,
-                        background: 'var(--accent-soft, #e8f0fe)',
-                        color: 'var(--accent, #1a73e8)',
-                        border: '1px solid var(--accent-border, #c5d8fb)',
-                      }}
-                    >
-                      {kw}
-                      {hits > 0 && (
-                        <span style={{ fontSize: 11, opacity: 0.75 }}>({hits})</span>
-                      )}
-                      <button
-                        onClick={() => removeKeyword(kw)}
-                        aria-label={`Remove keyword ${kw}`}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: 0,
-                          lineHeight: 1,
-                          color: 'inherit',
-                          opacity: 0.6,
-                          fontSize: 14,
-                        }}
-                      >
-                        x
-                      </button>
-                    </span>
-                  );
-                })}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {localSettings.keywordGroups.map(group => (
+                  <KeywordGroupCard
+                    key={group.id}
+                    group={group}
+                    keywordHits={localSettings.keywordHits}
+                    onRename={label => renameGroup(group.id, label)}
+                    onToggle={() => toggleGroup(group.id)}
+                    onDelete={() => deleteGroup(group.id)}
+                    onAddKeyword={raw => addKeywordToGroup(group.id, raw)}
+                    onRemoveKeyword={kw => removeKeywordFromGroup(group.id, kw)}
+                  />
+                ))}
               </div>
             )}
           </div>
