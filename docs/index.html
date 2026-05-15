@@ -239,8 +239,14 @@
         padding-top: 24px;
         border-top: 1px solid var(--rule);
         font-size: 12px; color: var(--ink-4);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
       }
       .footer a { color: var(--ink-4); }
+      .footer-author { white-space: nowrap; }
 
       @media (max-width: 560px) {
         .display { font-size: 40px; }
@@ -477,9 +483,14 @@ powershell -c "iwr -useb https://raw.githubusercontent.com/tasszz2k/scroll-learn
       </div>
 
       <div class="footer">
-        <a href="https://github.com/tasszz2k/scroll-learn">GitHub</a> &middot;
-        <a href="https://github.com/tasszz2k/scroll-learn/releases">Releases</a> &middot;
-        <a href="https://github.com/tasszz2k/scroll-learn/blob/main/INSTALL.md">Full install guide</a>
+        <div>
+          <a href="https://github.com/tasszz2k/scroll-learn">GitHub</a> &middot;
+          <a href="https://github.com/tasszz2k/scroll-learn/releases">Releases</a> &middot;
+          <a href="https://github.com/tasszz2k/scroll-learn/blob/main/INSTALL.md">Full install guide</a>
+        </div>
+        <div class="footer-author">
+          Made by <a href="https://github.com/tasszz2k">Tass</a>
+        </div>
       </div>
     </div>
 
