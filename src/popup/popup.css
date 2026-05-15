@@ -30,7 +30,7 @@
 }
 
 html, body {
-  width: 380px;
+  width: 400px;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans);
@@ -107,7 +107,7 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-left: 8px;
+  margin-top: 7px;
   padding: 1px 6px;
   border: 1px solid var(--rule-2);
   border-radius: 999px;
@@ -116,7 +116,6 @@ html, body {
   letter-spacing: 0.02em;
   color: var(--ink-4, var(--ink-3));
   background: var(--card);
-  vertical-align: middle;
 }
 button.popup-version {
   cursor: pointer;

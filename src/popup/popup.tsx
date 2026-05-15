@@ -384,22 +384,20 @@ function Popup() {
         </div>
         <div className="popup-title">
           <h1>Scroll Learn</h1>
-          <p>
-            Reclaim your attention.
-            {updateAvailable ? (
-              <button
-                type="button"
-                className="popup-version popup-version-update"
-                title={versionTitle}
-                onClick={openDashboard}
-              >
-                <span className="popup-version-dot" aria-hidden />
-                {versionLabel}
-              </button>
-            ) : (
-              <span className="popup-version" title={versionTitle}>{versionLabel}</span>
-            )}
-          </p>
+          <p>Reclaim your attention from the algorithm</p>
+          {updateAvailable ? (
+            <button
+              type="button"
+              className="popup-version popup-version-update"
+              title={versionTitle}
+              onClick={openDashboard}
+            >
+              <span className="popup-version-dot" aria-hidden />
+              {versionLabel}
+            </button>
+          ) : (
+            <span className="popup-version" title={versionTitle}>{versionLabel}</span>
+          )}
         </div>
         <button
           type="button"
