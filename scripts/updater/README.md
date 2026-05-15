@@ -1,7 +1,7 @@
 # ScrollLearn Auto-Updater
 
-One-click upgrades for ScrollLearn loaded as an unpacked extension on Chrome + macOS,
-without paying the Chrome Web Store fee.
+One-click upgrades for ScrollLearn loaded as an unpacked extension on Chrome
+(macOS and Windows), without paying the Chrome Web Store fee.
 
 ## How it works
 
@@ -26,16 +26,36 @@ npm run build
 # Load `dist/` at chrome://extensions/ as an unpacked extension.
 # Copy the extension ID from the card.
 
+# macOS
 bash scripts/updater/install.sh <EXTENSION_ID> "$(pwd)/dist"
 # Reload the extension once. Done.
 ```
 
-The installer writes:
+```powershell
+# Windows
+pwsh scripts/updater/install.ps1 -ExtId <EXTENSION_ID> -ExtDir "$PWD\dist"
+# Reload the extension once. Done.
+```
 
-- `~/.scroll-learn/scrolllearn-updater.py` – the helper
-- `~/.scroll-learn/scrolllearn-updater.sh` – wrapper that pins the extension dir
+The installer writes (macOS):
+
+- `~/.scroll-learn/scrolllearn-updater.py` -- the helper
+- `~/.scroll-learn/scrolllearn-updater.sh` -- wrapper that pins the extension dir
 - `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.scrolllearn.updater.json`
-  – Native Messaging registration scoped to your extension ID
+  -- Native Messaging registration scoped to your extension ID
+
+The installer writes (Windows):
+
+- `%USERPROFILE%\.scroll-learn\scrolllearn-updater.py` -- the helper (same Python script as macOS)
+- `%USERPROFILE%\.scroll-learn\scrolllearn-updater.bat` -- wrapper that pins the extension dir
+- `%USERPROFILE%\.scroll-learn\com.scrolllearn.updater.json` -- Native Messaging manifest
+- Registry: `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.scrolllearn.updater`
+  with `(Default)` pointing at the JSON manifest above (this is how Chrome on
+  Windows discovers native messaging hosts -- there is no
+  `NativeMessagingHosts/` directory like on macOS)
+
+The Python helper is the same on both OSes -- only the wrapper and the
+registration mechanism differ.
 
 ## Cutting a release (publisher side)
 
@@ -70,12 +90,15 @@ on next service worker startup.
 
 ## Troubleshooting
 
-- **"Native helper not installed"** – run `install.sh` again, then reload the extension.
-- **"Specified native messaging host not found"** – the `allowed_origins` extension
-  ID in the manifest has to match. Re-running `install.sh` with the right ID fixes it.
-- **Logs** – `~/.scroll-learn/updater.log`
-- **Manual reload after update** – if the extension does not pick up new files,
-  go to `chrome://extensions/` and click the reload icon once.
+- **"Native helper not installed"** -- run `install.sh` (macOS) or
+  `install.ps1` (Windows) again, then reload the extension.
+- **"Specified native messaging host not found"** -- the `allowed_origins`
+  extension ID in the manifest has to match. Re-running the installer with
+  the right ID fixes it.
+- **Logs** -- `~/.scroll-learn/updater.log` (macOS) or
+  `%USERPROFILE%\.scroll-learn\updater.log` (Windows).
+- **Manual reload after update** -- if the extension does not pick up new
+  files, go to `chrome://extensions/` and click the reload icon once.
 
 ## Security notes
 

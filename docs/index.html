@@ -127,6 +127,36 @@
       }
       .cmd-copied.show { opacity: 1; }
 
+      .os-toggle {
+        display: inline-flex;
+        background: #efe9dc;
+        border: 1px solid var(--rule);
+        border-radius: 999px;
+        padding: 4px;
+        gap: 2px;
+        margin-bottom: 18px;
+      }
+      .os-toggle button {
+        appearance: none;
+        background: transparent;
+        border: 0;
+        color: var(--ink-3);
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 6px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .os-toggle button.active {
+        background: var(--paper);
+        color: var(--ink);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+      .os-only { display: none; }
+      .os-only.active { display: block; }
+      .os-only.cta-row.active { display: flex; }
+
       .panel {
         background: #fbf8f2;
         border: 1px solid var(--rule);
@@ -175,31 +205,54 @@
       <h1 class="display">Install the <em>quiet</em> feed.</h1>
       <p class="lead">
         ScrollLearn injects spaced-repetition flashcards into Facebook, YouTube,
-        and Instagram feeds. macOS + Chrome.
+        and Instagram feeds. macOS and Windows + Chrome.
       </p>
 
-      <div class="cta-row">
-        <a class="btn btn-clay" id="downloadBtn"
+      <div class="os-toggle" role="tablist" aria-label="Choose operating system">
+        <button data-os="mac" type="button" role="tab" aria-selected="true">macOS</button>
+        <button data-os="windows" type="button" role="tab" aria-selected="false">Windows</button>
+      </div>
+
+      <div class="cta-row os-only os-mac active">
+        <a class="btn btn-clay"
            href="install.zip"
            download="scroll-learn-installer.zip"
            type="application/zip">
           <span class="ico">&#x2193;</span>
           Download installer
         </a>
-        <button class="btn btn-ghost" id="copyBtn" type="button">
+        <button class="btn btn-ghost" data-copy="mac" type="button">
           <span class="ico">&#x2398;</span>
           Copy install command
         </button>
       </div>
-      <div class="cmd" id="cmdBox">
+      <div class="cmd os-only os-mac active" data-cmd="mac">
 curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.sh | bash
-        <span class="cmd-copied" id="copiedToast">copied</span>
+        <span class="cmd-copied">copied</span>
+      </div>
+
+      <div class="cta-row os-only os-windows">
+        <a class="btn btn-clay"
+           href="install.bat"
+           download="install.bat"
+           type="application/octet-stream">
+          <span class="ico">&#x2193;</span>
+          Download installer
+        </a>
+        <button class="btn btn-ghost" data-copy="windows" type="button">
+          <span class="ico">&#x2398;</span>
+          Copy install command
+        </button>
+      </div>
+      <div class="cmd os-only os-windows" data-cmd="windows">
+powershell -c "iwr -useb https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.ps1 | iex"
+        <span class="cmd-copied">copied</span>
       </div>
 
       <hr class="rule" />
 
       <div class="eyebrow">After clicking download</div>
-      <ol class="steps">
+      <ol class="steps os-only os-mac active">
         <li>
           <strong>Open Downloads</strong> in Finder and <strong>double-click <code>scroll-learn-installer.zip</code></strong>
           to extract <code>install.command</code>.
@@ -224,6 +277,40 @@ curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.
         </li>
         <li>
           <strong>Copy the extension ID</strong> from the ScrollLearn card and paste it back into Terminal.
+        </li>
+        <li>
+          Reload the extension once. <strong>Done.</strong> Future updates appear as a one-click banner.
+        </li>
+      </ol>
+
+      <ol class="steps os-only os-windows">
+        <li>
+          <strong>Open Downloads</strong> in File Explorer and <strong>double-click <code>install.bat</code></strong>.
+        </li>
+        <li>
+          If <strong>Windows SmartScreen</strong> warns &ldquo;Windows protected your PC&rdquo;,
+          click <strong>More info</strong> &rarr; <strong>Run anyway</strong>
+          (the first time only; the installer is open source).
+        </li>
+        <li>
+          A Command Prompt window opens and runs the PowerShell installer.
+          It downloads the latest release into <code>%USERPROFILE%\.scroll-learn\</code>.
+          <br />
+          <em>If Python is missing</em>, the installer points you at
+          <code>winget install Python.Python.3</code> &mdash; install it,
+          then re-run.
+        </li>
+        <li>
+          The installer <strong>opens Chrome</strong> at <code>chrome://extensions</code>
+          and an <strong>Explorer window</strong> with the <code>extension</code> folder selected.
+          Toggle <strong>Developer mode</strong> in Chrome, then <strong>drag the highlighted
+          <code>extension</code> folder onto the Chrome tab</strong> &mdash; Chrome loads it.
+          <br />
+          <em>Prefer Load unpacked?</em> Click it, then paste
+          <code>%USERPROFILE%\.scroll-learn\extension</code> into the dialog.
+        </li>
+        <li>
+          <strong>Copy the extension ID</strong> from the ScrollLearn card and paste it back into PowerShell.
         </li>
         <li>
           Reload the extension once. <strong>Done.</strong> Future updates appear as a one-click banner.
@@ -255,29 +342,76 @@ curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.
 
     <script>
       (function () {
-        var INSTALL_CMD =
-          'curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.sh | bash';
-        var btn = document.getElementById('copyBtn');
-        var toast = document.getElementById('copiedToast');
-        if (!btn) return;
-        btn.addEventListener('click', function () {
+        var COMMANDS = {
+          mac: 'curl -fsSL https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.sh | bash',
+          windows: 'powershell -c "iwr -useb https://raw.githubusercontent.com/tasszz2k/scroll-learn/main/install.ps1 | iex"'
+        };
+
+        function detectOs() {
+          var p = '';
+          if (navigator.userAgentData && navigator.userAgentData.platform) {
+            p = String(navigator.userAgentData.platform).toLowerCase();
+          } else if (navigator.platform) {
+            p = String(navigator.platform).toLowerCase();
+          }
+          var ua = (navigator.userAgent || '').toLowerCase();
+          if (p.indexOf('win') !== -1 || ua.indexOf('windows') !== -1) return 'windows';
+          if (p.indexOf('mac') !== -1 || ua.indexOf('mac') !== -1) return 'mac';
+          return 'mac';
+        }
+
+        function setOs(os) {
+          var els = document.querySelectorAll('.os-only');
+          for (var i = 0; i < els.length; i++) {
+            els[i].classList.toggle('active', els[i].classList.contains('os-' + os));
+          }
+          var toggles = document.querySelectorAll('.os-toggle button');
+          for (var j = 0; j < toggles.length; j++) {
+            var match = toggles[j].getAttribute('data-os') === os;
+            toggles[j].classList.toggle('active', match);
+            toggles[j].setAttribute('aria-selected', match ? 'true' : 'false');
+          }
+        }
+
+        var initialOs = detectOs();
+        setOs(initialOs);
+
+        var toggleButtons = document.querySelectorAll('.os-toggle button');
+        for (var k = 0; k < toggleButtons.length; k++) {
+          toggleButtons[k].addEventListener('click', function (ev) {
+            setOs(ev.currentTarget.getAttribute('data-os'));
+          });
+        }
+
+        function copyText(text, toast) {
+          function flash() {
+            if (!toast) return;
+            toast.classList.add('show');
+            setTimeout(function () { toast.classList.remove('show'); }, 1400);
+          }
           if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(INSTALL_CMD).then(function () {
-              toast.classList.add('show');
-              setTimeout(function () { toast.classList.remove('show'); }, 1400);
-            });
+            navigator.clipboard.writeText(text).then(flash, flash);
           } else {
-            // Fallback
             var ta = document.createElement('textarea');
-            ta.value = INSTALL_CMD;
+            ta.value = text;
             document.body.appendChild(ta);
             ta.select();
             try { document.execCommand('copy'); } catch (e) {}
             document.body.removeChild(ta);
-            toast.classList.add('show');
-            setTimeout(function () { toast.classList.remove('show'); }, 1400);
+            flash();
           }
-        });
+        }
+
+        var copyButtons = document.querySelectorAll('[data-copy]');
+        for (var m = 0; m < copyButtons.length; m++) {
+          copyButtons[m].addEventListener('click', function (ev) {
+            var os = ev.currentTarget.getAttribute('data-copy');
+            var cmd = COMMANDS[os];
+            var box = document.querySelector('[data-cmd="' + os + '"]');
+            var toast = box ? box.querySelector('.cmd-copied') : null;
+            if (cmd) copyText(cmd, toast);
+          });
+        }
       })();
     </script>
   </body>

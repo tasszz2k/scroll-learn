@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://tasszz2k.github.io/scroll-learn/">tasszz2k.github.io/scroll-learn</a> — one-click installer for macOS + Chrome.
+  <a href="https://tasszz2k.github.io/scroll-learn/">tasszz2k.github.io/scroll-learn</a> — one-click installer for macOS and Windows + Chrome.
 </p>
 
 ---
@@ -112,13 +112,20 @@
 
 ### One-click (recommended)
 
-Visit **<https://tasszz2k.github.io/scroll-learn/>** and click **Download installer**.
-You'll get `scroll-learn-installer.zip` — double-click it in Finder to extract
-`install.command`, then right-click the extracted file → **Open** (macOS prompts
-about unsigned scripts the first time only). Future updates land with a single
-click — no terminal, no re-downloading.
+Visit **<https://tasszz2k.github.io/scroll-learn/>** -- the page detects your OS
+and shows the matching **Download installer** button.
 
-See [INSTALL.md](INSTALL.md) for a terminal-only fallback.
+- **macOS** -- you get `scroll-learn-installer.zip`. Double-click it in Finder
+  to extract `install.command`, then right-click the extracted file -> **Open**
+  (macOS prompts about unsigned scripts the first time only).
+- **Windows** -- you get `install.bat`. Double-click it in File Explorer
+  (Windows SmartScreen may warn the first time -- click **More info** ->
+  **Run anyway**).
+
+Future updates land with a single click -- no terminal, no re-downloading.
+
+See [INSTALL.md](INSTALL.md) for terminal-only fallbacks (`curl | bash` on
+macOS, `iwr | iex` on Windows) and full troubleshooting.
 
 ### Development Build
 
