@@ -1,4 +1,6 @@
 import type {
+  AiHideStats,
+  AiReason,
   Card,
   DailyStats,
   Deck,
@@ -12,7 +14,7 @@ import type {
   IpaProgress,
   IpaStudyStats,
 } from './types';
-import { STORAGE_KEYS, DEFAULT_SETTINGS, flattenEnabledKeywords, generateId } from './types';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, emptyAiHideStats, flattenEnabledKeywords, generateId } from './types';
 
 // Batch size for chunked operations
 const BATCH_SIZE = 100;
@@ -658,5 +660,47 @@ export async function getIpaStats(): Promise<IpaStudyStats> {
 export async function saveIpaStats(stats: IpaStudyStats): Promise<IpaStudyStats> {
   await set(STORAGE_KEYS.IPA_STATS, stats);
   return stats;
+}
+
+// AI content-filter hide stats. The blocker posts one record_ai_hide message
+// per hidden post; we accumulate per-day + all-time totals so the Stats tab
+// can render a 7-day sparkline and the per-reason ledger. History is capped
+// at 90 days; older entries fall off the end.
+const AI_HIDE_HISTORY_DAYS = 90;
+
+function aiHideTodayKey(now: number = Date.now()): string {
+  const d = new Date(now);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export async function getAiHideStats(): Promise<AiHideStats> {
+  const raw = await get<AiHideStats | undefined>(STORAGE_KEYS.AI_HIDE_STATS, undefined);
+  if (!raw) return emptyAiHideStats();
+  const base = emptyAiHideStats();
+  return {
+    total: { ...base.total, ...raw.total },
+    daily: Array.isArray(raw.daily) ? raw.daily : [],
+  };
+}
+
+export async function recordAiHideHit(reason: AiReason, now: number = Date.now()): Promise<void> {
+  const stats = await getAiHideStats();
+  stats.total[reason] = (stats.total[reason] ?? 0) + 1;
+  const date = aiHideTodayKey(now);
+  let entry = stats.daily[stats.daily.length - 1];
+  if (!entry || entry.date !== date) {
+    entry = { date, counts: {} };
+    stats.daily.push(entry);
+  }
+  entry.counts[reason] = (entry.counts[reason] ?? 0) + 1;
+  // Trim history to the most recent N days. Keeps storage bounded under
+  // sustained scrolling without losing the all-time totals.
+  if (stats.daily.length > AI_HIDE_HISTORY_DAYS) {
+    stats.daily = stats.daily.slice(stats.daily.length - AI_HIDE_HISTORY_DAYS);
+  }
+  await set(STORAGE_KEYS.AI_HIDE_STATS, stats);
 }
 

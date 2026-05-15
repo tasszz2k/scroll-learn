@@ -10,7 +10,7 @@
  * characters between letters, and nested spans. Detection must account for this.
  */
 
-import type { Settings } from '../common/types';
+import type { Settings, AiQualityReviewMessage, AiReason, Response, AiQualityReviewResultData } from '../common/types';
 
 const STYLE_ID = 'scrolllearn-blocker-styles';
 const HIDDEN_CLASS = 'scrolllearn-hidden';
@@ -24,6 +24,15 @@ let currentSettings: Settings | null = null;
 let periodicScanTimer: ReturnType<typeof setTimeout> | null = null;
 
 let pendingKeywordHits: Record<string, number> = {};
+
+// WeakSets track per-element AI review state so we don't fire duplicate
+// background requests for the same post on every periodic scan. Reassigned
+// to fresh sets in unhideAll so a settings change re-evaluates every post.
+let aiReviewInFlight = new WeakSet<Element>();
+let aiReviewResolved = new WeakSet<Element>();
+
+const AI_TEXT_MAX = 1200;
+const AI_TEXT_MIN = 20;
 
 export function matchedKeyword(text: string, keywords: string[]): string | null {
   // NFC-normalize + lowercase both sides so precomposed/decomposed Unicode
@@ -55,12 +64,134 @@ function flushKeywordHits() {
   }
 }
 
-export type BlockCategory = 'reels' | 'shorts' | 'sponsored' | 'suggested' | 'strangers' | 'other';
+// 32-bit djb2 -> 8-char hex. Must match djb2Hex in src/background/aiQualityReview.ts
+// so the configHash computed here lines up with the cache key built there.
+function djb2Hex(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+function computeAiConfigHash(s: Settings): string {
+  const q = s.aiQualityFilter;
+  const canon = [
+    q.hideAiSlop ? 'A' : '',
+    q.hideSpam ? 'S' : '',
+    q.hideSalesAds ? 'D' : '',
+    q.hideLowQuality ? 'L' : '',
+    q.extraInstructions.trim(),
+  ].join('|');
+  return djb2Hex(canon);
+}
+
+function isAiQualityActive(s: Settings): boolean {
+  const q = s.aiQualityFilter;
+  if (!q?.enabled) return false;
+  if (!s.geminiApiKey?.trim()) return false;
+  return (
+    q.hideAiSlop ||
+    q.hideSpam ||
+    q.hideSalesAds ||
+    q.hideLowQuality ||
+    !!q.extraInstructions.trim()
+  );
+}
+
+async function requestAiQualityReview(el: Element, text: string, settings: Settings): Promise<void> {
+  if (aiReviewInFlight.has(el) || aiReviewResolved.has(el)) return;
+  const clean = text.trim();
+  if (clean.length < AI_TEXT_MIN) return;
+  aiReviewInFlight.add(el);
+  try {
+    const q = settings.aiQualityFilter;
+    const msg: AiQualityReviewMessage = {
+      type: 'ai_quality_review',
+      text: clean.slice(0, AI_TEXT_MAX),
+      configHash: computeAiConfigHash(settings),
+      promptConfig: {
+        hideAiSlop: q.hideAiSlop,
+        hideSpam: q.hideSpam,
+        hideSalesAds: q.hideSalesAds,
+        hideLowQuality: q.hideLowQuality,
+        extraInstructions: q.extraInstructions,
+      },
+    };
+    const resp = (await chrome.runtime.sendMessage(msg)) as Response<AiQualityReviewResultData> | undefined;
+    aiReviewResolved.add(el);
+    if (resp?.ok && resp.data?.hide) {
+      const reason: AiReason = resp.data.reason ?? 'ai_custom';
+      if (!el.hasAttribute('data-sl-hidden')) {
+        hideElement(el, reasonToCategory(reason));
+      }
+      // Fire-and-forget persistent counter bump. Skip when the verdict came
+      // from the in-memory LRU cache so a re-scroll over the same post does
+      // not double-count -- the day/total bump happened on the first sighting.
+      if (!resp.data.cached) {
+        try {
+          void chrome.runtime.sendMessage({ type: 'record_ai_hide', reason });
+        } catch {
+          // SW asleep / context invalidated -- counter bump is best-effort.
+        }
+      }
+    }
+  } catch {
+    // Service worker asleep or extension context invalidated -> fail open.
+  } finally {
+    aiReviewInFlight.delete(el);
+  }
+}
+
+function hasContentFilters(s: Settings): boolean {
+  const keywordActive = s.hideByKeyword && s.blockedKeywords.length > 0;
+  return keywordActive || isAiQualityActive(s);
+}
+
+// Keyword first, AI review second. Returns true if the keyword path hid the
+// candidate (caller doesn't need to do anything else); false otherwise (the
+// AI request may have been kicked off, but it resolves asynchronously).
+function applyContentFilters(candidate: Element, text: string, settings: Settings): boolean {
+  if (candidate.hasAttribute('data-sl-hidden')) return true;
+  const keywordActive = settings.hideByKeyword && settings.blockedKeywords.length > 0;
+  if (keywordActive) {
+    const kw = matchedKeyword(text, settings.blockedKeywords);
+    if (kw) {
+      if (hideElement(candidate, 'other')) bufferKeywordHit(kw);
+      return true;
+    }
+  }
+  if (isAiQualityActive(settings)) {
+    void requestAiQualityReview(candidate, text, settings);
+  }
+  return false;
+}
+
+export type BlockCategory =
+  | 'reels'
+  | 'shorts'
+  | 'sponsored'
+  | 'suggested'
+  | 'strangers'
+  | 'other'
+  | 'ai_slop'
+  | 'ai_spam'
+  | 'ai_sales'
+  | 'ai_low_quality'
+  | 'ai_custom';
+
 export type BlockedCounts = Record<BlockCategory, number>;
 
 const blockedCounts: BlockedCounts = {
   reels: 0, shorts: 0, sponsored: 0, suggested: 0, strangers: 0, other: 0,
+  ai_slop: 0, ai_spam: 0, ai_sales: 0, ai_low_quality: 0, ai_custom: 0,
 };
+
+// AiReason and the AI-specific BlockCategory variants share string values so
+// the content script can pass an `AiReason` straight through as a category.
+function reasonToCategory(reason: AiReason | undefined): BlockCategory {
+  return (reason ?? 'ai_custom') as BlockCategory;
+}
 
 // ---------------------------------------------------------------------------
 // CSS rules for stable selectors
@@ -898,10 +1029,8 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
     }
   }
 
-  // --- Keyword Filters (all platforms) ---
-  if (settings.hideByKeyword && settings.blockedKeywords.length > 0) {
-    const keywords = settings.blockedKeywords;
-
+  // --- Content filters (keyword first, AI review second) ---
+  if (hasContentFilters(settings)) {
     if (isFacebook) {
       // Collect candidates: [role="article"] elements + direct children of
       // [role="feed"] (covers colored-background posts, link-share cards, and
@@ -934,10 +1063,8 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
       }
 
       for (const candidate of candidates) {
-        if (candidate.hasAttribute('data-sl-hidden')) continue;
         const text = stripInvisible(candidate.textContent || '');
-        const kw = matchedKeyword(text, keywords);
-        if (kw) { if (hideElement(candidate, 'other')) bufferKeywordHit(kw); }
+        applyContentFilters(candidate, text, settings);
       }
 
       // Fallback for feed-level posts without [role="article"] (colored-bg,
@@ -947,8 +1074,7 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
       const elParent = el.parentElement;
       if (elParent && elParent.children.length >= 8) {
         const text = stripInvisible(el.textContent || '');
-        const kw = matchedKeyword(text, keywords);
-        if (kw) { if (hideElement(el, 'other')) bufferKeywordHit(kw); }
+        applyContentFilters(el, text, settings);
       }
     }
 
@@ -959,10 +1085,8 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
       const parentArticle = el.closest('article');
       if (parentArticle && !articles.includes(parentArticle)) articles.push(parentArticle);
       for (const article of articles) {
-        if (article.hasAttribute('data-sl-hidden')) continue;
         const text = stripInvisible(article.textContent || '');
-        const kw = matchedKeyword(text, keywords);
-        if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); }
+        applyContentFilters(article, text, settings);
       }
     }
 
@@ -972,10 +1096,8 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
       const parentItem = el.closest?.(ytSel);
       if (parentItem && !items.includes(parentItem)) items.push(parentItem);
       for (const item of items) {
-        if (item.hasAttribute('data-sl-hidden')) continue;
         const text = stripInvisible(item.textContent || '');
-        const kw = matchedKeyword(text, keywords);
-        if (kw) { hideElement(item, 'other'); bufferKeywordHit(kw); }
+        applyContentFilters(item, text, settings);
       }
     }
   }
@@ -1086,44 +1208,53 @@ function startPeriodicScan(hostname: string) {
           hideElement(article, 'strangers');
           continue;
         }
-        if (currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
+        if (hasContentFilters(currentSettings)) {
           const raw = stripInvisible(article.textContent || '');
-          const kw = matchedKeyword(raw, currentSettings.blockedKeywords);
-          if (kw) { if (hideElement(article, 'other')) bufferKeywordHit(kw); continue; }
+          if (applyContentFilters(article, raw, currentSettings)) continue;
         }
       }
 
-      // Scan story_message elements for keyword matches (non-article post types:
+      // Scan story_message elements for keyword/AI matches (non-article post types:
       // colored-bg posts, link-share cards, group posts, etc.)
-      if (currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
-        const keywords = currentSettings.blockedKeywords;
+      if (hasContentFilters(currentSettings)) {
+        const keywordActive =
+          currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0;
         const allSM = document.querySelectorAll('[data-ad-rendering-role="story_message"]');
         for (const sm of allSM) {
           if (sm.closest(HIDDEN_SEL)) continue;
           if (sm.closest('[role="article"]')) continue; // already handled by article loop
+
+          // Walk up to find the post-level container.
+          // Stop when parent has 8+ children (feed level) or at explicit signals.
+          let container: Element | null = null;
+          let cur: Element | null = sm;
+          while (cur && cur !== document.body) {
+            const p: Element | null = cur.parentElement;
+            if (!p) break;
+            if (p.getAttribute('role') === 'feed') { container = cur; break; }
+            if (cur.hasAttribute('data-pagelet')) { container = cur; break; }
+            if (p.children.length >= 8) { container = cur; break; }
+            cur = p;
+          }
+          if (!container) {
+            let up: Element | null = sm;
+            for (let i = 0; i < 15 && up && up !== document.body; i++) {
+              up = up.parentElement;
+            }
+            container = up;
+          }
+          if (!container) continue;
+
           const raw = stripInvisible(sm.textContent || '');
-          const kw = matchedKeyword(raw, keywords);
-          if (kw) {
-            // Walk up to find the post-level container.
-            // Stop when parent has 8+ children (feed level) or at explicit signals.
-            let container: Element | null = null;
-            let cur: Element | null = sm;
-            while (cur && cur !== document.body) {
-              const p: Element | null = cur.parentElement;
-              if (!p) break;
-              if (p.getAttribute('role') === 'feed') { container = cur; break; }
-              if (cur.hasAttribute('data-pagelet')) { container = cur; break; }
-              if (p.children.length >= 8) { container = cur; break; }
-              cur = p;
+          if (keywordActive) {
+            const kw = matchedKeyword(raw, currentSettings.blockedKeywords);
+            if (kw) {
+              if (hideElement(container, 'other')) bufferKeywordHit(kw);
+              continue;
             }
-            if (!container) {
-              let up: Element | null = sm;
-              for (let i = 0; i < 15 && up && up !== document.body; i++) {
-                up = up.parentElement;
-              }
-              container = up;
-            }
-            if (hideElement(container, 'other')) bufferKeywordHit(kw);
+          }
+          if (isAiQualityActive(currentSettings)) {
+            void requestAiQualityReview(container, raw, currentSettings);
           }
         }
       }
@@ -1144,20 +1275,19 @@ function startPeriodicScan(hostname: string) {
           hideElement(article, 'strangers');
           continue;
         }
-        if (currentSettings.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
-          const kw = matchedKeyword(stripInvisible(article.textContent || ''), currentSettings.blockedKeywords);
-          if (kw) { hideElement(article, 'other'); bufferKeywordHit(kw); continue; }
+        if (hasContentFilters(currentSettings)) {
+          const raw = stripInvisible(article.textContent || '');
+          if (applyContentFilters(article, raw, currentSettings)) continue;
         }
       }
     }
 
-    if (isYouTube && currentSettings?.hideByKeyword && currentSettings.blockedKeywords.length > 0) {
+    if (isYouTube && currentSettings && hasContentFilters(currentSettings)) {
       const ytSel = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer';
       const notHiddenSel = `:not(.${HIDDEN_CLASS})`;
       for (const item of document.querySelectorAll(`${ytSel}${notHiddenSel}`)) {
         const text = stripInvisible(item.textContent || '');
-        const kw = matchedKeyword(text, currentSettings.blockedKeywords);
-        if (kw) { hideElement(item, 'other'); bufferKeywordHit(kw); }
+        applyContentFilters(item, text, currentSettings);
       }
     }
 
@@ -1223,6 +1353,11 @@ function unhideAll() {
     el.removeAttribute('data-sl-hidden');
     el.classList.remove(HIDDEN_CLASS);
   }
+  // Reset AI review tracking so the next scan re-evaluates every post with the
+  // new settings (config hash may have changed). WeakSet has no .clear(), so
+  // we reassign the binding to a fresh instance.
+  aiReviewInFlight = new WeakSet<Element>();
+  aiReviewResolved = new WeakSet<Element>();
 }
 
 export function startBlocker(settings: Settings) {

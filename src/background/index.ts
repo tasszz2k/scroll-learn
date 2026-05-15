@@ -22,6 +22,7 @@ import { deletePronCheckHistoryFor } from '../common/shadowPronHistory';
 import { detectVietnamese, isSingleWord, translate, translateWithDictionary } from '../common/translate';
 import { wordFamilyFor } from '../common/wordFamily';
 import { sm2Update, sortCardsForReview } from './scheduler';
+import { handleAiQualityReview } from './aiQualityReview';
 import {
   ALARM_CHECK_UPDATE,
   checkForUpdate,
@@ -416,6 +417,25 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
       try {
         await storage.recordPronCheckRun(message.averageScore);
         return { ok: true };
+      } catch (error) {
+        return { ok: false, error: String(error) };
+      }
+
+    case 'ai_quality_review':
+      return handleAiQualityReview(message);
+
+    case 'record_ai_hide':
+      try {
+        await storage.recordAiHideHit(message.reason);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: String(error) };
+      }
+
+    case 'get_ai_hide_stats':
+      try {
+        const stats = await storage.getAiHideStats();
+        return { ok: true, data: stats };
       } catch (error) {
         return { ok: false, error: String(error) };
       }

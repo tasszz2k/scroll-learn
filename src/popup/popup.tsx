@@ -360,7 +360,9 @@ function Popup() {
   const isInstagram = currentSite.includes('instagram');
   const isSocialSite = isFacebook || isYouTube || isInstagram;
 
-  // Blocked breakdown ordered for grid (Reels, Shorts, Sponsored, Suggested, Strangers)
+  // Blocked breakdown ordered for grid. AI rows only appear when the AI
+  // quality filter is enabled so the grid stays compact for users who only
+  // run the platform-level filters.
   const blockKeys: Array<{ key: keyof BlockedCounts; label: string }> = [
     { key: 'reels', label: 'Reels' },
     { key: 'shorts', label: 'Shorts' },
@@ -368,6 +370,16 @@ function Popup() {
     { key: 'suggested', label: 'Suggested' },
     { key: 'strangers', label: 'Strangers' },
   ];
+  const aiFilter = settings?.aiQualityFilter;
+  if (aiFilter?.enabled) {
+    if (aiFilter.hideAiSlop)     blockKeys.push({ key: 'ai_slop',        label: 'AI slop' });
+    if (aiFilter.hideSpam)       blockKeys.push({ key: 'ai_spam',        label: 'AI spam' });
+    if (aiFilter.hideSalesAds)   blockKeys.push({ key: 'ai_sales',       label: 'AI sales' });
+    if (aiFilter.hideLowQuality) blockKeys.push({ key: 'ai_low_quality', label: 'AI low-qual' });
+    if (aiFilter.extraInstructions.trim()) {
+      blockKeys.push({ key: 'ai_custom', label: 'AI custom' });
+    }
+  }
 
   return (
     <div className="popup-container">

@@ -1,5 +1,16 @@
-import { useMemo, useState, type ReactElement } from 'react';
-import type { Stats as StatsType, Deck, Card, Grade, Note, DailyStats, Settings } from '../../common/types';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import type {
+  Stats as StatsType,
+  Deck,
+  Card,
+  Grade,
+  Note,
+  DailyStats,
+  Settings,
+  AiHideStats,
+  AiReason,
+} from '../../common/types';
+import { AI_REASONS, STORAGE_KEYS, emptyAiHideStats } from '../../common/types';
 import EditorialHeader from './EditorialHeader';
 import { calculateRetentionRate } from '../../background/scheduler';
 import {
@@ -111,10 +122,51 @@ function deltaLabel(current: number, prior: number, unit: string): string {
 
 type KeywordView = 'all' | 'by-group';
 
+const AI_REASON_LABELS: Record<AiReason, string> = {
+  ai_slop: 'AI slop',
+  ai_spam: 'Spam',
+  ai_sales: 'Sales / Ads',
+  ai_low_quality: 'Low quality',
+  ai_custom: 'Custom rule',
+};
+
 export default function Stats({ stats, decks, cards, notes, settings }: StatsProps) {
   const [range, setRange] = useState<Range>('30d');
   const [keywordView, setKeywordView] = useState<KeywordView>('by-group');
   const [now] = useState(() => Date.now());
+
+  // AI quality filter stats. Loaded via message and kept live via
+  // chrome.storage.onChanged so the panel ticks up while the user scrolls a
+  // social feed in another tab.
+  const [aiHideStats, setAiHideStats] = useState<AiHideStats>(() => emptyAiHideStats());
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const resp = await chrome.runtime.sendMessage({ type: 'get_ai_hide_stats' });
+        if (cancelled) return;
+        if (resp?.ok && resp.data) setAiHideStats(resp.data as AiHideStats);
+      } catch {
+        // SW asleep -- leave defaults; live-sync will fill in.
+      }
+    }
+    void load();
+    function onChanged(changes: { [key: string]: chrome.storage.StorageChange }, area: string) {
+      if (area !== 'local') return;
+      if (!(STORAGE_KEYS.AI_HIDE_STATS in changes)) return;
+      const next = changes[STORAGE_KEYS.AI_HIDE_STATS]?.newValue as AiHideStats | undefined;
+      if (next) setAiHideStats({ total: { ...emptyAiHideStats().total, ...next.total }, daily: next.daily ?? [] });
+    }
+    try {
+      chrome.storage.onChanged.addListener(onChanged);
+    } catch {
+      // chrome.storage unavailable in some test contexts.
+    }
+    return () => {
+      cancelled = true;
+      try { chrome.storage.onChanged.removeListener(onChanged); } catch { /* ignore */ }
+    };
+  }, []);
 
   // ----- Big numbers --------------------------------------------------------
   const totalCards = cards.length;
@@ -856,6 +908,19 @@ export default function Stats({ stats, decks, cards, notes, settings }: StatsPro
         </div>
       </div>
 
+      {/* I -- AI content review */}
+      <section style={{ marginTop: 48 }}>
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #888)' }}>
+            I · AI content review
+          </span>
+          <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3, #777)' }}>
+            {numberFmt(AI_REASONS.reduce((sum, r) => sum + (aiHideStats.total[r] ?? 0), 0))} blocked all-time
+          </span>
+        </div>
+        <AiContentReviewPanel stats={aiHideStats} />
+      </section>
+
       {/* Keyword blocks -- toggle between an aggregated all-keywords ledger
           and a per-group breakdown. The per-group view shows an Ungrouped
           bucket for stray hits whose keywords are no longer in any group
@@ -1120,6 +1185,106 @@ export default function Stats({ stats, decks, cards, notes, settings }: StatsPro
           })()
         )}
       </section>
+    </div>
+  );
+}
+
+// AI content review breakdown. Renders three columns: today, 7-day, total,
+// each broken down per reason (slop / spam / sales / low-quality / custom).
+// Empty state when no posts have been logged yet.
+function AiContentReviewPanel({ stats }: { stats: AiHideStats }) {
+  const todayKey = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
+
+  const last7Keys = (() => {
+    const keys: string[] = [];
+    const d = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const dd = new Date(d);
+      dd.setDate(d.getDate() - i);
+      const y = dd.getFullYear();
+      const m = String(dd.getMonth() + 1).padStart(2, '0');
+      const day = String(dd.getDate()).padStart(2, '0');
+      keys.push(`${y}-${m}-${day}`);
+    }
+    return keys;
+  })();
+
+  const dailyMap = new Map(stats.daily.map(d => [d.date, d.counts]));
+
+  const todayCounts = dailyMap.get(todayKey) ?? {};
+  const last7Counts: Partial<Record<AiReason, number>> = {};
+  for (const k of last7Keys) {
+    const c = dailyMap.get(k);
+    if (!c) continue;
+    for (const r of AI_REASONS) {
+      last7Counts[r] = (last7Counts[r] ?? 0) + (c[r] ?? 0);
+    }
+  }
+
+  const total = AI_REASONS.reduce((s, r) => s + (stats.total[r] ?? 0), 0);
+
+  if (total === 0) {
+    return (
+      <div className="card-flat" style={{ padding: '20px 28px', fontSize: 13, color: 'var(--text-muted, #888)' }}>
+        No AI-reviewed posts hidden yet. Enable the filter under Settings &rarr; Keyword filters &rarr; "AI content review".
+      </div>
+    );
+  }
+
+  // Build last-7-day total trend for the sparkline (sum across reasons per day).
+  const sparkValues = last7Keys.map(k => {
+    const c = dailyMap.get(k);
+    if (!c) return 0;
+    return AI_REASONS.reduce((s, r) => s + (c[r] ?? 0), 0);
+  });
+  const sparkMax = Math.max(1, ...sparkValues);
+
+  return (
+    <div className="card-flat" style={{ padding: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16, gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <div className="stat-num">{numberFmt(total)}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+            post{total === 1 ? '' : 's'} hidden by AI review
+          </div>
+        </div>
+        <Sparkline values={sparkValues} max={sparkMax} accent="var(--clay)" />
+      </div>
+      <div className="mono" style={{ marginBottom: 8, fontSize: 11, color: 'var(--ink-4)' }}>
+        LAST 7 DAYS &mdash; trend
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--rule-2)' }}>
+            <th style={{ textAlign: 'left', padding: '8px 12px 8px 0', fontWeight: 600, color: 'var(--ink-3)' }}>Reason</th>
+            <th style={{ textAlign: 'right', padding: 8, fontWeight: 600, color: 'var(--ink-3)' }}>Today</th>
+            <th style={{ textAlign: 'right', padding: 8, fontWeight: 600, color: 'var(--ink-3)' }}>7-day</th>
+            <th style={{ textAlign: 'right', padding: '8px 0 8px 8px', fontWeight: 600, color: 'var(--ink-3)' }}>All-time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {AI_REASONS.map(reason => {
+            const today = todayCounts[reason] ?? 0;
+            const week = last7Counts[reason] ?? 0;
+            const all = stats.total[reason] ?? 0;
+            if (all === 0) return null;
+            return (
+              <tr key={reason} style={{ borderBottom: '1px solid var(--rule-3, rgba(0,0,0,0.05))' }}>
+                <td style={{ padding: '10px 12px 10px 0' }}>{AI_REASON_LABELS[reason]}</td>
+                <td className="mono" style={{ textAlign: 'right', padding: 10, color: today > 0 ? 'var(--clay-deep, #b1502d)' : 'var(--ink-4)' }}>{numberFmt(today)}</td>
+                <td className="mono" style={{ textAlign: 'right', padding: 10 }}>{numberFmt(week)}</td>
+                <td className="mono" style={{ textAlign: 'right', padding: '10px 0 10px 8px', fontWeight: 600 }}>{numberFmt(all)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

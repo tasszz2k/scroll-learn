@@ -765,6 +765,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
       await onSaveRef.current({
         hideByKeyword: localSettings.hideByKeyword,
         keywordGroups: localSettings.keywordGroups,
+        aiQualityFilter: localSettings.aiQualityFilter,
       });
       setKeywordAutoSaveStatus('saved');
       setTimeout(() => setKeywordAutoSaveStatus('idle'), 1500);
@@ -773,6 +774,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   }, [
     localSettings.hideByKeyword,
     localSettings.keywordGroups,
+    localSettings.aiQualityFilter,
   ]);
 
   async function handleSave() {
@@ -1387,6 +1389,69 @@ export default function Settings({ settings, onSave }: SettingsProps) {
               </div>
             )}
           </div>
+        </div>
+        <div className="card-flat" style={{ padding: '16px 28px', marginTop: 16 }}>
+          <Row label="AI content review" hint="A second filter that runs on posts the keyword filter let through. Sends each post text to Gemini and hides it when it matches any enabled category below. Keyword-matched posts are still hidden first with no API call.">
+            <ToggleControl
+              on={localSettings.aiQualityFilter.enabled}
+              onClick={() => update('aiQualityFilter', { ...localSettings.aiQualityFilter, enabled: !localSettings.aiQualityFilter.enabled })}
+              ariaLabel="AI content review"
+            />
+          </Row>
+          {localSettings.aiQualityFilter.enabled && (
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Row label="Hide AI-generated slop" hint="Machine-generated, low-effort, padded with filler.">
+                <ToggleControl
+                  on={localSettings.aiQualityFilter.hideAiSlop}
+                  onClick={() => update('aiQualityFilter', { ...localSettings.aiQualityFilter, hideAiSlop: !localSettings.aiQualityFilter.hideAiSlop })}
+                  ariaLabel="Hide AI slop"
+                />
+              </Row>
+              <Row label="Hide spam" hint="Repetitive, mass-posted, unrelated promotional or noise content.">
+                <ToggleControl
+                  on={localSettings.aiQualityFilter.hideSpam}
+                  onClick={() => update('aiQualityFilter', { ...localSettings.aiQualityFilter, hideSpam: !localSettings.aiQualityFilter.hideSpam })}
+                  ariaLabel="Hide spam"
+                />
+              </Row>
+              <Row label="Hide sales / ads" hint="Primary purpose is to sell or promote a product or service.">
+                <ToggleControl
+                  on={localSettings.aiQualityFilter.hideSalesAds}
+                  onClick={() => update('aiQualityFilter', { ...localSettings.aiQualityFilter, hideSalesAds: !localSettings.aiQualityFilter.hideSalesAds })}
+                  ariaLabel="Hide sales and ads"
+                />
+              </Row>
+              <Row label="Hide low-quality / clickbait" hint="Poorly written, substanceless, clickbait, rage-bait without value.">
+                <ToggleControl
+                  on={localSettings.aiQualityFilter.hideLowQuality}
+                  onClick={() => update('aiQualityFilter', { ...localSettings.aiQualityFilter, hideLowQuality: !localSettings.aiQualityFilter.hideLowQuality })}
+                  ariaLabel="Hide low quality"
+                />
+              </Row>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ marginBottom: 6, fontSize: 12, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Extra instructions (optional)
+                </div>
+                <FieldTextarea
+                  value={localSettings.aiQualityFilter.extraInstructions}
+                  onChange={v => update('aiQualityFilter', { ...localSettings.aiQualityFilter, extraInstructions: v.slice(0, 500) })}
+                  placeholder={'e.g. "Hide posts that are just screenshots of tweets" or "Hide political commentary"'}
+                  rows={3}
+                />
+              </div>
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  color: localSettings.geminiApiKey.trim() ? 'var(--ink-3)' : 'var(--clay-deep, #c0392b)',
+                }}
+              >
+                {localSettings.geminiApiKey.trim()
+                  ? 'Uses your Gemini API key from the AI provider section. Each post is reviewed once and cached.'
+                  : 'No Gemini API key set. AI review is paused until you add a key under the AI provider section.'}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

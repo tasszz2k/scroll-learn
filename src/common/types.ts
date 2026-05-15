@@ -162,6 +162,20 @@ export interface Settings {
   // (preserves daily capacity); 'quality' spends the flagship 20-RPD pools
   // first for sharper answers, then drops into the lite pool.
   geminiAutoStrategy: GeminiAutoStrategy;
+  // Second-stage content filter. Runs only on posts that survived the
+  // keyword filter; asks Gemini whether to hide each one. Disabled by
+  // default and silently inert when geminiApiKey is empty.
+  aiQualityFilter: AiQualityFilterSettings;
+}
+
+export interface AiQualityFilterSettings {
+  enabled: boolean;
+  hideAiSlop: boolean;
+  hideSpam: boolean;
+  hideSalesAds: boolean;
+  hideLowQuality: boolean;
+  // Free-form extra criteria appended to the prompt. Empty string = none.
+  extraInstructions: string;
 }
 
 // Free-tier Gemini API model picker for Settings -> AI provider. Slugs match
@@ -239,6 +253,14 @@ export const DEFAULT_SETTINGS: Settings = {
   geminiPersonalContext: '',
   geminiPreferredModel: 'auto',
   geminiAutoStrategy: 'volume',
+  aiQualityFilter: {
+    enabled: false,
+    hideAiSlop: true,
+    hideSpam: true,
+    hideSalesAds: true,
+    hideLowQuality: true,
+    extraInstructions: '',
+  },
 };
 
 export type TranslateLang = 'en' | 'vi';
@@ -752,6 +774,78 @@ export interface RecordPronCheckMessage {
   averageScore: number;
 }
 
+// Second-stage AI content filter. Content script ships a normalized post
+// text + the configHash already computed locally so cache lookups don't
+// require a second round-trip. promptConfig is the resolved per-call
+// payload used to build the prompt; passing it explicitly keeps the
+// background handler independent of stored Settings shape.
+export interface AiQualityReviewMessage {
+  type: 'ai_quality_review';
+  text: string;
+  configHash: string;
+  promptConfig: {
+    hideAiSlop: boolean;
+    hideSpam: boolean;
+    hideSalesAds: boolean;
+    hideLowQuality: boolean;
+    extraInstructions: string;
+  };
+}
+
+// Which category triggered an AI hide verdict. Used by the content script to
+// bump per-category counters and by the popup to break down the AI-hidden
+// total. 'ai_custom' covers verdicts driven by the free-text extra
+// instructions or any reason value the model returned outside the four preset
+// buckets.
+export type AiReason = 'ai_slop' | 'ai_spam' | 'ai_sales' | 'ai_low_quality' | 'ai_custom';
+
+export const AI_REASONS: readonly AiReason[] = [
+  'ai_slop',
+  'ai_spam',
+  'ai_sales',
+  'ai_low_quality',
+  'ai_custom',
+];
+
+export interface AiQualityReviewResultData {
+  hide: boolean;
+  cached: boolean;
+  // Present when hide is true; absent on keep verdicts. Older cache entries
+  // written before per-reason tracking existed default to 'ai_custom'.
+  reason?: AiReason;
+}
+
+export type AiHideCounts = Record<AiReason, number>;
+
+// Daily history entry for the Stats panel. `counts` only carries the reasons
+// that fired at least once that day; readers default missing keys to 0.
+export interface AiHideDaily {
+  date: string;            // YYYY-MM-DD (local)
+  counts: Partial<AiHideCounts>;
+}
+
+export interface AiHideStats {
+  total: AiHideCounts;     // all-time per-reason totals
+  daily: AiHideDaily[];    // newest entry last, capped at 90 days
+}
+
+export function emptyAiHideCounts(): AiHideCounts {
+  return { ai_slop: 0, ai_spam: 0, ai_sales: 0, ai_low_quality: 0, ai_custom: 0 };
+}
+
+export function emptyAiHideStats(): AiHideStats {
+  return { total: emptyAiHideCounts(), daily: [] };
+}
+
+export interface RecordAiHideMessage {
+  type: 'record_ai_hide';
+  reason: AiReason;
+}
+
+export interface GetAiHideStatsMessage {
+  type: 'get_ai_hide_stats';
+}
+
 export type Message =
   | GetNextCardMessage
   | CardAnsweredMessage
@@ -797,7 +891,10 @@ export type Message =
   | SetIpaStatsMessage
   | RecordShadowPracticeMessage
   | RecordConversationMessage
-  | RecordPronCheckMessage;
+  | RecordPronCheckMessage
+  | AiQualityReviewMessage
+  | RecordAiHideMessage
+  | GetAiHideStatsMessage;
 
 // Response Types
 export interface SuccessResponse<T = undefined> {
@@ -865,6 +962,12 @@ export const STORAGE_KEYS = {
   // Per-model free-tier counters for the Gemini API path. Contents:
   // Record<GeminiApiModelId, { dayBucket, dayCount, minuteBucket, minuteCount, cooldownUntil? }>
   GEMINI_API_USAGE: 'scrolllearn_gemini_api_usage',
+  // LRU cache of AI content-filter verdicts. Stored as { key, hide }[]
+  // where key = `${configHash}|${textHash}`. Capped at 500 entries.
+  AI_QUALITY_CACHE: 'scrolllearn_ai_quality_cache',
+  // Persistent counters for posts hidden by the AI quality filter, broken
+  // down by reason. Powers the "AI content review" panel on the Stats tab.
+  AI_HIDE_STATS: 'scrolllearn_ai_hide_stats',
 } as const;
 
 // Update Info
