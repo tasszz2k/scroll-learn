@@ -109,8 +109,11 @@ function deltaLabel(current: number, prior: number, unit: string): string {
   return `${sign}${numberFmt(diff)} ${unit} (${sign}${pct}% vs prior period)`;
 }
 
+type KeywordView = 'all' | 'by-group';
+
 export default function Stats({ stats, decks, cards, notes, settings }: StatsProps) {
   const [range, setRange] = useState<Range>('30d');
+  const [keywordView, setKeywordView] = useState<KeywordView>('by-group');
   const [now] = useState(() => Date.now());
 
   // ----- Big numbers --------------------------------------------------------
@@ -853,40 +856,268 @@ export default function Stats({ stats, decks, cards, notes, settings }: StatsPro
         </div>
       </div>
 
-      {/* Keyword blocks */}
+      {/* Keyword blocks -- toggle between an aggregated all-keywords ledger
+          and a per-group breakdown. The per-group view shows an Ungrouped
+          bucket for stray hits whose keywords are no longer in any group
+          (e.g. legacy hits surviving a rename); the all view folds those
+          strays into a single ranked table. */}
       <section style={{ marginTop: 48 }}>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #888)' }}>
-            Keyword blocks
+            {keywordView === 'all' ? 'Keyword blocks · all keywords' : 'Keyword blocks by topic'}
           </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
+            {settings && settings.keywordGroups.length > 0 && (
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3, #777)' }}>
+                {settings.keywordGroups.length} groups · {numberFmt(Object.values(settings.keywordHits).reduce((a, b) => a + b, 0))} blocked
+              </span>
+            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => setKeywordView('all')}
+                className={keywordView === 'all' ? 'btn btn-dark' : 'btn btn-ghost'}
+                style={{ padding: '4px 12px', fontSize: 11 }}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setKeywordView('by-group')}
+                className={keywordView === 'by-group' ? 'btn btn-dark' : 'btn btn-ghost'}
+                style={{ padding: '4px 12px', fontSize: 11 }}
+              >
+                By group
+              </button>
+            </div>
+          </div>
         </div>
-        {!settings || settings.blockedKeywords.length === 0 ? (
+        {!settings || settings.keywordGroups.length === 0 ? (
           <div className="card-flat" style={{ padding: '20px 28px', fontSize: 13, color: 'var(--text-muted, #888)' }}>
-            No keywords configured — add some in Settings.
+            No groups configured -- create one in Settings.
           </div>
         ) : (
-          <div className="card-flat" style={{ borderRadius: 0 }}>
-            <table className="dtable">
-              <thead>
-                <tr>
-                  <th style={{ paddingLeft: 24 }}>Keyword</th>
-                  <th style={{ textAlign: 'right', paddingRight: 24 }}>Hidden (all time)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...settings.blockedKeywords]
-                  .sort((a, b) => (settings.keywordHits[b] ?? 0) - (settings.keywordHits[a] ?? 0))
-                  .map(kw => (
-                    <tr key={kw}>
-                      <td style={{ paddingLeft: 24 }}>{kw}</td>
-                      <td style={{ textAlign: 'right', paddingRight: 24 }}>
-                        {numberFmt(settings.keywordHits[kw] ?? 0)}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+          (() => {
+            // Stray hits: keywords with a count but not present in any group.
+            const grouped = new Set<string>();
+            for (const g of settings.keywordGroups) {
+              for (const kw of g.keywords) grouped.add(kw.toLowerCase());
+            }
+            const strays = Object.entries(settings.keywordHits)
+              .filter(([kw, count]) => count > 0 && !grouped.has(kw.toLowerCase()));
+
+            if (keywordView === 'all') {
+              // Build one ranked ledger across every group, plus strays. Each
+              // row remembers its first group membership so the user can see
+              // which bucket a keyword belongs to without leaving the all-view.
+              type Row = { keyword: string; group: string; enabled: boolean; hits: number };
+              const rows: Row[] = [];
+              const seen = new Set<string>();
+              for (const g of settings.keywordGroups) {
+                for (const kw of g.keywords) {
+                  const key = kw.toLowerCase();
+                  if (seen.has(key)) continue;
+                  seen.add(key);
+                  rows.push({
+                    keyword: kw,
+                    group: g.label,
+                    enabled: g.enabled,
+                    hits: settings.keywordHits[kw] ?? 0,
+                  });
+                }
+              }
+              for (const [kw, n] of strays) {
+                const key = kw.toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                rows.push({ keyword: kw, group: 'Ungrouped (historic)', enabled: false, hits: n });
+              }
+              rows.sort((a, b) => b.hits - a.hits);
+              const totalHits = rows.reduce((a, r) => a + r.hits, 0);
+
+              return (
+                <div className="card-flat" style={{ borderRadius: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      padding: '12px 24px',
+                      borderBottom: '1px solid var(--rule, #eee)',
+                    }}
+                  >
+                    <span className="serif" style={{ fontSize: 15, fontWeight: 600 }}>
+                      All keywords
+                    </span>
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3, #777)' }}>
+                      {rows.length} kw · {numberFmt(totalHits)} blocked
+                    </span>
+                  </div>
+                  {rows.length === 0 ? (
+                    <div style={{ padding: '12px 24px', fontSize: 12, color: 'var(--text-muted, #888)' }}>
+                      No keywords configured yet.
+                    </div>
+                  ) : (
+                    <table className="dtable">
+                      <thead>
+                        <tr>
+                          <th style={{ paddingLeft: 24 }}>Keyword</th>
+                          <th>Group</th>
+                          <th style={{ textAlign: 'right', paddingRight: 24 }}>Hidden (all time)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(r => (
+                          <tr key={r.keyword} style={{ opacity: r.enabled ? 1 : 0.55 }}>
+                            <td style={{ paddingLeft: 24 }}>{r.keyword}</td>
+                            <td style={{ color: 'var(--ink-3, #777)' }}>
+                              {r.group}
+                              {!r.enabled && (
+                                <span
+                                  className="mono"
+                                  style={{
+                                    marginLeft: 8,
+                                    fontSize: 10,
+                                    color: 'var(--ink-4, #999)',
+                                    letterSpacing: '0.08em',
+                                    textTransform: 'uppercase',
+                                  }}
+                                >
+                                  muted
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'right', paddingRight: 24 }}>
+                              {numberFmt(r.hits)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {settings.keywordGroups.map(group => {
+                  const subtotal = group.keywords.reduce((sum, kw) => sum + (settings.keywordHits[kw] ?? 0), 0);
+                  return (
+                    <div
+                      key={group.id}
+                      className="card-flat"
+                      style={{
+                        borderRadius: 0,
+                        opacity: group.enabled ? 1 : 0.65,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'baseline',
+                          justifyContent: 'space-between',
+                          padding: '12px 24px',
+                          borderBottom: '1px solid var(--rule, #eee)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                          <span
+                            className="serif"
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 600,
+                              textDecoration: group.enabled ? 'none' : 'line-through',
+                            }}
+                          >
+                            {group.label}
+                          </span>
+                          {!group.enabled && (
+                            <span
+                              className="mono"
+                              style={{
+                                fontSize: 10,
+                                color: 'var(--ink-3, #777)',
+                                letterSpacing: '0.08em',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              muted
+                            </span>
+                          )}
+                        </div>
+                        <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3, #777)' }}>
+                          {group.keywords.length} kw · {numberFmt(subtotal)} blocked
+                        </span>
+                      </div>
+                      {group.keywords.length === 0 ? (
+                        <div style={{ padding: '12px 24px', fontSize: 12, color: 'var(--text-muted, #888)' }}>
+                          No keywords in this group.
+                        </div>
+                      ) : (
+                        <table className="dtable">
+                          <thead>
+                            <tr>
+                              <th style={{ paddingLeft: 24 }}>Keyword</th>
+                              <th style={{ textAlign: 'right', paddingRight: 24 }}>Hidden (all time)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...group.keywords]
+                              .sort((a, b) => (settings.keywordHits[b] ?? 0) - (settings.keywordHits[a] ?? 0))
+                              .map(kw => (
+                                <tr key={kw}>
+                                  <td style={{ paddingLeft: 24 }}>{kw}</td>
+                                  <td style={{ textAlign: 'right', paddingRight: 24 }}>
+                                    {numberFmt(settings.keywordHits[kw] ?? 0)}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  );
+                })}
+                {strays.length > 0 && (
+                  <div className="card-flat" style={{ borderRadius: 0, opacity: 0.75 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        padding: '12px 24px',
+                        borderBottom: '1px solid var(--rule, #eee)',
+                      }}
+                    >
+                      <span className="serif" style={{ fontSize: 15, fontWeight: 600, fontStyle: 'italic' }}>Ungrouped (historic)</span>
+                      <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3, #777)' }}>
+                        {strays.length} kw · {numberFmt(strays.reduce((a, [, n]) => a + n, 0))} blocked
+                      </span>
+                    </div>
+                    <table className="dtable">
+                      <thead>
+                        <tr>
+                          <th style={{ paddingLeft: 24 }}>Keyword</th>
+                          <th style={{ textAlign: 'right', paddingRight: 24 }}>Hidden (all time)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {strays
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([kw, n]) => (
+                            <tr key={kw}>
+                              <td style={{ paddingLeft: 24 }}>{kw}</td>
+                              <td style={{ textAlign: 'right', paddingRight: 24 }}>{numberFmt(n)}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()
         )}
       </section>
     </div>
