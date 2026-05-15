@@ -276,13 +276,20 @@ export default function App() {
     return response;
   }
 
-  async function handleSaveSettings(newSettings: Partial<SettingsType>) {
+  // Stable reference so that the auto-save effects inside <Settings> don't
+  // re-fire every time App re-renders. App re-renders constantly because the
+  // content blocker writes keywordHits to storage on every blocked post, which
+  // triggers the storage live-sync below and calls setSettings. Without
+  // useCallback, every blocked post would hand <Settings> a fresh onSave
+  // function reference, kick the keyword auto-save effect, and produce the
+  // SAVING / AUTO-SAVED spam loop the user reported.
+  const handleSaveSettings = useCallback(async (newSettings: Partial<SettingsType>) => {
     const response = await chrome.runtime.sendMessage({ type: 'set_settings', settings: newSettings });
     if (response.ok) {
       setSettings(response.data);
     }
     return response;
-  }
+  }, []);
 
   async function handleImport(importCards: Card[], deckId: string) {
     const response = await chrome.runtime.sendMessage({ 
