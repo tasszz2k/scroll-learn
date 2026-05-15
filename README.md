@@ -5,7 +5,7 @@
 <h1 align="center">ScrollLearn</h1>
 
 <p align="center">
-  <strong>Learn while you scroll</strong> - A Chrome extension that turns social media scrolling into learning time by injecting spaced-repetition flashcard quizzes into your feeds and blocking distracting content.
+  <strong>Reclaim your attention from the social media algorithm.</strong> A Chrome extension that turns social media scrolling into learning time by injecting spaced-repetition flashcard quizzes into your feeds and blocking distracting content.
 </p>
 
 <p align="center">

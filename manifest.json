@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ScrollLearn",
   "version": "1.23.0",
-  "description": "Learn while you scroll - quizzes injected into social feeds with spaced repetition.",
+  "description": "Reclaim your attention from the social media algorithm. Quizzes injected into social feeds with spaced repetition.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

@@ -385,7 +385,7 @@ function Popup() {
         <div className="popup-title">
           <h1>Scroll Learn</h1>
           <p>
-            Learn while you scroll
+            Reclaim your attention from the social media algorithm.
             {updateAvailable ? (
               <button
                 type="button"
