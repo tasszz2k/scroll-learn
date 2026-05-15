@@ -4,6 +4,21 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.23.0](https://github.com/tasszz2k/scroll-learn/compare/v1.22.4...v1.23.0) (2026-05-15)
+
+
+### Features
+
+* **install:** add Windows installer and redirect bash on non-Darwin ([3f01c87](https://github.com/tasszz2k/scroll-learn/commit/3f01c87ab0c50f27facf2f40ff4f038d64aa4bd3))
+* **settings:** manage keyword filters as topic groups with AI helpers ([0bf6d9e](https://github.com/tasszz2k/scroll-learn/commit/0bf6d9eebc99c602f8edb7b639fe152f019d2333))
+* **stats:** break down keyword blocks by group with all/by-group toggle ([2370646](https://github.com/tasszz2k/scroll-learn/commit/23706469f6a8d366d95115e63df21be7138d08fa))
+* **types,storage:** introduce KeywordGroup with auto-migration ([34cf3b3](https://github.com/tasszz2k/scroll-learn/commit/34cf3b39fa8fa8709b47b96104f42b90f3370e46))
+
+
+### Bug Fixes
+
+* **dashboard:** memoize handleSaveSettings to stop auto-save loop ([6de7935](https://github.com/tasszz2k/scroll-learn/commit/6de79355c2ac22de635c3faabc7057b75cc8054b))
+
 ## [1.22.4](https://github.com/tasszz2k/scroll-learn/compare/v1.22.3...v1.22.4) (2026-05-11)
 
 
