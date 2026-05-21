@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS, GEMINI_API_MODELS, STORAGE_KEYS } from '../../common/
 import { newKeywordGroupId } from '../../common/storage';
 import { MODEL_QUOTAS, getUsage, type GeminiApiUsage } from '../../common/gemini/quota';
 import { parseRegexEntry, validateAllowlistEntry } from '../../common/allowlist';
+import { normalizeIgnoreEntry, validateIgnoreEntry } from '../../common/urlIgnore';
 import EditorialHeader from './EditorialHeader';
 import SettingsKeywordSuggest from './SettingsKeywordSuggest';
 import SettingsKeywordAutoGroup from './SettingsKeywordAutoGroup';
@@ -618,6 +619,10 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   const [saved, setSaved] = useState(false);
   const [allowlistInput, setAllowlistInput] = useState('');
   const [allowlistError, setAllowlistError] = useState<string | null>(null);
+  const [ignoreUrlInput, setIgnoreUrlInput] = useState('');
+  const [ignoreUrlError, setIgnoreUrlError] = useState<string | null>(null);
+  const [ignoreUrlAutoSaveStatus, setIgnoreUrlAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const ignoreUrlAutoSaveSkipFirst = useRef(true);
   const [keywordInput, setKeywordInput] = useState('');
   const [noteAutoSaveStatus, setNoteAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const noteAutoSaveSkipFirst = useRef(true);
@@ -776,6 +781,24 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     localSettings.keywordGroups,
     localSettings.aiQualityFilter,
   ]);
+
+  // Auto-save blockerIgnoredUrls so adding/removing a URL takes effect on the
+  // user's open Facebook tab without an extra click on Save changes.
+  useEffect(() => {
+    if (ignoreUrlAutoSaveSkipFirst.current) {
+      ignoreUrlAutoSaveSkipFirst.current = false;
+      return;
+    }
+    setIgnoreUrlAutoSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      await onSaveRef.current({
+        blockerIgnoredUrls: localSettings.blockerIgnoredUrls,
+      });
+      setIgnoreUrlAutoSaveStatus('saved');
+      setTimeout(() => setIgnoreUrlAutoSaveStatus('idle'), 1500);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localSettings.blockerIgnoredUrls]);
 
   async function handleSave() {
     setSaving(true);
@@ -1051,6 +1074,37 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     });
   }
 
+  function addIgnoredUrl() {
+    const entry = normalizeIgnoreEntry(ignoreUrlInput);
+    if (!entry) {
+      setIgnoreUrlError(null);
+      return;
+    }
+    const validation = validateIgnoreEntry(entry);
+    if (validation === 'invalid-regex') {
+      setIgnoreUrlError('Invalid regex pattern');
+      return;
+    }
+    if (localSettings.blockerIgnoredUrls.includes(entry)) {
+      setIgnoreUrlInput('');
+      setIgnoreUrlError(null);
+      return;
+    }
+    setLocalSettings({
+      ...localSettings,
+      blockerIgnoredUrls: [...localSettings.blockerIgnoredUrls, entry],
+    });
+    setIgnoreUrlInput('');
+    setIgnoreUrlError(null);
+  }
+
+  function removeIgnoredUrl(entry: string) {
+    setLocalSettings({
+      ...localSettings,
+      blockerIgnoredUrls: localSettings.blockerIgnoredUrls.filter(u => u !== entry),
+    });
+  }
+
   const activeSites = SUPPORTED_DOMAINS.filter(s => isDomainEnabled(s.domain)).length;
   const blockedToday = 27;
   const showAfter = String(localSettings.showAfterNPosts).padStart(2, ' ');
@@ -1257,6 +1311,63 @@ export default function Settings({ settings, onSave }: SettingsProps) {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Ignored URLs -- pages where the blocker should not run at all.
+            Defaults ship with facebook.com/messages so Messenger threads
+            inside Facebook's own SPA never get caught by the heuristics. */}
+        <div className="card-flat" style={{ padding: '4px 28px', marginTop: 16 }}>
+          <Row
+            label="Ignored URLs"
+            hint={
+              <>
+                Pages where the blocker is disabled entirely. Add a host
+                (<span className="mono" style={{ fontSize: 12 }}>facebook.com</span>),
+                a host + path prefix
+                (<span className="mono" style={{ fontSize: 12 }}>facebook.com/messages</span>),
+                or a regex like
+                <span className="mono" style={{ fontSize: 12 }}> /facebook\.com\/(messages|marketplace)/</span>.
+                {ignoreUrlAutoSaveStatus === 'saving' && <> · <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>SAVING…</span></>}
+                {ignoreUrlAutoSaveStatus === 'saved' && <> · <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>AUTO-SAVED</span></>}
+              </>
+            }
+            last
+          >
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <FieldInput
+                value={ignoreUrlInput}
+                onChange={v => setIgnoreUrlInput(v)}
+                placeholder="facebook.com/messages"
+              />
+              <button type="button" onClick={addIgnoredUrl} className="btn btn-ghost" style={{ padding: '8px 14px', fontSize: 12 }}>
+                Add
+              </button>
+            </div>
+          </Row>
+          {(ignoreUrlError || localSettings.blockerIgnoredUrls.length > 0) && (
+            <div style={{ padding: '14px 0' }}>
+              {ignoreUrlError && (
+                <div className="mono" style={{ fontSize: 11, color: 'var(--rose)', marginBottom: 8 }}>{ignoreUrlError}</div>
+              )}
+              {localSettings.blockerIgnoredUrls.length > 0 && (
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {localSettings.blockerIgnoredUrls.map(entry => (
+                    <li key={entry}>
+                      <span className="pill" style={{ paddingRight: 6, gap: 4 }}>
+                        {entry}
+                        <button
+                          type="button"
+                          onClick={() => removeIgnoredUrl(entry)}
+                          aria-label={`Remove ${entry}`}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--ink-3)', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1 }}
+                        >x</button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       </section>
 

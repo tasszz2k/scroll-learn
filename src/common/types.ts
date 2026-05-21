@@ -107,6 +107,14 @@ export interface Settings {
   hideFacebookStrangers: boolean;
   hideInstagramStrangers: boolean;
   hideByKeyword: boolean;
+  // Pages where the content blocker should NOT run. Each entry matches against
+  // the page's `host + pathname` (lowercased). Three forms are accepted:
+  //   - Plain host with no slash, e.g. `facebook.com` -> exact host match.
+  //   - Host + path prefix, e.g. `facebook.com/messages` -> startsWith match.
+  //   - JS regex literal `/pattern/flags` -> tested against `host+pathname`.
+  // Used to keep the blocker out of pages that look like a feed but are not
+  // (Facebook Messenger at facebook.com/messages, etc.).
+  blockerIgnoredUrls: string[];
   // Topic buckets that own the user's keywords. Source of truth -- the UI
   // edits this directly. The content blocker still reads the flat
   // `blockedKeywords` list below, which is auto-recomputed in
@@ -235,6 +243,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideFacebookStrangers: true,
   hideInstagramStrangers: true,
   hideByKeyword: true,
+  blockerIgnoredUrls: ['facebook.com/messages', 'facebook.com/marketplace/messages'],
   keywordGroups: [],
   blockedKeywords: [],
   keywordHits: {},

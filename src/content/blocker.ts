@@ -11,6 +11,7 @@
  */
 
 import type { Settings, AiQualityReviewMessage, AiReason, Response, AiQualityReviewResultData } from '../common/types';
+import { isUrlIgnored } from '../common/urlIgnore';
 
 const STYLE_ID = 'scrolllearn-blocker-styles';
 const HIDDEN_CLASS = 'scrolllearn-hidden';
@@ -304,6 +305,13 @@ function removeStyle() {
 
 function getHostname(): string {
   return window.location.hostname.replace(/^(www\.|m\.)/, '');
+}
+
+function currentUrlIgnored(settings: Settings | null): boolean {
+  if (!settings) return false;
+  const list = settings.blockerIgnoredUrls;
+  if (!list || list.length === 0) return false;
+  return isUrlIgnored(list, window.location.hostname, window.location.pathname);
 }
 
 /**
@@ -1362,6 +1370,15 @@ function unhideAll() {
 
 export function startBlocker(settings: Settings) {
   currentSettings = settings;
+  installUrlChangeWatcher();
+  if (currentUrlIgnored(settings)) {
+    // Page is on the user's ignore list (e.g. facebook.com/messages); make sure
+    // any prior run on this tab is fully torn down so nothing stays hidden.
+    stopObserver();
+    removeStyle();
+    unhideAll();
+    return;
+  }
   const hostname = getHostname();
   injectOrUpdateStyle(buildCSS(settings, hostname));
   startObserver(settings);
@@ -1369,8 +1386,22 @@ export function startBlocker(settings: Settings) {
 
 export function updateBlocker(settings: Settings) {
   currentSettings = settings;
+  installUrlChangeWatcher();
+
+  if (currentUrlIgnored(settings)) {
+    stopObserver();
+    removeStyle();
+    unhideAll();
+    return;
+  }
+
   const hostname = getHostname();
   injectOrUpdateStyle(buildCSS(settings, hostname));
+
+  if (!blockerObserver) {
+    startObserver(settings);
+    return;
+  }
 
   // Remove all hidden markers (including inline style) so re-scan starts clean.
   unhideAll();
@@ -1385,4 +1416,68 @@ export function stopBlocker() {
   currentSettings = null;
 
   unhideAll();
+}
+
+// ---------------------------------------------------------------------------
+// SPA URL change watcher
+// ---------------------------------------------------------------------------
+// Facebook, Instagram, and YouTube swap content via history.pushState rather
+// than full navigations, so we patch pushState/replaceState (and listen for
+// popstate) to re-evaluate the blocker when the path changes. Without this
+// the blocker keeps observing on facebook.com/messages even though the user
+// added /messages to their ignore list before navigating there.
+
+let urlWatcherInstalled = false;
+let lastWatchedHref: string | null = null;
+
+function reEvaluateForUrlChange() {
+  if (!currentSettings) return;
+  const href = window.location.href;
+  if (href === lastWatchedHref) return;
+  lastWatchedHref = href;
+
+  if (currentUrlIgnored(currentSettings)) {
+    stopObserver();
+    removeStyle();
+    unhideAll();
+    return;
+  }
+
+  // Coming back to a non-ignored URL: re-inject CSS + observer if we tore down.
+  if (!blockerObserver) {
+    const hostname = getHostname();
+    injectOrUpdateStyle(buildCSS(currentSettings, hostname));
+    startObserver(currentSettings);
+  }
+}
+
+function installUrlChangeWatcher() {
+  lastWatchedHref = window.location.href;
+  if (urlWatcherInstalled) return;
+  urlWatcherInstalled = true;
+
+  const fire = () => {
+    // Defer one tick so location.href reflects the new value when called from
+    // the patched history methods below.
+    setTimeout(reEvaluateForUrlChange, 0);
+  };
+
+  try {
+    const origPush = history.pushState;
+    const origReplace = history.replaceState;
+    history.pushState = function (...args: Parameters<typeof origPush>) {
+      const r = origPush.apply(this, args);
+      fire();
+      return r;
+    };
+    history.replaceState = function (...args: Parameters<typeof origReplace>) {
+      const r = origReplace.apply(this, args);
+      fire();
+      return r;
+    };
+  } catch {
+    // CSP / proxied history -- fall back to popstate + interval below.
+  }
+  window.addEventListener('popstate', fire);
+  window.addEventListener('hashchange', fire);
 }
