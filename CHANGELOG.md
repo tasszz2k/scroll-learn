@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.25.0](https://github.com/tasszz2k/scroll-learn/compare/v1.24.0...v1.25.0) (2026-05-21)
+
+
+### Features
+
+* **blocker:** add per-URL ignore list to skip non-feed pages ([edc1d95](https://github.com/tasszz2k/scroll-learn/commit/edc1d95d0816d8710cdcfbe83bb6d17a9cfbebdb))
+
 ## [1.24.0](https://github.com/tasszz2k/scroll-learn/compare/v1.23.2...v1.24.0) (2026-05-15)
 
 
