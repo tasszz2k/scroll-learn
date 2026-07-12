@@ -4,6 +4,14 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.26.0](https://github.com/tasszz2k/scroll-learn/compare/v1.25.0...v1.26.0) (2026-07-12)
+
+
+### Features
+
+* **notes:** capture text from local files and PDFs, with OCR for scanned pages ([945ceca](https://github.com/tasszz2k/scroll-learn/commit/945cecaba8910ea37d2d8edc5727367e3d57ec54))
+* **pdf:** add persistent annotation editor ([865407a](https://github.com/tasszz2k/scroll-learn/commit/865407a6f34d104a579c5e78ae5a705ce377d82a))
+
 ## [1.25.0](https://github.com/tasszz2k/scroll-learn/compare/v1.24.0...v1.25.0) (2026-05-21)
 
 
