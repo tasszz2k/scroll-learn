@@ -20,6 +20,15 @@ const HIDDEN_CLASS = 'scrolllearn-hidden';
 // elements hidden via CSS class.
 const HIDDEN_SEL = `[data-sl-hidden],.${HIDDEN_CLASS}`;
 
+// Facebook labels ads as "Sponsored" (legacy, obfuscated) or the newer short
+// "Ad". Every exact-match label check accepts both spellings.
+const AD_LABELS = ['sponsored', 'ad'];
+
+// "Suggested for you" posts render this label as plain (unobfuscated) header
+// text. Exact leaf-span matches only, so organic posts that merely mention the
+// word are not hidden.
+const SUGGESTED_MARKERS = ['suggested for you', 'suggested posts', 'suggested'];
+
 let blockerObserver: MutationObserver | null = null;
 let currentSettings: Settings | null = null;
 let periodicScanTimer: ReturnType<typeof setTimeout> | null = null;
@@ -366,7 +375,7 @@ function findSponsoredIndicators(): Element[] {
   // Strategy A: aria-label on links (case-insensitive check)
   for (const link of document.querySelectorAll('a[aria-label]')) {
     const label = link.getAttribute('aria-label')?.toLowerCase() || '';
-    if (label === 'sponsored') {
+    if (AD_LABELS.includes(label)) {
       results.push(link);
     }
   }
@@ -380,7 +389,7 @@ function findSponsoredIndicators(): Element[] {
       const labelEl = document.getElementById(labelId);
       if (labelEl) {
         const text = stripInvisible(labelEl.textContent || '').trim().toLowerCase();
-        if (text === 'sponsored') {
+        if (AD_LABELS.includes(text)) {
           results.push(el);
         }
       }
@@ -394,17 +403,19 @@ function findSponsoredIndicators(): Element[] {
     const children = container.children;
     if (children.length < 8 || children.length > 80) continue;
     const text = reconstructVisibleText(container);
-    if (text.toLowerCase() === 'sponsored') {
+    if (AD_LABELS.includes(text.toLowerCase())) {
       results.push(container);
     }
   }
 
-  // Strategy D: Direct text match on link spans
+  // Strategy D: Direct text match on link spans. Both selectors are already
+  // scoped inside an anchor, so accepting the short "ad" label here does not
+  // risk matching a bare "ad" span elsewhere in an organic post.
   for (const el of document.querySelectorAll('a[role="link"] span, a span[dir="auto"]')) {
     if (el.closest(HIDDEN_SEL)) continue;
     if (el.closest('[role="article"]')) continue;
     const cleaned = stripInvisible(el.textContent || '').trim().toLowerCase();
-    if (cleaned === 'sponsored') {
+    if (AD_LABELS.includes(cleaned)) {
       results.push(el);
     }
   }
@@ -519,12 +530,14 @@ function isFacebookSponsored(article: Element): boolean {
   // Facebook uses it on ALL posts in their rendering pipeline.
 
   // Strategy 2: aria-label on links
-  if (article.querySelector('a[aria-label="Sponsored"], a[aria-label="sponsored"]')) {
+  if (article.querySelector(
+    'a[aria-label="Sponsored"], a[aria-label="sponsored"], a[aria-label="Ad"], a[aria-label="ad"]'
+  )) {
     return true;
   }
 
   // Strategy 3: aria-labelledby pointing to a hidden element whose text
-  // is the unobfuscated word "Sponsored" (used for screen readers).
+  // is the unobfuscated label ("Sponsored" or "Ad") used for screen readers.
   const labelledEls = article.querySelectorAll('[aria-labelledby]');
   for (const el of labelledEls) {
     const labelId = el.getAttribute('aria-labelledby');
@@ -532,13 +545,13 @@ function isFacebookSponsored(article: Element): boolean {
       const labelEl = document.getElementById(labelId);
       if (labelEl) {
         const text = stripInvisible(labelEl.textContent || '').trim().toLowerCase();
-        if (text === 'sponsored') return true;
+        if (AD_LABELS.includes(text)) return true;
       }
     }
   }
 
   // Strategy 4: Reconstruct visible text from obfuscated character spans.
-  // Facebook renders "Sponsored" inside a flex container where each character
+  // Facebook renders the label inside a flex container where each character
   // is a separate <span>. Decoy characters are stacked at a single left
   // coordinate; visible characters have distinct, sequential left positions.
   const flexSpans = article.querySelectorAll<HTMLElement>('span[style*="display: flex"]');
@@ -546,7 +559,7 @@ function isFacebookSponsored(article: Element): boolean {
     const children = container.children;
     if (children.length < 8 || children.length > 80) continue;
     const text = reconstructVisibleText(container);
-    if (text.toLowerCase() === 'sponsored') return true;
+    if (AD_LABELS.includes(text.toLowerCase())) return true;
   }
 
   // Strategy 5: Simple text match (non-obfuscated fallback, e.g. mobile web)
@@ -554,6 +567,10 @@ function isFacebookSponsored(article: Element): boolean {
   for (const el of candidates) {
     const cleaned = stripInvisible(el.textContent || '').trim().toLowerCase();
     if (cleaned === 'sponsored') return true;
+    // The short "Ad" label is trusted only as the accessible text of a link
+    // (the ad permalink), never a bare span, so organic posts that merely
+    // contain the word "ad" are not hidden.
+    if (cleaned === 'ad' && el.closest('a[role="link"]')) return true;
   }
 
   return false;
@@ -794,10 +811,46 @@ function scanNonArticleSponsored(scope: Element) {
 
   for (const container of candidates) {
     if (container.children.length < 8 || container.children.length > 80) continue;
-    if (reconstructVisibleText(container).toLowerCase() === 'sponsored') {
+    if (AD_LABELS.includes(reconstructVisibleText(container).toLowerCase())) {
       const unit = findAdFeedUnit(container);
       if (unit && !unit.hasAttribute('data-sl-hidden')) hideElement(unit, 'sponsored');
     }
+  }
+}
+
+/**
+ * Deterministic, layout-independent scan for Facebook "Sponsored"/"Ad" posts
+ * that lack [role="article"]. Facebook's ad label span carries an
+ * aria-labelledby pointing to a clean screen-reader element whose text is the
+ * unobfuscated label. Because this needs neither getBoundingClientRect nor the
+ * obfuscation CSS to have painted, it fires on the MutationObserver pass so ads
+ * hide on insertion instead of waiting for the 2s reconstruction tick.
+ */
+function scanNonArticleAdLabel(scope: Element) {
+  const sel = '[aria-labelledby]';
+  const candidates: Element[] = [];
+
+  for (const el of scope.querySelectorAll(sel)) {
+    if (!el.closest('[role="article"]') && !el.closest(HIDDEN_SEL)) candidates.push(el);
+  }
+  if (scope.matches?.(sel) &&
+      !scope.closest('[role="article"]') && !scope.closest(HIDDEN_SEL)) {
+    candidates.push(scope);
+  }
+  const parent = scope.closest?.(sel);
+  if (parent && !parent.closest('[role="article"]') && !parent.closest(HIDDEN_SEL)) {
+    candidates.push(parent);
+  }
+
+  for (const el of candidates) {
+    const labelId = el.getAttribute('aria-labelledby');
+    if (!labelId) continue;
+    const labelEl = document.getElementById(labelId);
+    if (!labelEl) continue;
+    const text = stripInvisible(labelEl.textContent || '').trim().toLowerCase();
+    if (!AD_LABELS.includes(text)) continue;
+    const unit = findAdFeedUnit(el);
+    if (unit && !unit.hasAttribute('data-sl-hidden')) hideElement(unit, 'sponsored');
   }
 }
 
@@ -838,6 +891,60 @@ function scanNonArticleStrangers(scope: Element) {
     if (!hasFollow) continue;
     const unit = findAdFeedUnit(pn);
     if (unit && !unit.hasAttribute('data-sl-hidden')) hideElement(unit, 'strangers');
+  }
+}
+
+/**
+ * True if `el` contains a leaf span whose exact (invisible-stripped) text is a
+ * suggested marker. Leaf-only + exact-match keeps this from matching post body
+ * prose that happens to contain the word "suggested".
+ */
+function containsSuggestedLabel(el: Element): boolean {
+  for (const span of el.querySelectorAll('span')) {
+    if (span.querySelector('span')) continue;
+    const t = stripInvisible(span.textContent || '').trim().toLowerCase();
+    if (SUGGESTED_MARKERS.includes(t)) return true;
+  }
+  return false;
+}
+
+/**
+ * Deterministic non-article "Suggested for you" detection. Facebook renders the
+ * label as plain (unobfuscated) header text next to the profile_name block on
+ * posts that have no [role="article"] wrapper, so the article-only suggested
+ * scan misses them entirely. We anchor on the profile_name element (one per
+ * post), confirm the nearest header ancestor carries a suggested marker, and
+ * hide the feed unit. Layout-independent, so it fires on the observer pass.
+ */
+function scanNonArticleSuggested(scope: Element) {
+  const pnSel = '[data-ad-rendering-role="profile_name"]';
+  const profileNames: Element[] = [];
+
+  for (const pn of scope.querySelectorAll(pnSel)) {
+    if (!pn.closest('[role="article"]') && !pn.closest(HIDDEN_SEL)) profileNames.push(pn);
+  }
+  if (scope.matches?.(pnSel) &&
+      !scope.closest('[role="article"]') && !scope.closest(HIDDEN_SEL)) {
+    profileNames.push(scope);
+  }
+  const parentPN = scope.closest?.(pnSel);
+  if (parentPN && !parentPN.closest('[role="article"]') &&
+      !parentPN.closest(HIDDEN_SEL)) {
+    profileNames.push(parentPN);
+  }
+
+  for (const pn of profileNames) {
+    // The label is a sibling row of profile_name a few levels up. Stop at the
+    // first (lowest) ancestor carrying the marker so we never reach post body.
+    let header: Element | null = pn.parentElement;
+    let matched = false;
+    for (let i = 0; i < 5 && header && header !== document.body; i++) {
+      if (containsSuggestedLabel(header)) { matched = true; break; }
+      header = header.parentElement;
+    }
+    if (!matched) continue;
+    const unit = findAdFeedUnit(pn);
+    if (unit && !unit.hasAttribute('data-sl-hidden')) hideElement(unit, 'suggested');
   }
 }
 
@@ -1000,6 +1107,7 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
   if (settings.hideFacebookSponsored && isFacebook) {
     scanFacebookArticles(el, isFacebookSponsored, 'sponsored');
     scanNonArticleSponsored(el);
+    scanNonArticleAdLabel(el);
   }
 
   // --- Instagram Sponsored ---
@@ -1010,6 +1118,7 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
   // --- Facebook Suggested ---
   if (settings.hideFacebookSuggested && isFacebook) {
     scanFacebookArticles(el, isFacebookSuggested, 'suggested');
+    scanNonArticleSuggested(el);
   }
 
   // --- Instagram Suggested ---
@@ -1188,6 +1297,7 @@ function startPeriodicScan(hostname: string) {
 
       if (currentSettings.hideFacebookSponsored) {
         scanNonArticleSponsored(document.body);
+        scanNonArticleAdLabel(document.body);
         const sponsoredEls = findSponsoredIndicators();
         for (const el of sponsoredEls) {
           if (el.closest(HIDDEN_SEL)) continue;
@@ -1200,6 +1310,10 @@ function startPeriodicScan(hostname: string) {
 
       if (currentSettings.hideFacebookStrangers) {
         scanNonArticleStrangers(document.body);
+      }
+
+      if (currentSettings.hideFacebookSuggested) {
+        scanNonArticleSuggested(document.body);
       }
 
       const articles = document.querySelectorAll(`[role="article"]${notHidden}`);
