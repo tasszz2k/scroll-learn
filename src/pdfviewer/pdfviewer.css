@@ -1,0 +1,193 @@
+/* Standalone reader chrome for the in-extension PDF viewer. The text layer
+ * styling itself comes from pdfjs-dist/web/pdf_viewer.css (imported in the
+ * entry module); this file only styles the surrounding page and the
+ * page/canvas frames so a selectable text layer sits over each rendered page. */
+
+:root {
+  --ssv-bg: #2b2b2b;
+  --ssv-bar-bg: #1f2937;
+  --ssv-bar-ink: #f8fafc;
+  --ssv-page-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--ssv-bg);
+  color: var(--ssv-bar-ink);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+#ssv-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--ssv-bar-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+#ssv-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #f8fafc;
+  font-weight: 600;
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+
+#ssv-file {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(248, 250, 252, 0.85);
+  font-size: 13px;
+}
+
+#ssv-hint {
+  flex: 0 0 auto;
+  color: rgba(248, 250, 252, 0.7);
+  font-size: 12px;
+}
+
+#ssv-hint kbd {
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+}
+
+#ssv-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 12px 60px;
+}
+
+.ssv-page {
+  position: relative;
+  background: #ffffff;
+  box-shadow: var(--ssv-page-shadow);
+}
+
+.ssv-page canvas {
+  display: block;
+}
+
+/* pdf_viewer.css positions .textLayer over the page via --scale-factor. We
+ * make sure the layer fills the page frame and stays selectable above canvas. */
+.ssv-page .textLayer {
+  position: absolute;
+  inset: 0;
+}
+
+/* OCR overlay: a transparent, selectable text layer built from Tesseract word
+ * boxes for scanned pages. Text is invisible (the page image shows through)
+ * but fully selectable, so pluck's window.getSelection() reads real words. */
+.ssv-page .ssv-ocr-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ssv-page .ssv-ocr-layer span {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  transform-origin: 0 0;
+  cursor: text;
+}
+
+.ssv-page .ssv-ocr-layer span::selection {
+  background: rgba(37, 99, 235, 0.35);
+}
+
+/* Per-page badge shown while a scanned page waits for / runs OCR. */
+.ssv-ocr-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(31, 41, 55, 0.82);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* Top-bar pill reporting document-wide OCR progress. */
+#ssv-ocr-status {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(201, 100, 66, 0.9);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#ssv-status {
+  max-width: 620px;
+  margin: 48px auto;
+  padding: 24px 28px;
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 12px;
+  box-shadow: var(--ssv-page-shadow);
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+#ssv-status h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+#ssv-status ol {
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+#ssv-status code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12.5px;
+}
+
+#ssv-status button {
+  margin-top: 16px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #c96442;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#ssv-status button:hover {
+  background: #b4573a;
+}

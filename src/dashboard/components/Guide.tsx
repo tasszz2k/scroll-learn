@@ -243,6 +243,19 @@ Again: card resets, returns in 10 minutes`}</Pre>
         <P>
           Manage which sites pluck mode runs on under <strong>Settings → Note capture allowlist</strong>. Plain hostnames like <Code>en.wikipedia.org</Code> work; regex entries like <Code>/^.*\.zim\.vn$/</Code> work too. The popup's per-site toggle only flips plain hostnames — regex-allowlisted sites must be edited in Settings.
         </P>
+        <H>Local files &amp; PDFs.</H>
+        <P>
+          Pluck also works on files you open straight from disk (<Code>file://</Code>). Chrome only lets extensions touch local files after you turn on <strong>Allow access to file URLs</strong> on the extension's card in <Code>chrome://extensions</Code> — the popup and <strong>Settings → Note capture</strong> both surface a one-click shortcut to that page when access is off.
+        </P>
+        <List>
+          <Bullet><strong>HTML / text / markdown</strong> files render as normal pages, so hold <Kbd>Option</Kbd> / <Kbd>Alt</Kbd> and pluck exactly as on the web.</Bullet>
+          <Bullet><strong>PDFs</strong> use Chrome's built-in viewer, which hides its text from extensions. Open the PDF in ScrollLearn's own viewer (the <strong>Open viewer</strong> button in the popup, or the floating <strong>Capture with ScrollLearn</strong> button on the page) — there the text is selectable and pluckable like any other page.</Bullet>
+          <Bullet><strong>Scanned / photocopied PDFs</strong> have no real text, only a page image. The viewer detects those pages and runs on-device OCR (a top-bar pill shows progress), then lays selectable words over the image so pluck still works. No text leaves your machine.</Bullet>
+          <Bullet><strong>Or use Chrome's viewer + copy</strong>: if you prefer Chrome's built-in reader, select and copy the text there, then click <strong>Save copied text</strong> in the popup to store it as a bookmark.</Bullet>
+        </List>
+        <P>
+          The whole local-file behaviour is gated by <strong>Settings → Note capture → Capture on local files</strong> (on by default).
+        </P>
       </Section>
 
       <Section num="06b" label="Notebooks (manual authoring)">
@@ -291,6 +304,7 @@ Again: card resets, returns in 10 minutes`}</Pre>
           <Bullet><strong>Pause after quiz</strong> — minutes of quiet between cards.</Bullet>
           <Bullet><strong>Active deck</strong> — restrict cards to one deck, or leave on auto-select.</Bullet>
           <Bullet><strong>Note allowlist</strong> — which sites pluck mode is armed on.</Bullet>
+          <Bullet><strong>Capture on local files</strong> — arm pluck on <Code>file://</Code> pages and PDFs (needs "Allow access to file URLs").</Bullet>
           <Bullet><strong>Note minimum length</strong> — drop captures below this many characters.</Bullet>
           <Bullet><strong>Toast duration</strong> — 1–30 seconds for the save confirmation.</Bullet>
           <Bullet><strong>Translation direction</strong> — auto-translate captured bookmarks (e.g. EN → VI).</Bullet>

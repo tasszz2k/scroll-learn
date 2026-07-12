@@ -132,6 +132,11 @@ export interface Settings {
   // is ignored. Lets the user enable pluck capture everywhere without curating
   // a per-site list. Off by default to keep the original opt-in behaviour.
   noteCaptureAllSites: boolean;
+  // When true, pluck capture is active on local files opened in Chrome
+  // (file:// pages: HTML/txt/md directly, PDFs via the in-extension viewer).
+  // Only has any effect once the user turns on "Allow access to file URLs" for
+  // the extension, which Chrome requires before injecting into file:// at all.
+  noteCaptureLocalFiles: boolean;
   noteMinLength: number;
   noteRetentionDays: number;
   noteTranslateDirection: TranslateDirection;
@@ -249,6 +254,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keywordHits: {},
   noteCaptureAllowlist: ['app.zim.vn'],
   noteCaptureAllSites: false,
+  noteCaptureLocalFiles: true,
   noteMinLength: 2,
   noteRetentionDays: 0,
   noteTranslateDirection: 'auto',
@@ -448,6 +454,12 @@ export interface OpenDashboardMessage {
 
 export interface OpenSidePanelMessage {
   type: 'open_side_panel';
+}
+
+export interface OpenPdfViewerMessage {
+  type: 'open_pdf_viewer';
+  // Absolute file:// URL of the local PDF to open in the in-extension viewer.
+  fileUrl: string;
 }
 
 export interface GetNextStudyCardMessage {
@@ -874,6 +886,7 @@ export type Message =
   | SkipCardMessage
   | OpenDashboardMessage
   | OpenSidePanelMessage
+  | OpenPdfViewerMessage
   | GetNextStudyCardMessage
   | SaveNoteMessage
   | GetNotesMessage

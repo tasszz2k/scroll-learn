@@ -24,6 +24,10 @@ export default defineConfig({
         // chrome.offscreen.createDocument and isn't referenced from the
         // manifest, so we list it here explicitly to make Rollup emit it.
         kokoroOffscreen: resolve(__dirname, 'src/offscreen/kokoroOffscreen.html'),
+        // The PDF viewer is opened at runtime via chrome.runtime.getURL (from
+        // the popup / background), not referenced from the manifest, so list
+        // it here too so Rollup emits it.
+        pdfViewer: resolve(__dirname, 'src/pdfviewer/pdfviewer.html'),
       },
     },
   },

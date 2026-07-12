@@ -21,6 +21,37 @@ interface PopupState {
   blockedCount: number;
   blockedCounts: BlockedCounts | null;
   updateInfo: UpdateInfo | null;
+  /** Active tab is a local file (file://...). */
+  isFileUrl: boolean;
+  /** Full file:// URL of the active tab, when it's a local file. */
+  fileUrl: string;
+  /** Active tab is a local PDF (file://....pdf). */
+  isLocalPdf: boolean;
+  /** Whether the user has granted "Allow access to file URLs". */
+  fileAccessAllowed: boolean;
+}
+
+/** Promisified wrapper for the callback-style file-scheme access check. */
+function getFileSchemeAccess(): Promise<boolean> {
+  return new Promise(resolve => {
+    try {
+      chrome.extension.isAllowedFileSchemeAccess(resolve);
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/** Human-friendly base name from a file:// URL. */
+function fileBaseName(fileUrl: string): string {
+  try {
+    const decoded = decodeURIComponent(fileUrl);
+    const path = decoded.split('?')[0].split('#')[0];
+    const name = path.split('/').pop();
+    return name && name.trim() ? name : decoded;
+  } catch {
+    return fileUrl;
+  }
 }
 
 // Shared SVG attributes for every popup button icon: 14px box, no fill,
@@ -109,13 +140,24 @@ function Popup() {
     blockedCount: 0,
     blockedCounts: null,
     updateInfo: null,
+    isFileUrl: false,
+    fileUrl: '',
+    isLocalPdf: false,
+    fileAccessAllowed: false,
   });
+
+  // Transient feedback for the "save copied text" action on file:// PDFs.
+  const [clipboardMsg, setClipboardMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const url = tab?.url ? new URL(tab.url) : null;
       const currentSite = url?.hostname?.replace(/^(www\.|m\.)/, '') || '';
+      const isFileUrl = url?.protocol === 'file:';
+      const fileUrl = isFileUrl ? (tab?.url ?? '') : '';
+      const isLocalPdf = isFileUrl && /\.pdf$/i.test(url?.pathname ?? '');
+      const fileAccessAllowed = await getFileSchemeAccess();
 
       const [statsResponse, settingsResponse, decksResponse, cardsResponse, updateResponse] = await Promise.all([
         chrome.runtime.sendMessage({ type: 'get_stats' }),
@@ -168,6 +210,10 @@ function Popup() {
         blockedCount,
         blockedCounts,
         updateInfo: updateResponse?.ok ? updateResponse.data : null,
+        isFileUrl,
+        fileUrl,
+        isLocalPdf,
+        fileAccessAllowed,
       });
     } catch (error) {
       console.error('Failed to load popup data:', error);
@@ -284,6 +330,64 @@ function Popup() {
     if (response?.ok) setState(prev => ({ ...prev, settings: response.data }));
   }
 
+  function openExtensionSettings() {
+    // Lands on this extension's card in chrome://extensions where the
+    // "Allow access to file URLs" toggle lives (it can't be flipped by script).
+    chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
+    window.close();
+  }
+
+  function openPdfViewer() {
+    if (!state.fileUrl) return;
+    const viewerUrl =
+      chrome.runtime.getURL('src/pdfviewer/pdfviewer.html') +
+      '?src=' +
+      encodeURIComponent(state.fileUrl);
+    chrome.tabs.create({ url: viewerUrl });
+    window.close();
+  }
+
+  // Fallback capture for scanned PDFs read in Chrome's native viewer: Chrome
+  // OCRs the page so text can be selected + copied there, but its out-of-process
+  // <embed> hides that selection from our scripts. So we read whatever the user
+  // just copied (Cmd/Ctrl+C) and save it as a bookmark. Needs the clipboardRead
+  // permission; the popup click is the required user gesture.
+  async function saveClipboardAsBookmark() {
+    try {
+      const raw = await navigator.clipboard.readText();
+      const text = raw.replace(/\s+/g, ' ').trim();
+      if (!text) {
+        setClipboardMsg({ text: 'Clipboard is empty - copy some text first', ok: false });
+        return;
+      }
+      const note = {
+        text,
+        url: state.fileUrl || '',
+        pageTitle: state.fileUrl ? fileBaseName(state.fileUrl) : 'Local PDF',
+        domain: '',
+      };
+      const res = await chrome.runtime.sendMessage({ type: 'save_note', note });
+      if (res?.ok) {
+        setClipboardMsg({ text: 'Saved to bookmarks', ok: true });
+      } else {
+        setClipboardMsg({ text: `Save failed: ${res?.error ?? 'unknown'}`, ok: false });
+      }
+    } catch (err) {
+      console.warn('[ScrollLearn:popup] clipboard read failed:', err);
+      setClipboardMsg({ text: 'Could not read clipboard', ok: false });
+    }
+  }
+
+  async function toggleLocalFileCapture() {
+    if (!state.settings) return;
+    const next = !state.settings.noteCaptureLocalFiles;
+    const response = await chrome.runtime.sendMessage({
+      type: 'set_settings',
+      settings: { noteCaptureLocalFiles: next },
+    });
+    if (response?.ok) setState(prev => ({ ...prev, settings: response.data }));
+  }
+
   function openDashboard() { chrome.runtime.openOptionsPage(); }
   function openStudy()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#study') }); }
   function openGuide()     { chrome.tabs.create({ url: chrome.runtime.getURL('index.html#guide') }); }
@@ -337,7 +441,8 @@ function Popup() {
     );
   }
 
-  const { stats, settings, currentSite, decks, cardCounts, dueCounts, learnedCounts, totalDue, blockedCount, blockedCounts, updateInfo } = state;
+  const { stats, settings, currentSite, decks, cardCounts, dueCounts, learnedCounts, totalDue, blockedCount, blockedCounts, updateInfo, isFileUrl, fileUrl, isLocalPdf, fileAccessAllowed } = state;
+  const localFileCaptureOn = settings?.noteCaptureLocalFiles !== false;
   const updateAvailable = !!updateInfo?.updateAvailable;
   const currentVersion = chrome.runtime.getManifest().version;
   const versionLabel = updateAvailable && updateInfo?.latestVersion
@@ -354,7 +459,9 @@ function Popup() {
   // The current tab's hostname on a chrome-extension:// URL is the volatile
   // extension id; surface a friendly label in the popup chrome instead so
   // the user never sees a 32-char gibberish hostname.
-  const displaySite = isOwnExtension ? 'this extension' : currentSite;
+  const displaySite = isFileUrl
+    ? fileBaseName(fileUrl)
+    : isOwnExtension ? 'this extension' : currentSite;
   const isFacebook = currentSite.includes('facebook');
   const isYouTube = currentSite.includes('youtube');
   const isInstagram = currentSite.includes('instagram');
@@ -488,63 +595,132 @@ function Popup() {
           <span className="eyebrow">This site</span>
           <span className="url">{displaySite || '—'}</span>
         </div>
-        {isSocialSite ? (
-          <div className="site-row">
-            <div>
-              <div className="head">{siteEnabled ? 'Quizzes enabled' : 'Quizzes paused'}</div>
-              <div className="sub">
-                Every {settings?.showAfterNPosts ?? 5} posts
-                {settings?.pauseMinutesAfterQuiz ? ` · pause ${settings.pauseMinutesAfterQuiz} m` : ''}
+        {isFileUrl ? (
+          <>
+            {!fileAccessAllowed ? (
+              <div className="site-row">
+                <div>
+                  <div className="head">File access needed</div>
+                  <div className="sub">
+                    Turn on <span className="mono" style={{ fontSize: 11 }}>Allow access to file URLs</span> so ScrollLearn can read local files.
+                  </div>
+                </div>
+                <button type="button" className="btn btn-clay" onClick={openExtensionSettings}>
+                  Enable
+                </button>
               </div>
-            </div>
-            <button
-              type="button"
-              className={'switch' + (siteEnabled ? ' on' : '')}
-              aria-pressed={siteEnabled}
-              onClick={toggleSite}
-            />
-          </div>
+            ) : isLocalPdf ? (
+              <>
+                <div className="site-row">
+                  <div>
+                    <div className="head">Local PDF</div>
+                    <div className="sub">Open in ScrollLearn's viewer to select and capture text (scanned pages are OCR'd).</div>
+                  </div>
+                  <button type="button" className="btn btn-clay" onClick={openPdfViewer}>
+                    Open viewer
+                  </button>
+                </div>
+                <div className="site-row">
+                  <div>
+                    <div className="head">Save copied text</div>
+                    <div className="sub">
+                      {clipboardMsg
+                        ? <span style={{ color: clipboardMsg.ok ? 'var(--good, #16a34a)' : 'var(--bad, #dc2626)' }}>{clipboardMsg.text}</span>
+                        : <>In Chrome's viewer, select + copy, then save it here as a bookmark.</>}
+                    </div>
+                  </div>
+                  <button type="button" className="btn btn-ghost" onClick={saveClipboardAsBookmark}>
+                    Save
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="site-row">
+                <div>
+                  <div className="head">{localFileCaptureOn ? 'Capturing on this file' : 'Local file capture off'}</div>
+                  <div className="sub">
+                    Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.
+                  </div>
+                </div>
+              </div>
+            )}
+            {fileAccessAllowed && (
+              <div className="site-row">
+                <div>
+                  <div className="head">Capture on local files</div>
+                  <div className="sub">Applies to all local file pages and the PDF viewer.</div>
+                </div>
+                <button
+                  type="button"
+                  className={'switch' + (localFileCaptureOn ? ' on' : '')}
+                  aria-pressed={localFileCaptureOn}
+                  onClick={toggleLocalFileCapture}
+                  title={localFileCaptureOn ? 'Stop capturing on local files' : 'Capture on local files'}
+                />
+              </div>
+            )}
+          </>
         ) : (
-          <div className="site-row">
-            <div>
-              <div className="head" style={{ color: 'var(--ink-3)' }}>Not a feed site</div>
-              <div className="sub">Quizzes inject on Facebook, YouTube, and Instagram.</div>
+          <>
+            {isSocialSite ? (
+              <div className="site-row">
+                <div>
+                  <div className="head">{siteEnabled ? 'Quizzes enabled' : 'Quizzes paused'}</div>
+                  <div className="sub">
+                    Every {settings?.showAfterNPosts ?? 5} posts
+                    {settings?.pauseMinutesAfterQuiz ? ` · pause ${settings.pauseMinutesAfterQuiz} m` : ''}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={'switch' + (siteEnabled ? ' on' : '')}
+                  aria-pressed={siteEnabled}
+                  onClick={toggleSite}
+                />
+              </div>
+            ) : (
+              <div className="site-row">
+                <div>
+                  <div className="head" style={{ color: 'var(--ink-3)' }}>Not a feed site</div>
+                  <div className="sub">Quizzes inject on Facebook, YouTube, and Instagram.</div>
+                </div>
+                <button type="button" className="switch" aria-pressed="false" disabled />
+              </div>
+            )}
+            <div className="site-row">
+              <div>
+                <div className="head">{noteCaptureOn ? 'Capturing bookmarks' : 'Bookmark capture off'}</div>
+                <div className="sub">
+                  {isOwnExtension
+                    ? 'Always allowlisted — no setup needed on this extension.'
+                    : noteCaptureAllSitesOn
+                      ? 'Enabled on all sites — turn off in Settings.'
+                      : noteCaptureLockedByRegex
+                        ? 'Allowlisted by a regex pattern — manage in Settings.'
+                        : currentSite
+                          ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.</>
+                          : 'Open a tab to enable.'}
+                </div>
+              </div>
+              <button
+                type="button"
+                className={'switch' + (noteCaptureOn ? ' on' : '')}
+                aria-pressed={noteCaptureOn}
+                onClick={toggleNoteCapture}
+                disabled={!currentSite || noteCaptureAllSitesOn || noteCaptureLockedByRegex || isOwnExtension}
+                title={isOwnExtension
+                  ? 'This extension\'s own pages are always allowlisted'
+                  : noteCaptureAllSitesOn
+                    ? '"Enable on all sites" is on - turn it off in Settings to manage per-host'
+                    : noteCaptureLockedByRegex
+                      ? 'Manage regex allowlist in the dashboard Settings'
+                      : noteCaptureOn
+                        ? `Stop capturing bookmarks on ${currentSite}`
+                        : `Capture bookmarks on ${currentSite}`}
+              />
             </div>
-            <button type="button" className="switch" aria-pressed="false" disabled />
-          </div>
+          </>
         )}
-        <div className="site-row">
-          <div>
-            <div className="head">{noteCaptureOn ? 'Capturing bookmarks' : 'Bookmark capture off'}</div>
-            <div className="sub">
-              {isOwnExtension
-                ? 'Always allowlisted — no setup needed on this extension.'
-                : noteCaptureAllSitesOn
-                  ? 'Enabled on all sites — turn off in Settings.'
-                  : noteCaptureLockedByRegex
-                    ? 'Allowlisted by a regex pattern — manage in Settings.'
-                    : currentSite
-                      ? <>Hold <span className="mono" style={{ fontSize: 11 }}>Option/Alt</span> and hover to pluck text.</>
-                      : 'Open a tab to enable.'}
-            </div>
-          </div>
-          <button
-            type="button"
-            className={'switch' + (noteCaptureOn ? ' on' : '')}
-            aria-pressed={noteCaptureOn}
-            onClick={toggleNoteCapture}
-            disabled={!currentSite || noteCaptureAllSitesOn || noteCaptureLockedByRegex || isOwnExtension}
-            title={isOwnExtension
-              ? 'This extension\'s own pages are always allowlisted'
-              : noteCaptureAllSitesOn
-                ? '"Enable on all sites" is on - turn it off in Settings to manage per-host'
-                : noteCaptureLockedByRegex
-                  ? 'Manage regex allowlist in the dashboard Settings'
-                  : noteCaptureOn
-                    ? `Stop capturing bookmarks on ${currentSite}`
-                    : `Capture bookmarks on ${currentSite}`}
-          />
-        </div>
       </section>
 
       {/* Active deck */}

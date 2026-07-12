@@ -630,6 +630,10 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   const aiAutoSaveSkipFirst = useRef(true);
   const [keywordAutoSaveStatus, setKeywordAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const keywordAutoSaveSkipFirst = useRef(true);
+  // Whether the user has granted "Allow access to file URLs" (required before
+  // Chrome injects into any file:// page). Read-only here; only the user can
+  // flip it from chrome://extensions.
+  const [fileAccessAllowed, setFileAccessAllowed] = useState<boolean | null>(null);
 
   // Auto-save effects call onSave through this ref instead of taking it as a
   // dependency. If the parent ever passes an unstable onSave (fresh function
@@ -696,6 +700,7 @@ export default function Settings({ settings, onSave }: SettingsProps) {
       await onSaveRef.current({
         noteCaptureAllowlist: localSettings.noteCaptureAllowlist,
         noteCaptureAllSites: localSettings.noteCaptureAllSites,
+        noteCaptureLocalFiles: localSettings.noteCaptureLocalFiles,
         noteMinLength: localSettings.noteMinLength,
         noteRetentionDays: localSettings.noteRetentionDays,
         noteTranslateDirection: localSettings.noteTranslateDirection,
@@ -709,12 +714,23 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   }, [
     localSettings.noteCaptureAllowlist,
     localSettings.noteCaptureAllSites,
+    localSettings.noteCaptureLocalFiles,
     localSettings.noteMinLength,
     localSettings.noteRetentionDays,
     localSettings.noteTranslateDirection,
     localSettings.noteAutoTranslate,
     localSettings.noteToastDurationSeconds,
   ]);
+
+  // Read the file-scheme access grant once so the Note capture section can
+  // surface whether local-file capture will actually work.
+  useEffect(() => {
+    try {
+      chrome.extension.isAllowedFileSchemeAccess(setFileAccessAllowed);
+    } catch {
+      setFileAccessAllowed(false);
+    }
+  }, []);
 
   // Auto-save AI provider fields. Without this the user has to remember to
   // click Save changes after pasting a key, and Generate quiz silently falls
@@ -1730,6 +1746,36 @@ export default function Settings({ settings, onSave }: SettingsProps) {
               on={localSettings.noteCaptureAllSites}
               onClick={() => toggle('noteCaptureAllSites')}
               ariaLabel="Enable note capture on all sites"
+            />
+          </Row>
+          <Row
+            label="Capture on local files"
+            hint={
+              fileAccessAllowed === false
+                ? (
+                  <>
+                    Requires <strong>Allow access to file URLs</strong> for this extension.{' '}
+                    <button
+                      type="button"
+                      onClick={() => chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` })}
+                      style={{ background: 'none', border: 'none', padding: 0, color: 'var(--clay)', cursor: 'pointer', textDecoration: 'underline', font: 'inherit' }}
+                    >
+                      Open extension settings
+                    </button>
+                  </>
+                )
+                : (
+                  <>
+                    Pluck text on local <span className="mono" style={{ fontSize: 12 }}>file://</span> pages. Local PDFs open in ScrollLearn's built-in viewer.
+                    {fileAccessAllowed === true ? ' File access is on.' : ''}
+                  </>
+                )
+            }
+          >
+            <ToggleControl
+              on={localSettings.noteCaptureLocalFiles}
+              onClick={() => toggle('noteCaptureLocalFiles')}
+              ariaLabel="Enable note capture on local files"
             />
           </Row>
           <Row

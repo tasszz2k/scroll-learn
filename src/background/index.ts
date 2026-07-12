@@ -340,6 +340,9 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
     case 'open_dashboard':
       return handleOpenDashboard();
 
+    case 'open_pdf_viewer':
+      return handleOpenPdfViewer(message.fileUrl);
+
     case 'get_next_study_card':
       return handleGetNextStudyCard(message.deckId, message.practiceMode);
 
@@ -996,6 +999,25 @@ async function handleOpenDashboard(): Promise<Response<void>> {
   try {
     const dashboardUrl = chrome.runtime.getURL('index.html');
     await chrome.tabs.create({ url: dashboardUrl });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+}
+
+/**
+ * Open a local PDF in the in-extension PDF viewer so its text becomes
+ * selectable and pluck-capturable. `fileUrl` is the original file:// URL,
+ * passed to the viewer via the ?src= query param.
+ */
+async function handleOpenPdfViewer(fileUrl: string): Promise<Response<void>> {
+  try {
+    if (!fileUrl) return { ok: false, error: 'No file URL' };
+    const viewerUrl =
+      chrome.runtime.getURL('src/pdfviewer/pdfviewer.html') +
+      '?src=' +
+      encodeURIComponent(fileUrl);
+    await chrome.tabs.create({ url: viewerUrl });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };

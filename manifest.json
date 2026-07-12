@@ -14,7 +14,8 @@
     "tabs",
     "nativeMessaging",
     "sidePanel",
-    "offscreen"
+    "offscreen",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://www.facebook.com/*",
