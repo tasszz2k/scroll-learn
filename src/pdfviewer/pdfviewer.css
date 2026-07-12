@@ -23,17 +23,21 @@ body {
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-#ssv-bar {
+#ssv-chrome {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
+  background: var(--ssv-bar-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.38);
+}
+
+#ssv-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
-  background: var(--ssv-bar-bg);
+  min-height: 44px;
+  gap: 14px;
+  padding: 7px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
 }
 
 #ssv-brand {
@@ -146,6 +150,67 @@ body {
   font-weight: 600;
 }
 
+/* Saved-text highlights: a per-page layer of colored boxes over captured
+ * words. pointer-events:none so it never blocks pluck selection; hover is
+ * detected by a global mousemove hit-test. mix-blend-mode:multiply keeps the
+ * underlying glyphs readable through the color. */
+.ssv-page .ssv-hl-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ssv-hl-box {
+  position: absolute;
+  background: rgba(255, 208, 92, 0.5);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
+}
+
+/* Hover card echoing the bookmark row: word + translation + senses + family. */
+#ssv-hl-popup {
+  position: fixed;
+  z-index: 2147483647;
+  max-width: 340px;
+  padding: 12px 14px;
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.4;
+}
+
+.ssv-hl-pop-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ssv-hl-pop-translation {
+  margin-top: 3px;
+  color: #c96442;
+  font-style: italic;
+  font-size: 13px;
+}
+
+.ssv-hl-pop-sense {
+  margin-top: 3px;
+  color: #4b5563;
+  font-style: italic;
+  font-size: 12.5px;
+}
+
+.ssv-hl-pop-family {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(31, 41, 55, 0.12);
+  color: #6b7280;
+  font-size: 12px;
+}
+
 #ssv-status {
   max-width: 620px;
   margin: 48px auto;
@@ -190,4 +255,387 @@ body {
 
 #ssv-status button:hover {
   background: #b4573a;
+}
+
+#ssv-toolbar:not(:empty) {
+  padding: 7px 12px;
+  background: #111827;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ssv-annotation-toolbar,
+.ssv-toolbar-tools,
+.ssv-toolbar-controls,
+.ssv-toolbar-history,
+.ssv-toolbar-control {
+  display: flex;
+  align-items: center;
+}
+
+.ssv-annotation-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ssv-toolbar-tools {
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 1px;
+  scrollbar-width: thin;
+}
+
+.ssv-toolbar-controls,
+.ssv-toolbar-history {
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.ssv-toolbar-control {
+  gap: 5px;
+  color: rgba(248, 250, 252, 0.82);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ssv-toolbar-control[hidden] {
+  display: none;
+}
+
+.ssv-toolbar-controls:not(:has(.ssv-toolbar-control:not([hidden]))) {
+  display: none;
+}
+
+.ssv-toolbar-tool,
+.ssv-toolbar-undo,
+.ssv-toolbar-redo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(248, 250, 252, 0.82);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ssv-toolbar-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ssv-toolbar-tool:hover,
+.ssv-toolbar-undo:hover:not(:disabled),
+.ssv-toolbar-redo:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.ssv-toolbar-tool.is-active {
+  border-color: rgba(201, 100, 66, 0.8);
+  background: rgba(201, 100, 66, 0.25);
+  color: #ffffff;
+}
+
+.ssv-toolbar-tool:focus-visible,
+.ssv-toolbar-undo:focus-visible,
+.ssv-toolbar-redo:focus-visible,
+.ssv-toolbar-color:focus-visible,
+.ssv-toolbar-width:focus-visible,
+.ssv-toolbar-font-size:focus-visible,
+.ssv-toolbar-fill:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.ssv-toolbar-undo:disabled,
+.ssv-toolbar-redo:disabled {
+  color: rgba(248, 250, 252, 0.3);
+  cursor: default;
+}
+
+.ssv-toolbar-colors {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ssv-toolbar-color {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  background: var(--ssv-swatch-color);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.ssv-toolbar-color:hover {
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.ssv-toolbar-color.is-active {
+  border-color: #ffffff;
+  box-shadow:
+    0 0 0 2px #2563eb,
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.ssv-toolbar-width {
+  width: 72px;
+  accent-color: #c96442;
+}
+
+.ssv-toolbar-font-size {
+  width: 72px;
+  height: 26px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  background: #374151;
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.ssv-toolbar-fill {
+  width: 16px;
+  height: 16px;
+  accent-color: #c96442;
+}
+
+/* The permanent content layers stay passive in Hand mode. Tool bindings turn
+ * individual rendered annotations interactive without blocking empty page
+ * space, text selection, or OCR selection. */
+.ssv-anno-svg,
+.ssv-anno-html,
+.ssv-anno-preview-layer,
+.ssv-anno-selection-layer {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ssv-anno-content > *,
+.ssv-anno-html-content > * {
+  cursor: move;
+}
+
+.ssv-anno-preview-layer,
+.ssv-anno-selection-layer {
+  isolation: isolate;
+}
+
+.ssv-anno-preview {
+  opacity: 0.86;
+}
+
+.ssv-anno-selection rect {
+  vector-effect: non-scaling-stroke;
+}
+
+.ssv-anno-selection circle {
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+.ssv-page:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+.ssv-page[data-annotation-tool="select"] {
+  cursor: default;
+}
+
+.ssv-page[data-annotation-tool="text"] {
+  cursor: text;
+}
+
+.ssv-page[data-annotation-tool="note"],
+.ssv-page[data-annotation-tool="highlight"],
+.ssv-page[data-annotation-tool="pencil"],
+.ssv-page[data-annotation-tool="highlighter"],
+.ssv-page[data-annotation-tool="rect"],
+.ssv-page[data-annotation-tool="ellipse"],
+.ssv-page[data-annotation-tool="line"],
+.ssv-page[data-annotation-tool="arrow"] {
+  cursor: crosshair;
+}
+
+.ssv-page[data-annotation-tool="eraser"] {
+  cursor: cell;
+}
+
+.ssv-anno-text {
+  min-width: 1em;
+  max-width: min(420px, calc(100% - 12px));
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.82);
+  line-height: 1.25;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.ssv-anno-text:hover {
+  border-color: rgba(37, 99, 235, 0.55);
+}
+
+.ssv-anno-note {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(120, 80, 0, 0.45);
+  border-radius: 3px 3px 3px 0;
+  background: #fde68a;
+  color: #713f12 !important;
+  font-size: 0 !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.24);
+}
+
+.ssv-anno-note::before {
+  content: "N";
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ssv-anno-note::after {
+  content: attr(data-note-text);
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 3;
+  display: none;
+  width: max-content;
+  min-width: 140px;
+  max-width: 280px;
+  padding: 9px 10px;
+  border: 1px solid #e5c454;
+  border-radius: 7px;
+  background: #fffbdb;
+  color: #3f2d0b;
+  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.23);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.ssv-anno-note:hover::after,
+.ssv-anno-note:focus::after {
+  display: block;
+}
+
+.ssv-anno-text-editor,
+.ssv-anno-note-editor {
+  padding: 8px 10px;
+  border: 2px solid #2563eb;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #111827;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28);
+  line-height: 1.35;
+  cursor: text;
+  outline: none;
+}
+
+.ssv-anno-text-editor:focus,
+.ssv-anno-note-editor:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.5), 0 10px 25px rgba(0, 0, 0, 0.28);
+}
+
+.ssv-anno-note-editor {
+  border-color: #d6a817;
+  background: #fffbdb;
+  color: #3f2d0b;
+}
+
+@media (max-width: 980px) {
+  #ssv-hint {
+    display: none;
+  }
+
+  .ssv-annotation-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tools history"
+      "controls controls";
+  }
+
+  .ssv-toolbar-tools {
+    grid-area: tools;
+  }
+
+  .ssv-toolbar-controls {
+    grid-area: controls;
+    padding-left: 0;
+    padding-top: 6px;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .ssv-toolbar-history {
+    grid-area: history;
+  }
+}
+
+@media (max-width: 560px) {
+  #ssv-bar {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  #ssv-brand span {
+    display: none;
+  }
+
+  #ssv-toolbar:not(:empty) {
+    padding: 6px;
+  }
+
+  .ssv-annotation-toolbar {
+    gap: 6px;
+  }
+
+  .ssv-toolbar-control-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .ssv-toolbar-width {
+    width: 58px;
+  }
+
+  .ssv-toolbar-tool,
+  .ssv-toolbar-undo,
+  .ssv-toolbar-redo {
+    padding-inline: 7px;
+    font-size: 11px;
+  }
 }

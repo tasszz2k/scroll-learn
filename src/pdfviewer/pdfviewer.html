@@ -7,21 +7,24 @@
     <script type="module" src="./pdfviewer.ts"></script>
   </head>
   <body>
-    <header id="ssv-bar">
-      <div id="ssv-brand">
-        <svg width="18" height="18" viewBox="0 0 64 64" aria-hidden="true">
-          <rect x="14" y="16" width="36" height="3" fill="currentColor" />
-          <rect x="14" y="26" width="28" height="3" fill="currentColor" />
-          <rect x="14" y="36" width="32" height="3" fill="currentColor" />
-          <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="#C96442" stroke-width="3" stroke-linecap="round" />
-          <circle cx="50" cy="46" r="3" fill="#C96442" />
-        </svg>
-        <span>ScrollLearn PDF</span>
-      </div>
-      <div id="ssv-file" title=""></div>
-      <div id="ssv-hint">Hold <kbd>Option</kbd>/<kbd>Alt</kbd> and select text to capture</div>
-    </header>
+    <div id="ssv-chrome">
+      <header id="ssv-bar">
+        <div id="ssv-brand">
+          <svg width="18" height="18" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="14" y="16" width="36" height="3" fill="currentColor" />
+            <rect x="14" y="26" width="28" height="3" fill="currentColor" />
+            <rect x="14" y="36" width="32" height="3" fill="currentColor" />
+            <path d="M 50 12 Q 60 32 50 52" fill="none" stroke="#C96442" stroke-width="3" stroke-linecap="round" />
+            <circle cx="50" cy="46" r="3" fill="#C96442" />
+          </svg>
+          <span>ScrollLearn PDF</span>
+        </div>
+        <div id="ssv-file" title=""></div>
+        <div id="ssv-hint">Hold <kbd>Option</kbd>/<kbd>Alt</kbd> and select text to capture</div>
+      </header>
+      <div id="ssv-toolbar"></div>
+    </div>
     <main id="ssv-pages"></main>
-    <div id="ssv-status" hidden></div>
+    <div id="ssv-status" aria-live="polite" aria-atomic="true" hidden></div>
   </body>
 </html>

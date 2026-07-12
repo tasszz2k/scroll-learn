@@ -31,6 +31,22 @@ export interface PluckHandle {
   unmount: () => void;
 }
 
+// Fired after a capture is successfully saved. Carries the client-space rects
+// of what was captured (selection line boxes, or the element box for a click)
+// plus the enrichment the background returned, so callers like the PDF viewer
+// can paint a persistent highlight and reuse the explanation on hover.
+export interface CaptureInfo {
+  text: string;
+  rects: DOMRect[];
+  translation?: string;
+  senses?: DictionarySense[];
+  derivedForms?: DerivedForm[];
+}
+
+export interface PluckOptions {
+  onCapture?: (info: CaptureInfo) => void;
+}
+
 interface PluckState {
   settings: Settings;
   unmounted: boolean;
@@ -56,7 +72,7 @@ interface PluckState {
 
 // Mount the pluck flow on the current document. Returns a handle whose
 // `unmount` removes every listener and DOM node created here.
-export function mountPluckMode(): PluckHandle {
+export function mountPluckMode(options: PluckOptions = {}): PluckHandle {
   const state: PluckState = {
     settings: { ...DEFAULT_SETTINGS },
     unmounted: false,
@@ -420,7 +436,7 @@ export function mountPluckMode(): PluckHandle {
     return host.toLowerCase().replace(/^(www\.|m\.)/, '');
   }
 
-  async function trySendNote(text: string) {
+  async function trySendNote(text: string, rects: DOMRect[] = []) {
     // Stage the captured text on the system clipboard alongside the save so
     // the user can paste it elsewhere without an explicit Ctrl+C step.
     const copied = await copyTextToClipboard(text);
@@ -466,6 +482,11 @@ export function mountPluckMode(): PluckHandle {
           'family:', derivedForms?.length ?? 0,
         );
         showToast(text, { copied, translation, senses, derivedForms });
+        try {
+          options.onCapture?.({ text, rects, translation, senses, derivedForms });
+        } catch (cbErr) {
+          console.warn('[ScrollLearn:pluck] onCapture threw:', cbErr);
+        }
       });
     } catch (err) {
       console.warn('[ScrollLearn:pluck] sendMessage threw:', err);
@@ -546,7 +567,7 @@ export function mountPluckMode(): PluckHandle {
     state.lastSentText = text;
     state.lastSentAt = now;
 
-    void trySendNote(text);
+    void trySendNote(text, [target.getBoundingClientRect()]);
   }
 
   function pluckCaptureSelection(): boolean {
@@ -572,7 +593,13 @@ export function mountPluckMode(): PluckHandle {
     state.lastSentText = text;
     state.lastSentAt = now;
 
-    void trySendNote(text);
+    // Grab the line boxes now, while the selection still exists, so the caller
+    // can paint a highlight over exactly what was captured.
+    const rects = sel.rangeCount > 0
+      ? Array.from(sel.getRangeAt(0).getClientRects()).filter(r => r.width > 0 && r.height > 0)
+      : [];
+
+    void trySendNote(text, rects);
     return true;
   }
 

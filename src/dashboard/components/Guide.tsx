@@ -249,8 +249,11 @@ Again: card resets, returns in 10 minutes`}</Pre>
         </P>
         <List>
           <Bullet><strong>HTML / text / markdown</strong> files render as normal pages, so hold <Kbd>Option</Kbd> / <Kbd>Alt</Kbd> and pluck exactly as on the web.</Bullet>
-          <Bullet><strong>PDFs</strong> use Chrome's built-in viewer, which hides its text from extensions. Open the PDF in ScrollLearn's own viewer (the <strong>Open viewer</strong> button in the popup, or the floating <strong>Capture with ScrollLearn</strong> button on the page) — there the text is selectable and pluckable like any other page.</Bullet>
+          <Bullet><strong>PDFs</strong> use Chrome's built-in viewer, which hides its text from extensions. Open the PDF in ScrollLearn's own viewer (the <strong>Open viewer</strong> button in the popup, or the floating <strong>Open with ScrollLearn</strong> button on the page) — there the text is selectable and pluckable like any other page.</Bullet>
           <Bullet><strong>Scanned / photocopied PDFs</strong> have no real text, only a page image. The viewer detects those pages and runs on-device OCR (a top-bar pill shows progress), then lays selectable words over the image so pluck still works. No text leaves your machine.</Bullet>
+          <Bullet><strong>Annotate in the ScrollLearn viewer</strong> with Select, Text, area Highlight, Sticky note, Pencil, freehand Highlighter, Rectangle, Ellipse, Line, Arrow, and Eraser. Undo and Redo cover each complete drawing or editing gesture.</Bullet>
+          <Bullet><strong>Hand mode returns to reading</strong>: it disables annotation interaction and restores <Kbd>Option</Kbd> / <Kbd>Alt</Kbd> pluck plus saved-bookmark hover cards.</Bullet>
+          <Bullet><strong>Annotations stay local</strong> in IndexedDB and are matched to the PDF's content fingerprint, so they remain aligned across viewer sizes and file moves. They are overlays only and are not written into, printed with, or exported inside the PDF.</Bullet>
           <Bullet><strong>Or use Chrome's viewer + copy</strong>: if you prefer Chrome's built-in reader, select and copy the text there, then click <strong>Save copied text</strong> in the popup to store it as a bookmark.</Bullet>
         </List>
         <P>

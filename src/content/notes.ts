@@ -73,7 +73,7 @@ function showPdfButton() {
   const btn = document.createElement('button');
   btn.id = PDF_BUTTON_ID;
   btn.type = 'button';
-  btn.textContent = 'Capture with ScrollLearn';
+  btn.textContent = 'Open with ScrollLearn';
   btn.style.cssText = [
     'all: initial',
     'position: fixed',

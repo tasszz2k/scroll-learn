@@ -33,6 +33,18 @@ async function set<T>(key: string, value: T): Promise<void> {
   await chrome.storage.local.set({ [key]: value });
 }
 
+export async function getPdfAnnotationFontSize(): Promise<number> {
+  const value = await get<number>(STORAGE_KEYS.PDF_ANNOTATION_FONT_SIZE, 16);
+  return Number.isFinite(value) && value >= 1 ? value : 16;
+}
+
+export async function savePdfAnnotationFontSize(fontSize: number): Promise<void> {
+  if (!Number.isFinite(fontSize) || fontSize < 1) {
+    throw new RangeError('PDF annotation font size must be at least 1');
+  }
+  await set(STORAGE_KEYS.PDF_ANNOTATION_FONT_SIZE, fontSize);
+}
+
 // Deck Operations
 export async function getDecks(): Promise<Deck[]> {
   return get<Deck[]>(STORAGE_KEYS.DECKS, []);

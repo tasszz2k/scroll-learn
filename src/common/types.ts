@@ -981,6 +981,7 @@ export const STORAGE_KEYS = {
   IPA_PROGRESS: 'scrolllearn_ipa_progress',
   IPA_STATS: 'scrolllearn_ipa_stats',
   NOTEBOOK_VIEW_MODE: 'scrolllearn_notebook_view_mode',
+  PDF_ANNOTATION_FONT_SIZE: 'scrolllearn_pdf_annotation_font_size',
   // Per-model free-tier counters for the Gemini API path. Contents:
   // Record<GeminiApiModelId, { dayBucket, dayCount, minuteBucket, minuteCount, cooldownUntil? }>
   GEMINI_API_USAGE: 'scrolllearn_gemini_api_usage',
