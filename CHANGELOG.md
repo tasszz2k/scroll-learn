@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.27.0](https://github.com/tasszz2k/scroll-learn/compare/v1.26.0...v1.27.0) (2026-07-12)
+
+
+### Features
+
+* **blocker:** detect Facebook "Ad" label and non-article "Suggested for you" posts ([c746538](https://github.com/tasszz2k/scroll-learn/commit/c7465380b6135ecd7793a8db004392d898c5a56f))
+
 ## [1.26.0](https://github.com/tasszz2k/scroll-learn/compare/v1.25.0...v1.26.0) (2026-07-12)
 
 
