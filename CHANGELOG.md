@@ -4,6 +4,13 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.27.1](https://github.com/tasszz2k/scroll-learn/compare/v1.27.0...v1.27.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **blocker:** never hide ScrollLearn's own quiz overlay on Facebook ([dc95719](https://github.com/tasszz2k/scroll-learn/commit/dc95719e5394590dbc12665157c30a339837af83))
+
 ## [1.27.0](https://github.com/tasszz2k/scroll-learn/compare/v1.26.0...v1.27.0) (2026-07-12)
 
 
