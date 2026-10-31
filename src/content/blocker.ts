@@ -20,6 +20,11 @@ const HIDDEN_CLASS = 'scrolllearn-hidden';
 // elements hidden via CSS class.
 const HIDDEN_SEL = `[data-sl-hidden],.${HIDDEN_CLASS}`;
 
+// Our own injected UI (quiz overlay, scroll blocker, confirm dialog, tooltip)
+// is appended to <body>, so body-level heuristics would otherwise treat it as
+// a feed post and hide the quiz while leaving the blur overlay in place.
+const OWN_UI_SEL = '[id^="scrolllearn-"]';
+
 // Facebook labels ads as "Sponsored" (legacy, obfuscated) or the newer short
 // "Ad". Every exact-match label check accepts both spellings.
 const AD_LABELS = ['sponsored', 'ad'];
@@ -336,6 +341,7 @@ function currentUrlIgnored(settings: Settings | null): boolean {
  */
 function hideElement(el: Element | null, category: BlockCategory = 'other'): boolean {
   if (!el) return false;
+  if (el.closest(OWN_UI_SEL)) return false;
   const htmlEl = el as HTMLElement;
   if (htmlEl.style.getPropertyValue('display') === 'none') return false;
   if (el.hasAttribute('data-sl-hidden')) return false;
@@ -1017,6 +1023,7 @@ function hideFacebookReelsNavByText(el: Element) {
  * Scan an element (and its subtree) for content that should be hidden.
  */
 function scanElement(el: Element, settings: Settings, hostname: string) {
+  if (el.closest(OWN_UI_SEL)) return;
   const isFacebook = hostname.includes('facebook');
   const isInstagram = hostname.includes('instagram');
   const isYouTube = hostname.includes('youtube');
