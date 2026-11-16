@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ScrollLearn - Privacy Policy</title>
+    <meta name="description" content="Privacy policy for ScrollLearn and the owner's personal Gmail tool." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --paper: #f5f1eb;
+        --ink: #2a2620;
+        --ink-3: #6b655c;
+        --ink-4: #9a9388;
+        --rule: #d9d2c5;
+        --clay: #c96442;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--clay); text-decoration: underline; text-underline-offset: 3px; }
+      a:hover { color: var(--ink); }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+      .eyebrow {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .display {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-weight: 400;
+        line-height: 1.05;
+        margin: 12px 0 0;
+        font-size: 48px;
+      }
+      .display em { color: var(--clay); font-style: italic; }
+      .lead { color: var(--ink-3); font-size: 17px; margin: 18px 0 0; max-width: 60ch; }
+      h2 {
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-weight: 400;
+        font-size: 26px;
+        margin: 40px 0 8px;
+      }
+      ul { padding-left: 20px; }
+      li { margin: 6px 0; }
+      code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        background: #efe9dc;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .rule { height: 1px; background: var(--rule); margin: 40px 0; border: 0; }
+      .footer {
+        margin-top: 64px;
+        padding-top: 24px;
+        border-top: 1px solid var(--rule);
+        font-size: 12px; color: var(--ink-4);
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 12px; flex-wrap: wrap;
+      }
+      .footer a { color: var(--ink-4); }
+      @media (max-width: 560px) {
+        .display { font-size: 36px; }
+        .wrap { padding: 40px 20px 64px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="eyebrow"><a href="./">Scroll &middot; Learn</a> / Privacy</div>
+      <h1 class="display">Privacy <em>policy</em>.</h1>
+      <p class="lead">
+        Effective November 16, 2026. This page covers the ScrollLearn Chrome
+        extension and the owner's personal Gmail tool. Both are personal,
+        open-source projects by Tass.
+      </p>
+
+      <hr class="rule" />
+
+      <h2>ScrollLearn extension</h2>
+      <ul>
+        <li>
+          All your data (decks, cards, notes, notebooks, settings, and stats)
+          stays in your browser, in <code>chrome.storage.local</code> and
+          IndexedDB. ScrollLearn has no server and no account system.
+        </li>
+        <li>ScrollLearn has no analytics, no tracking, and no ads.</li>
+        <li>
+          Some features send data to third-party services, only when you use
+          them:
+          <ul>
+            <li>Translation of a captured word or sentence: Google Translate.</li>
+            <li>Word family lookup for English words: Datamuse.</li>
+            <li>AI assist: Google Gemini, in your own Gemini session or with your own API key.</li>
+            <li>Text-to-speech: ElevenLabs or the Kokoro Hugging Face Space, with your own key.</li>
+            <li>Update check: the GitHub Releases API.</li>
+          </ul>
+        </li>
+        <li>
+          API keys that you enter stay in your browser. ScrollLearn sends them
+          only to the service that they belong to.
+        </li>
+      </ul>
+
+      <h2>Personal Gmail tool</h2>
+      <ul>
+        <li>
+          This tool is for the owner's own Gmail account only. It is not
+          offered to other users.
+        </li>
+        <li>
+          It uses the Gmail API to read unread messages and mark them as read.
+          It requests the <code>https://www.googleapis.com/auth/gmail.modify</code>
+          scope for this purpose only.
+        </li>
+        <li>
+          It does not sell, share, or transfer Gmail data to any third party.
+          It does not use Gmail data for advertising or to train AI models.
+        </li>
+        <li>
+          OAuth credentials stay on the owner's machine. Message content is
+          processed in memory and is not kept after processing.
+        </li>
+        <li>
+          The use of information received from Google APIs follows the
+          <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+          including the Limited Use requirements.
+        </li>
+        <li>
+          You can remove access at any time at
+          <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+        </li>
+      </ul>
+
+      <h2>Contact</h2>
+      <p>
+        For questions about this policy, open an issue at
+        <a href="https://github.com/tasszz2k/scroll-learn/issues">github.com/tasszz2k/scroll-learn/issues</a>.
+      </p>
+
+      <div class="footer">
+        <div>
+          <a href="./">Home</a> &middot;
+          <a href="https://github.com/tasszz2k/scroll-learn">GitHub</a>
+        </div>
+        <div>Made by <a href="https://github.com/tasszz2k">Tass</a></div>
+      </div>
+    </div>
+  </body>
+</html>
