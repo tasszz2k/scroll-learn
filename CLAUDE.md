@@ -152,6 +152,9 @@ Facebook renders the Reels button differently across surfaces:
 Facebook obfuscates "Sponsored" using character-level `<span>` elements with CSS reordering and decoy characters. Detection uses: `data-ad-rendering-role` attributes, `aria-labelledby` references, `getBoundingClientRect`-based visible text reconstruction, and plain text fallback.
 
 ## Common Gotchas
+### Facebook Right-Rail Sponsored
+The desktop right column renders ads as a standalone section: a plain `<h3>Sponsored</h3>` heading (followed by a zero-width space) plus ad cards. The heading sits outside any post or link, and the cards' `aria-labelledby` targets are not in the DOM, so the post-level detectors miss it. `scanRightRailSponsored` matches the heading, requires an ad card in the same section (`a[attributionsrc]` or a menu `aria-label` containing "sponsored content"), and hides the section plus at most 4 single-child wrappers so it never reaches the rail column (Contacts, Birthdays). The section is a React Suspense boundary, so a card-only mutation walks upward to find its heading.
+
 
 - Extension context can be invalidated on reload — content scripts handle `chrome.runtime` errors gracefully
 - Batch imports chunk at 100 cards per batch to avoid Chrome Storage limits

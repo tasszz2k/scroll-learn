@@ -860,6 +860,75 @@ function scanNonArticleAdLabel(scope: Element) {
   }
 }
 
+// Facebook's desktop right rail shows ads as a standalone section: a plain
+// <h3>Sponsored</h3> heading followed by ad cards. The heading sits outside any
+// post or link, and the cards' aria-labelledby targets are not in the DOM, so
+// none of the post-level detectors see it. A heading alone never hides
+// anything: the section must also hold an ad card, recognized by
+// attributionsrc (Attribution Reporting API, set only on ad click-throughs) or
+// the card menu's accessible label.
+const RIGHT_RAIL_AD_CARD_SEL = 'a[attributionsrc], [aria-label*="sponsored content" i]';
+const FEED_SEL = '[role="article"], [role="feed"]';
+const RIGHT_RAIL_MAX_DEPTH = 15;
+// The rail column can briefly hold only the ad section while Contacts and
+// Birthdays stream in; an uncapped single-child climb would hide the column
+// and everything later rendered into it.
+const RIGHT_RAIL_MAX_WRAPPERS = 4;
+
+function isAdHeading(el: Element): boolean {
+  return AD_LABELS.includes(stripInvisible(el.textContent || '').trim().toLowerCase());
+}
+
+function rightRailAdSection(heading: Element): Element | null {
+  let section: Element | null = heading.parentElement;
+  for (let i = 0; section && section !== document.body && i < RIGHT_RAIL_MAX_DEPTH; i++) {
+    if (section.querySelector(FEED_SEL)) return null;
+    if (section.querySelector(RIGHT_RAIL_AD_CARD_SEL)) break;
+    section = section.parentElement;
+  }
+  if (!section || section === document.body || !section.querySelector(RIGHT_RAIL_AD_CARD_SEL)) {
+    return null;
+  }
+  for (let i = 0; i < RIGHT_RAIL_MAX_WRAPPERS; i++) {
+    const parent: Element | null = section.parentElement;
+    if (!parent || parent === document.body || parent.children.length !== 1) break;
+    if (parent.hasAttribute('role') || parent.hasAttribute('data-pagelet')) break;
+    section = parent;
+  }
+  return section;
+}
+
+function scanRightRailSponsored(scope: Element) {
+  const headings = new Set<Element>();
+  const consider = (h: Element) => {
+    if (h.closest(FEED_SEL) || h.closest(HIDDEN_SEL)) return;
+    if (isAdHeading(h)) headings.add(h);
+  };
+
+  for (const h of scope.querySelectorAll('h3')) consider(h);
+  if (scope.matches?.('h3')) consider(scope);
+
+  // The section is a React Suspense boundary, so ad cards can land after the
+  // heading. A card-only mutation looks upward for its heading instead.
+  if (headings.size === 0) {
+    const card = scope.matches?.(RIGHT_RAIL_AD_CARD_SEL) ? scope : scope.querySelector(RIGHT_RAIL_AD_CARD_SEL);
+    if (card && !card.closest(FEED_SEL)) {
+      let up: Element | null = scope.parentElement;
+      for (let i = 0; up && up !== document.body && i < RIGHT_RAIL_MAX_DEPTH; i++) {
+        if (up.querySelector(FEED_SEL)) break;
+        for (const h of up.querySelectorAll('h3')) consider(h);
+        if (headings.size > 0) break;
+        up = up.parentElement;
+      }
+    }
+  }
+
+  for (const h of headings) {
+    const section = rightRailAdSection(h);
+    if (section) hideElement(section, 'sponsored');
+  }
+}
+
 /**
  * Scan for Facebook stranger posts that lack [role="article"].
  * Looks for "Follow" buttons inside [data-ad-rendering-role="profile_name"]
@@ -1115,6 +1184,7 @@ function scanElement(el: Element, settings: Settings, hostname: string) {
     scanFacebookArticles(el, isFacebookSponsored, 'sponsored');
     scanNonArticleSponsored(el);
     scanNonArticleAdLabel(el);
+    scanRightRailSponsored(el);
   }
 
   // --- Instagram Sponsored ---
@@ -1305,6 +1375,7 @@ function startPeriodicScan(hostname: string) {
       if (currentSettings.hideFacebookSponsored) {
         scanNonArticleSponsored(document.body);
         scanNonArticleAdLabel(document.body);
+        scanRightRailSponsored(document.body);
         const sponsoredEls = findSponsoredIndicators();
         for (const el of sponsoredEls) {
           if (el.closest(HIDDEN_SEL)) continue;
