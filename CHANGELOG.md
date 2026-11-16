@@ -4,6 +4,18 @@ All notable changes to ScrollLearn will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.28.0](https://github.com/tasszz2k/scroll-learn/compare/v1.27.1...v1.28.0) (2026-11-16)
+
+
+### Features
+
+* **messenger:** add focus mode, Zalo and CLI themes for Facebook Messenger ([023d46c](https://github.com/tasszz2k/scroll-learn/commit/023d46c53159379f1b4919b6f5e07b60bc836c86))
+
+
+### Bug Fixes
+
+* **blocker:** hide Facebook right-rail Sponsored section ([3738461](https://github.com/tasszz2k/scroll-learn/commit/373846173029055536d451df67612bdd4cb81072))
+
 ## [1.27.1](https://github.com/tasszz2k/scroll-learn/compare/v1.27.0...v1.27.1) (2026-10-31)
 
 
