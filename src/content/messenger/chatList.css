@@ -1,0 +1,48 @@
+/*
+ * Collapsible chat list. The list is the role="navigation" pane beside the
+ * chat, marked data-fmess-list (the same mark fMess themes use, and the
+ * element fMess resizes, so a width set here sticks).
+ */
+
+/* Default look: the list goes away and the chat takes the room. */
+html[data-sl-list-hidden]:not([data-sl-msgr-theme="zalo"]) [data-fmess-list] { display: none !important; }
+
+/* Zalo look: fold the list down to its blue rail, as Zalo does, so the rail
+   (and its chats button, which brings the list back) stays. */
+html[data-sl-list-hidden][data-sl-msgr-theme="zalo"] [data-fmess-list] {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  flex: 0 0 64px !important;
+  overflow: hidden !important;
+}
+html[data-sl-list-hidden][data-sl-msgr-theme="zalo"] [data-fmess-list] > * { display: none !important; }
+
+#sl-msgr-list-toggle {
+  position: fixed;
+  z-index: 3;
+  top: 50%;
+  left: 0;
+  width: 14px;
+  height: 44px;
+  margin-top: -22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--divider, rgba(0, 0, 0, 0.1));
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  background: var(--surface-background, #fff);
+  color: var(--secondary-icon, #65676b);
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.08);
+  opacity: 0.75;
+  cursor: pointer;
+  transition: opacity 0.15s, width 0.15s;
+}
+#sl-msgr-list-toggle:hover,
+#sl-msgr-list-toggle:focus-visible { opacity: 1; width: 18px; }
+#sl-msgr-list-toggle svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; }
+html[data-sl-list-hidden] #sl-msgr-list-toggle svg { transform: rotate(180deg); }
+/* The photo viewer covers the chats; the handle would float over it. */
+html[data-fmess-media] #sl-msgr-list-toggle { display: none; }

@@ -7,6 +7,7 @@ import type {
   GeminiModelChoice,
   GeminiAutoStrategy,
   KeywordGroup,
+  MessengerThemeId,
 } from '../../common/types';
 import { DEFAULT_SETTINGS, GEMINI_API_MODELS, STORAGE_KEYS } from '../../common/types';
 import { newKeywordGroupId } from '../../common/storage';
@@ -623,6 +624,8 @@ export default function Settings({ settings, onSave }: SettingsProps) {
   const [ignoreUrlError, setIgnoreUrlError] = useState<string | null>(null);
   const [ignoreUrlAutoSaveStatus, setIgnoreUrlAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const ignoreUrlAutoSaveSkipFirst = useRef(true);
+  const [messengerAutoSaveStatus, setMessengerAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const messengerAutoSaveSkipFirst = useRef(true);
   const [keywordInput, setKeywordInput] = useState('');
   const [noteAutoSaveStatus, setNoteAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const noteAutoSaveSkipFirst = useRef(true);
@@ -815,6 +818,25 @@ export default function Settings({ settings, onSave }: SettingsProps) {
     }, 400);
     return () => clearTimeout(timer);
   }, [localSettings.blockerIgnoredUrls]);
+
+  // Auto-save the Messenger look so an open Messenger tab restyles live.
+  useEffect(() => {
+    if (messengerAutoSaveSkipFirst.current) {
+      messengerAutoSaveSkipFirst.current = false;
+      return;
+    }
+    setMessengerAutoSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      await onSaveRef.current({
+        messengerFocusMode: localSettings.messengerFocusMode,
+        messengerTheme: localSettings.messengerTheme,
+        messengerHideChatList: localSettings.messengerHideChatList,
+      });
+      setMessengerAutoSaveStatus('saved');
+      setTimeout(() => setMessengerAutoSaveStatus('idle'), 1500);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [localSettings.messengerFocusMode, localSettings.messengerTheme, localSettings.messengerHideChatList]);
 
   async function handleSave() {
     setSaving(true);
@@ -1327,6 +1349,58 @@ export default function Settings({ settings, onSave }: SettingsProps) {
               })}
             </tbody>
           </table>
+        </div>
+
+        <div className="card-flat" style={{ padding: '4px 28px', marginTop: 16 }}>
+          <Row
+            label="Messenger focus mode"
+            hint={
+              <>
+                Hides the Facebook top bar (Home, Reels, notifications) on{' '}
+                <span className="mono" style={{ fontSize: 12 }}>facebook.com/messages</span> so only your chats stay on screen.
+                {messengerAutoSaveStatus === 'saving' && <> · <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>SAVING…</span></>}
+                {messengerAutoSaveStatus === 'saved' && <> · <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>AUTO-SAVED</span></>}
+              </>
+            }
+          >
+            <ToggleControl
+              on={localSettings.messengerFocusMode}
+              onClick={() => toggle('messengerFocusMode')}
+              ariaLabel="Messenger focus mode"
+            />
+          </Row>
+          <Row
+            label="Hide chat list"
+            hint="Folds the chat list away so only the open chat stays. A handle on the chat's left edge (or the Zalo rail's chats button) brings it back."
+          >
+            <ToggleControl
+              on={localSettings.messengerHideChatList}
+              onClick={() => toggle('messengerHideChatList')}
+              ariaLabel="Hide Messenger chat list"
+            />
+          </Row>
+          <Row
+            label="Messenger theme"
+            hint={
+              <>
+                Restyles Messenger chats. Zalo (always light) is ported from{' '}
+                <a href="https://github.com/toanbku/fmess" target="_blank" rel="noopener noreferrer">fMess</a> (MIT).
+                CLI turns Messenger into a dark, text-only terminal: each chat is a folder you <span className="mono" style={{ fontSize: 12 }}>cd</span> into, with no pictures or icons.
+                It also works with the keyboard alone: type to write, Esc for the chat list, j / k to move, Enter to open, / to search, ? for all keys.
+              </>
+            }
+            last
+          >
+            <StyledSelect<MessengerThemeId>
+              value={localSettings.messengerTheme}
+              onChange={v => update('messengerTheme', v)}
+              options={[
+                { value: 'default', label: 'Default (Messenger)' },
+                { value: 'zalo', label: 'Zalo' },
+                { value: 'cli', label: 'CLI (terminal, text only)' },
+              ]}
+            />
+          </Row>
         </div>
 
         {/* Ignored URLs -- pages where the blocker should not run at all.

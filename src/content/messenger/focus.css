@@ -1,0 +1,47 @@
+/*
+ * Messenger focus mode: no Facebook top bar inside the chats. Adapted from
+ * fMess 07-layout.js (MIT, https://github.com/toanbku/fmess).
+ */
+
+html[data-fmess-chats] div[role="banner"] { display: none !important; }
+
+/* Facebook reserves room for the bar through --header-height, and themed
+   subtrees declare it again, so it is overridden on every element. */
+html[data-fmess-chats], html[data-fmess-chats] * { --header-height: 0px !important; }
+
+/* The photo/video viewer centres its own top bar in a band made for the
+   56px Facebook bar; without it the buttons sit off the top. */
+html[data-fmess-media] [role="dialog"], html[data-fmess-media] [role="dialog"] * { --header-height: 56px !important; }
+
+/* Facebook shows the viewer's close button in the hidden top bar and keeps
+   the viewer's own copy transparent; show that copy (without the logo). */
+html[data-fmess-media] [role="dialog"] > div:has(> a[href="/"]) {
+  opacity: 1 !important;
+  z-index: 2147483000 !important;
+}
+html[data-fmess-media] [role="dialog"] > div:has(> a[href="/"]) > a[href="/"] { display: none !important; }
+
+#sl-msgr-back {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--secondary-button-background, #e4e6eb);
+  color: var(--primary-button-background, #0866ff);
+  text-decoration: none;
+  cursor: pointer;
+}
+#sl-msgr-back:hover { filter: brightness(0.92); }
+#sl-msgr-back svg { width: 20px; height: 20px; fill: currentColor; }
+#sl-msgr-back.sl-msgr-back-floating {
+  position: fixed;
+  z-index: 2147483000;
+  top: 8px;
+  left: 8px;
+  margin: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}

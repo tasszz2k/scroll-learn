@@ -1,0 +1,36 @@
+/*
+ * Layout fMess applies under every theme (from its 07-layout.js and
+ * 20-theme.js, MIT, https://github.com/toanbku/fmess). Its themes are written
+ * against this base, so it ships with them rather than with focus mode.
+ */
+
+/* A browser tab has no title-bar strip to draw in; themes collapse it at 0. */
+:root { --fmess-title-bar: 0px; }
+
+/* The panes sit edge to edge with a divider instead of Facebook's inset,
+   rounded cards. */
+html[data-fmess-chats], html[data-fmess-chats] * {
+  --messenger-card-spacing: 0px !important;
+  --messenger-card-corner-radius: 0px !important;
+  --messenger-card-box-shadow: none !important;
+}
+html[data-fmess-chats] [role="main"] { box-shadow: -1px 0 0 var(--divider, var(--card-border-color)); }
+html[data-fmess-chats] body { background: var(--surface-background) !important; }
+html[data-fmess-chats] [role="main"] [data-fmess-ui="details"] {
+  box-shadow: -1px 0 0 var(--divider, var(--card-border-color));
+}
+
+/* fMess gets thin overlay scroll bars from the OS (11-scrollbars.js); a
+   Chrome tab with "always show scroll bars" draws wide grey tracks instead,
+   which crowd the narrow chat list. Thin, theme-tinted bars stand in. */
+html[data-fmess-chats], html[data-fmess-chats] * {
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--z-scroll, rgba(0, 0, 0, 0.2)) transparent !important;
+}
+
+/* The bar above the message box (replying, a link's preview) has fixed
+   heights made for Facebook's type; a theme's larger type overflowed them. */
+html[data-fmess-chats] [data-fmess-ui="composer-bar"],
+html[data-fmess-chats] [data-fmess-ui="composer-bar"] > div,
+html[data-fmess-chats] [data-fmess-ui="composer-bar"] > div > div { height: auto !important; }
+html[data-fmess-chats] [data-fmess-ui="composer-bar"] > div { padding-bottom: 8px !important; }

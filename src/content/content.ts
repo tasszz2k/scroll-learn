@@ -17,6 +17,7 @@ import { normalizeText } from '../common/parser';
 import { renderBackExtraHTML } from '../common/markdown';
 import { speak, stopSpeaking, isSpeechSupported } from '../common/speak';
 import { startBlocker, updateBlocker, getBlockedCount, getBlockedCounts } from './blocker';
+import { startMessengerTheme, updateMessengerTheme } from './messenger';
 
 // State
 let currentDetector: DomainDetector | null = null;
@@ -79,6 +80,8 @@ async function initialize() {
 
   // Start content blocker (independent of quiz system)
   startBlocker(settings);
+  // Messenger focus mode / theme, also independent of the quiz on/off switch.
+  startMessengerTheme(settings);
 
   // Listen for settings changes and reload
   chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -94,6 +97,7 @@ async function initialize() {
       }
       loadSettings().then(() => {
         updateBlocker(settings);
+        updateMessengerTheme(settings);
       });
     }
   });

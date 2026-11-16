@@ -86,6 +86,8 @@ export function flattenEnabledKeywords(groups: KeywordGroup[]): string[] {
   return out;
 }
 
+export type MessengerThemeId = 'default' | 'zalo' | 'cli';
+
 export interface Settings {
   showAfterNPosts: number; // Default 5
   pauseMinutesAfterQuiz: number; // Default 0
@@ -115,6 +117,11 @@ export interface Settings {
   // Used to keep the blocker out of pages that look like a feed but are not
   // (Facebook Messenger at facebook.com/messages, etc.).
   blockerIgnoredUrls: string[];
+  // Messenger (facebook.com/messages). Independent of the blocker, which is
+  // ignored on Messenger by default via blockerIgnoredUrls.
+  messengerFocusMode: boolean; // Hide Facebook's top bar inside the chats
+  messengerTheme: MessengerThemeId;
+  messengerHideChatList: boolean; // Collapse the chat list so only the open chat shows
   // Topic buckets that own the user's keywords. Source of truth -- the UI
   // edits this directly. The content blocker still reads the flat
   // `blockedKeywords` list below, which is auto-recomputed in
@@ -249,6 +256,9 @@ export const DEFAULT_SETTINGS: Settings = {
   hideInstagramStrangers: true,
   hideByKeyword: true,
   blockerIgnoredUrls: ['facebook.com/messages', 'facebook.com/marketplace/messages'],
+  messengerFocusMode: false,
+  messengerTheme: 'default',
+  messengerHideChatList: false,
   keywordGroups: [],
   blockedKeywords: [],
   keywordHits: {},
@@ -450,6 +460,8 @@ export interface SkipCardMessage {
 
 export interface OpenDashboardMessage {
   type: 'open_dashboard';
+  // Dashboard route without the '#', e.g. 'settings'.
+  hash?: string;
 }
 
 export interface OpenSidePanelMessage {

@@ -338,7 +338,7 @@ async function handleMessageAsync(message: Message): Promise<Response<unknown>> 
       return handleSkipCard(message.cardId, message.snoozeMinutes);
 
     case 'open_dashboard':
-      return handleOpenDashboard();
+      return handleOpenDashboard(message.hash);
 
     case 'open_pdf_viewer':
       return handleOpenPdfViewer(message.fileUrl);
@@ -995,9 +995,11 @@ async function handleSkipCard(cardId: string, snoozeMinutes: number): Promise<Re
 /**
  * Open the dashboard in a new tab
  */
-async function handleOpenDashboard(): Promise<Response<void>> {
+async function handleOpenDashboard(hash?: string): Promise<Response<void>> {
   try {
-    const dashboardUrl = chrome.runtime.getURL('index.html');
+    // Content scripts send this, so only accept plain route names.
+    const route = hash && /^[a-z:]+$/.test(hash) ? `#${hash}` : '';
+    const dashboardUrl = chrome.runtime.getURL('index.html') + route;
     await chrome.tabs.create({ url: dashboardUrl });
     return { ok: true };
   } catch (error) {

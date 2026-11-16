@@ -1,9 +1,10 @@
 /* eslint-disable react-refresh/only-export-components -- popup.tsx is the entry point, not a Vite-HMR module */
 import { createRoot } from 'react-dom/client';
 import { useState, useEffect, useCallback } from 'react';
-import type { Card, Deck, Stats, Settings, UpdateInfo } from '../common/types';
+import type { Card, Deck, MessengerThemeId, Stats, Settings, UpdateInfo } from '../common/types';
 import type { BlockedCounts } from '../content/blocker';
 import { isExtensionHost, isHostAllowed, parseRegexEntry } from '../common/allowlist';
+import { isMessengerRoute } from '../common/messengerRoute';
 import DeckDropdown from '../dashboard/components/DeckDropdown';
 import './popup.css';
 
@@ -29,6 +30,8 @@ interface PopupState {
   isLocalPdf: boolean;
   /** Whether the user has granted "Allow access to file URLs". */
   fileAccessAllowed: boolean;
+  /** Active tab is Messenger (facebook.com/messages/...). */
+  isMessenger: boolean;
 }
 
 /** Promisified wrapper for the callback-style file-scheme access check. */
@@ -144,6 +147,7 @@ function Popup() {
     fileUrl: '',
     isLocalPdf: false,
     fileAccessAllowed: false,
+    isMessenger: false,
   });
 
   // Transient feedback for the "save copied text" action on file:// PDFs.
@@ -157,6 +161,7 @@ function Popup() {
       const isFileUrl = url?.protocol === 'file:';
       const fileUrl = isFileUrl ? (tab?.url ?? '') : '';
       const isLocalPdf = isFileUrl && /\.pdf$/i.test(url?.pathname ?? '');
+      const isMessenger = url ? isMessengerRoute(url.hostname, url.pathname) : false;
       const fileAccessAllowed = await getFileSchemeAccess();
 
       const [statsResponse, settingsResponse, decksResponse, cardsResponse, updateResponse] = await Promise.all([
@@ -214,6 +219,7 @@ function Popup() {
         fileUrl,
         isLocalPdf,
         fileAccessAllowed,
+        isMessenger,
       });
     } catch (error) {
       console.error('Failed to load popup data:', error);
@@ -423,6 +429,15 @@ function Popup() {
     if (response.ok) setState(prev => ({ ...prev, settings: response.data }));
   }
 
+  async function setMessengerTheme(theme: MessengerThemeId) {
+    if (!state.settings || state.settings.messengerTheme === theme) return;
+    const response = await chrome.runtime.sendMessage({
+      type: 'set_settings',
+      settings: { messengerTheme: theme },
+    });
+    if (response?.ok) setState(prev => ({ ...prev, settings: response.data }));
+  }
+
   async function setActiveDeck(deckId: string | null) {
     const response = await chrome.runtime.sendMessage({
       type: 'set_settings',
@@ -441,7 +456,7 @@ function Popup() {
     );
   }
 
-  const { stats, settings, currentSite, decks, cardCounts, dueCounts, learnedCounts, totalDue, blockedCount, blockedCounts, updateInfo, isFileUrl, fileUrl, isLocalPdf, fileAccessAllowed } = state;
+  const { stats, settings, currentSite, decks, cardCounts, dueCounts, learnedCounts, totalDue, blockedCount, blockedCounts, updateInfo, isFileUrl, fileUrl, isLocalPdf, fileAccessAllowed, isMessenger } = state;
   const localFileCaptureOn = settings?.noteCaptureLocalFiles !== false;
   const updateAvailable = !!updateInfo?.updateAvailable;
   const currentVersion = chrome.runtime.getManifest().version;
@@ -722,6 +737,66 @@ function Popup() {
           </>
         )}
       </section>
+
+      {/* Messenger look -- only on facebook.com/messages, where it applies. */}
+      {isMessenger && settings && (
+        <section className="section">
+          <div className="section-head">
+            <span className="eyebrow">Messenger</span>
+            <span className="url">chats only</span>
+          </div>
+          <div className="site-row">
+            <div>
+              <div className="head">Focus mode</div>
+              <div className="sub">Hide the Facebook top bar and notifications.</div>
+            </div>
+            <button
+              type="button"
+              className={'switch' + (settings.messengerFocusMode ? ' on' : '')}
+              aria-pressed={settings.messengerFocusMode}
+              aria-label="Messenger focus mode"
+              onClick={() => toggleBlockingSetting('messengerFocusMode')}
+            />
+          </div>
+          <div className="site-row" style={{ marginTop: 12 }}>
+            <div>
+              <div className="head">Hide chat list</div>
+              <div className="sub">Only the open chat stays. Use the edge handle to bring it back.</div>
+            </div>
+            <button
+              type="button"
+              className={'switch' + (settings.messengerHideChatList ? ' on' : '')}
+              aria-pressed={settings.messengerHideChatList}
+              aria-label="Hide Messenger chat list"
+              onClick={() => toggleBlockingSetting('messengerHideChatList')}
+            />
+          </div>
+          <div className="site-row" style={{ marginTop: 12 }}>
+            <div>
+              <div className="head">Theme</div>
+              <div className="sub">Zalo from fMess. CLI: a text-only terminal.</div>
+            </div>
+            <div className="seg" role="radiogroup" aria-label="Messenger theme">
+              {([
+                { id: 'default', label: 'Default' },
+                { id: 'zalo', label: 'Zalo' },
+                { id: 'cli', label: 'CLI' },
+              ] as const).map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={settings.messengerTheme === opt.id}
+                  className={'seg-btn' + (settings.messengerTheme === opt.id ? ' on' : '')}
+                  onClick={() => setMessengerTheme(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Active deck */}
       <section className="section">

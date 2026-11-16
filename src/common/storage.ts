@@ -167,6 +167,8 @@ export async function getSettings(): Promise<Settings> {
   // never sees stale entries (e.g. a group flipped off but its keywords still
   // hanging around in the legacy flat list).
   merged.blockedKeywords = flattenEnabledKeywords(keywordGroups);
+  // The text-only Messenger theme was renamed from "mono" to "cli".
+  if ((merged.messengerTheme as string) === 'mono') merged.messengerTheme = 'cli';
   return merged;
 }
 

@@ -1,0 +1,406 @@
+/*
+ * CLI: Messenger as a terminal. Dark, one monospace font, text only. The
+ * chat list reads like `ls` in ~/chats, each chat a folder you `cd` into;
+ * the open chat's header is its path. Their lines are plain output, yours
+ * are in prompt green; the composer is a `$` prompt. No pictures, no icons,
+ * no bubbles. Buttons that still need to work are [bracketed] text.
+ * Emoji are grey; photos, GIFs and stickers sent in a chat keep their
+ * colours.
+ *
+ * Written for ScrollLearn on top of fMess's theme hooks and its starter
+ * theme's variable map (MIT, https://github.com/toanbku/fmess). Structural
+ * selectors are the ones fMess documents in .claude/skills/fmess-theme/
+ * hooks.md. Always dark: palette.ts copies Facebook's dark palette over its
+ * light one, so panels this file does not name (menus, dialogs) are dark
+ * too.
+ */
+
+:root {
+  --t-bg: #0e0e0e;
+  --t-raise: #171717;
+  --t-line: #262626;
+  --t-text: #d4d4d4;
+  --t-dim: #737373;
+  --t-green: #5fd068;
+  --t-hover: rgba(255, 255, 255, 0.04);
+  --t-selected: rgba(255, 255, 255, 0.08);
+  --t-font: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace,
+    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  --z-scroll: rgba(255, 255, 255, 0.15); /* read by fmessBase.css's thin scroll bars */
+}
+
+/* Facebook declares its colours again on its mode islands and on each
+   chat's colour host (a chat theme someone picked), hence four selectors. */
+:root,
+.__fb-dark-mode,
+.__fb-light-mode,
+[style*="--chat-outgoing-message-bubble-background-color"] {
+  --accent: var(--t-green) !important;
+  --primary-button-background: var(--t-green) !important;
+  --primary-button-text: var(--t-bg) !important;
+  --mwp-primary-theme-color: var(--t-green) !important;
+  --primary-deemphasized-button-background: transparent !important;
+  --primary-deemphasized-button-text: var(--t-green) !important;
+  --secondary-button-background: transparent !important;
+  --text-highlight: rgba(95, 208, 104, 0.3) !important;
+  --primary-text: var(--t-text) !important;
+  --secondary-text: var(--t-dim) !important;
+  --placeholder-text: var(--t-dim) !important;
+  --primary-icon: var(--t-dim) !important;
+  --secondary-icon: var(--t-dim) !important;
+  --placeholder-icon: var(--t-dim) !important;
+  --blue-link: var(--t-text) !important;
+  --positive: var(--t-green) !important;
+  --media-inner-border: transparent !important;
+  --divider: var(--t-line) !important;
+  --web-wash: var(--t-bg) !important;
+  --surface-background: var(--t-bg) !important;
+  --card-background: var(--t-raise) !important;
+  --messenger-card-background: var(--t-bg) !important;
+  --popover-background: var(--t-raise) !important;
+  --comment-background: transparent !important;
+  --input-background: transparent !important;
+  --hover-overlay: var(--t-hover) !important;
+  --notification-badge: var(--t-green) !important;
+
+  /* No bubbles: lines of output. */
+  --chat-bubble-border-radius: 0px !important;
+  --chat-bubble-padding-vertical: 2px !important;
+  --chat-bubble-padding-horizontal: 0px !important;
+  --chat-outgoing-message-bubble-background-color: transparent !important;
+  --chat-outgoing-message-background-gradient: initial !important;
+  --chat-message-text-color: var(--t-green) !important;
+  --chat-incoming-message-bubble-background-color: transparent !important;
+  --chat-incoming-message-text-color: var(--t-text) !important;
+  --chat-admin-text-color: var(--t-dim) !important;
+  --chat-replied-message-background-color: transparent !important;
+  --chat-composer-background-color: var(--t-bg) !important;
+  --chat-composer-input-background-color: transparent !important;
+  --chat-composer-button-color: var(--t-dim) !important;
+  --chat-composer-caret-color: var(--t-green) !important;
+  --chat-edit-message-overlay-color: var(--t-hover) !important;
+  --chat-scrollbar-thumb-color: rgba(255, 255, 255, 0.15) !important;
+  --mwp-header-background-color: var(--t-bg) !important;
+  --mwp-header-button-color: var(--t-dim) !important;
+  --mwp-header-text-color: var(--t-text) !important;
+  --mwp-subheader-text-color: var(--t-dim) !important;
+  --mwp-message-row-background: transparent !important;
+  --reaction-pill-background-color: var(--t-raise) !important;
+  --reaction-pill-multireact-selected-color: var(--t-selected) !important;
+}
+
+/* One monospace font everywhere in the chats (emoji fonts last, so text
+   emoji still have a glyph). */
+html[data-fmess-chats] body,
+html[data-fmess-chats] :is(div, span, a, p, h1, h2, h3, h4, h5, h6, li, input, textarea, button, label) {
+  font-family: var(--t-font) !important;
+  letter-spacing: normal !important;
+}
+html[data-fmess-chats] ::selection {
+  background: rgba(95, 208, 104, 0.3);
+}
+
+/* ---- No pictures, no icons ---- */
+
+/* People's pictures (avatars.ts tags them) and seen receipts. Hidden, not
+   removed, so the layout Facebook measures around them stays put. */
+[data-fmess-avatar="icon"],
+[data-fmess-avatar="dot"] {
+  visibility: hidden !important;
+}
+/* Facebook's icons are SVGs without a picture inside. They are hidden
+   everywhere outside the message log (so video and voice players in a
+   message keep their controls) and the composer (which gets labels). */
+[data-fmess-list] svg:not(:has(image)),
+[role="main"] svg:not(:has(image)):not([role="log"] *):not([data-fmess-ui="composer"] *),
+[data-fmess-ui="composer"] [role="button"] svg:not(:has(image)) {
+  opacity: 0 !important;
+}
+
+/* Emoji in grey. Facebook draws most emoji as emoji.php pictures (names,
+   messages, reactions, the picker); any left as text ask for the plain
+   text glyph where the font has one. */
+html[data-fmess-chats] img[src*="emoji.php"],
+[data-fmess-ui="reactions"] img {
+  filter: grayscale(1) !important;
+}
+html[data-fmess-chats] body {
+  font-variant-emoji: text;
+}
+
+/* ---- [bracketed] text where a button must stay usable ---- */
+
+[data-fmess-ui="audio-call"] { --t-label: "[call]"; }
+[data-fmess-ui="video-call"] { --t-label: "[video]"; }
+[data-fmess-ui="info"] { --t-label: "[info]"; }
+[data-fmess-ui="send"] { --t-label: "[send]"; }
+[data-fmess-ui="list-menu"] { --t-label: "[more]"; }
+[data-fmess-list] a[href="/messages/new/"] { --t-label: "[new]"; }
+[data-fmess-ui="composer-bar"] [role="button"] { --t-label: "[cancel]"; }
+
+:is(
+    [data-fmess-ui="audio-call"],
+    [data-fmess-ui="video-call"],
+    [data-fmess-ui="info"],
+    [data-fmess-ui="send"],
+    [data-fmess-ui="list-menu"],
+    [data-fmess-list] a[href="/messages/new/"],
+    [data-fmess-ui="composer-bar"] [role="button"]
+  ) {
+  position: relative !important;
+}
+:is(
+    [data-fmess-ui="audio-call"],
+    [data-fmess-ui="video-call"],
+    [data-fmess-ui="info"],
+    [data-fmess-ui="send"],
+    [data-fmess-ui="list-menu"],
+    [data-fmess-list] a[href="/messages/new/"],
+    [data-fmess-ui="composer-bar"] [role="button"]
+  )::after {
+  content: var(--t-label);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 12px/1 var(--t-font);
+  color: var(--t-dim);
+  white-space: nowrap;
+  pointer-events: none;
+}
+:is(
+    [data-fmess-ui="audio-call"],
+    [data-fmess-ui="video-call"],
+    [data-fmess-ui="info"],
+    [data-fmess-ui="send"],
+    [data-fmess-ui="list-menu"],
+    [data-fmess-list] a[href="/messages/new/"],
+    [data-fmess-ui="composer-bar"] [role="button"]
+  ):hover::after {
+  color: var(--t-green);
+}
+/* Composer tools a terminal has no use for. Photos can still be pasted or
+   dropped onto the chat. */
+:is(
+    [data-fmess-ui="voice-clip"],
+    [data-fmess-ui="attach"],
+    [data-fmess-ui="sticker"],
+    [data-fmess-ui="gif"],
+    [data-fmess-ui="emoji"],
+    [data-fmess-ui="like"],
+    [data-fmess-ui="more-actions"]
+  ) {
+  display: none !important;
+}
+
+/* ---- Chat: terminal output ---- */
+
+[role="main"] [data-mw-file-dropzone] {
+  background-color: var(--t-bg) !important;
+}
+[data-mw-file-dropzone] [style*="background-image"]:has([role="log"]) {
+  background: transparent !important;
+}
+[role="main"] [data-message-id] [dir="auto"] {
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+}
+[role="main"] [data-message-id] [role="presentation"] {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+[data-scope="messages_table"] h4 span {
+  color: var(--t-dim) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+[role="main"] [data-message-id] blockquote {
+  --secondary-text-on-media: var(--t-dim) !important;
+  --chat-text-blockquote-color-text-primary-media: var(--t-dim) !important;
+}
+
+/* Header: the chat's path, ~/chats/<name>. */
+[data-fmess-ui="chat-header"] {
+  border-bottom: 1px solid var(--t-line) !important;
+  box-shadow: none !important;
+}
+[data-fmess-ui="chat-header"] :is(h1, h2):not(:is(h1, h2) *) {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+[data-fmess-ui="chat-header"] :is(h1, h2):not(:is(h1, h2) *)::before {
+  content: "~/chats/";
+  color: var(--t-green);
+  font-weight: 400;
+}
+[data-fmess-ui="chat-header"] a[role="link"] > div > div > div:first-child {
+  display: none !important;
+}
+
+/* Composer: a `$` prompt in front of the text field. */
+[data-fmess-ui="composer"] {
+  border-top: 1px solid var(--t-line) !important;
+}
+[data-fmess-ui="composer"] > :has([role="textbox"]) {
+  position: relative !important;
+  padding-left: 2ch !important;
+}
+[data-fmess-ui="composer"] > :has([role="textbox"])::before {
+  content: "$";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font: 600 13px/1 var(--t-font);
+  color: var(--t-green);
+  pointer-events: none;
+}
+[data-fmess-ui="composer"] [role="textbox"] {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  color: var(--t-text) !important;
+}
+/* Facebook's "Aa" placeholder, replaced by a hint. */
+[data-fmess-ui="composer"] [role="textbox"] + div[aria-hidden="true"] > div {
+  font-size: 0 !important;
+}
+[data-fmess-ui="composer"] [role="textbox"] + div[aria-hidden="true"] > div::after {
+  content: "type a message   Enter send   Esc chats   ? keys";
+  white-space: pre;
+  font: 13px/1.5 var(--t-font);
+  color: var(--t-dim);
+}
+
+[role="main"] [data-fmess-ui="details"] {
+  border-left: 1px solid var(--t-line) !important;
+  box-shadow: none !important;
+}
+
+/* The key help (`?`), drawn by keyboard.ts. */
+#sl-msgr-keys {
+  position: fixed;
+  z-index: 2147483000;
+  right: 24px;
+  bottom: 96px;
+  min-width: 320px;
+  padding: 12px 16px;
+  background: var(--t-raise);
+  border: 1px solid var(--t-line);
+  font: 12.5px/1.7 var(--t-font);
+  color: var(--t-text);
+  white-space: pre;
+}
+#sl-msgr-keys .sl-keys-title {
+  color: var(--t-green);
+  margin-bottom: 4px;
+}
+#sl-msgr-keys .sl-keys-k {
+  display: inline-block;
+  min-width: 15ch;
+  color: var(--t-green);
+}
+#sl-msgr-keys .sl-keys-foot {
+  margin-top: 4px;
+  color: var(--t-dim);
+}
+
+/* ---- Chat list: `ls` of ~/chats ---- */
+
+[data-fmess-list] {
+  background: var(--t-bg) !important;
+  --surface-background: var(--t-bg) !important;
+  --messenger-card-background: var(--t-bg) !important;
+  border-right: 1px solid var(--t-line) !important;
+}
+/* "Chats" becomes the prompt that lists them. */
+[data-fmess-list] h1,
+[data-fmess-list] h1 * {
+  font-size: 0 !important;
+}
+[data-fmess-list] h1::before {
+  content: "~/chats";
+  font: 600 13px/20px var(--t-font);
+  color: var(--t-green);
+}
+[data-fmess-list] h1::after {
+  content: " $ ls";
+  font: 13px/20px var(--t-font);
+  color: var(--t-text);
+  white-space: pre;
+}
+[data-fmess-list] label:has(input) {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--t-line) !important;
+}
+[data-fmess-list] input {
+  font-size: 13px !important;
+  color: var(--t-text) !important;
+}
+[data-fmess-list] [role="tablist"] [role="tab"] {
+  font-size: 12px !important;
+  color: var(--t-dim) !important;
+}
+[data-fmess-list] [role="tablist"] [role="tab"][aria-selected="true"] {
+  color: var(--t-green) !important;
+}
+[data-fmess-list] [role="tablist"] [role="tab"][aria-selected="true"]::before { content: "["; }
+[data-fmess-list] [role="tablist"] [role="tab"][aria-selected="true"]::after { content: "]"; }
+
+/* Rows: `cd <name>`, one line each. */
+[data-fmess-list] [role="row"] a[role="link"] {
+  border-radius: 0 !important;
+  margin: 0 8px !important;
+}
+[data-fmess-list] [role="row"] a[role="link"] > div {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  min-height: 0 !important;
+}
+[data-fmess-list] [role="row"] a[role="link"]:hover {
+  background: var(--t-hover) !important;
+}
+[data-fmess-list] [role="row"] a[role="link"][aria-current="page"] {
+  background: var(--t-selected) !important;
+}
+[data-fmess-list] [role="row"] a[role="link"] > div > div > div:first-child {
+  display: none !important;
+}
+[data-fmess-list] [role="row"] a[role="link"] > div > div::before {
+  content: "cd";
+  flex: none;
+  align-self: center;
+  width: 3ch;
+  font: 13px/20px var(--t-font);
+  color: var(--t-dim);
+}
+[data-fmess-list] [role="row"] a[role="link"][aria-current="page"] > div > div::before {
+  color: var(--t-green);
+}
+/* The keyboard cursor (keyboard.ts moves real focus between the rows). */
+[data-fmess-list] [role="row"] a[role="link"]:focus-visible {
+  outline: none !important;
+  background: var(--t-selected) !important;
+  box-shadow: inset 2px 0 0 var(--t-green) !important;
+}
+[data-fmess-list] [role="row"] a[role="link"]:focus-visible > div > div::before {
+  content: ">";
+  color: var(--t-green);
+}
+[data-fmess-list] input:focus {
+  outline: none !important;
+}
+[data-fmess-list] label:has(input:focus) {
+  box-shadow: inset 0 0 0 1px var(--t-green) !important;
+}
+[data-fmess-list] [role="row"] a[role="link"] span[dir="auto"] {
+  font-size: 13px !important;
+  line-height: 20px !important;
+}
+/* The second line (preview, time) and the 8px gap before it: the name is
+   enough. Unread chats stay bold, as Messenger draws them. */
+[data-fmess-list] [role="row"] a[role="link"] div[style*="height: 8px"],
+[data-fmess-list] [role="row"] a[role="link"] div[style*="height: 8px"] + div {
+  display: none !important;
+}

@@ -443,6 +443,29 @@ button.popup-version {
 .switch.on { background: var(--clay); }
 .switch.on::after { left: 18px; }
 
+/* Segmented choice (Messenger theme) */
+.seg {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border: 1px solid var(--rule-2);
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+.seg-btn {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-3);
+  font: 500 12px var(--font-sans);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.seg-btn:hover { color: var(--ink); }
+.seg-btn.on { background: var(--clay); color: #FFF8F2; }
+.seg-btn:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+
 /* ----------------------------------------------------------------
  * Quick actions — pair grid
  * ---------------------------------------------------------------- */
